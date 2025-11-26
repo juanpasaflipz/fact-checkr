@@ -1,8 +1,9 @@
-#!/bin/bash
+#!/bin/sh
 # Railway startup script
 # Railway sets $PORT automatically
 
-set -e  # Exit on error
+# Don't exit on error immediately - we want to see what's failing
+set -u  # Treat unset vars as error
 
 PORT=${PORT:-8000}
 
@@ -10,23 +11,43 @@ echo "=========================================="
 echo "Starting FactCheckr API on port ${PORT}..."
 echo "=========================================="
 
+echo "Environment check:"
+echo "PORT=${PORT}"
+echo "DATABASE_URL=${DATABASE_URL:-NOT SET}"
+echo ""
+
+echo "Runtime info:"
+python --version || true
+pip --version || true
+echo "Checking installed packages..."
+pip show fastapi uvicorn gunicorn || true
+
 # Test if main.py can be imported
+echo ""
 echo "Testing app import..."
-python -c "import main; print('✅ App module imported successfully')" || {
+if python -c "import main; print('✅ App module imported successfully')" 2>&1; then
+    echo "✅ App import successful"
+else
     echo "❌ Failed to import app module"
-    exit 1
-}
+    echo "Attempting to start anyway..."
+fi
 
-echo "Starting gunicorn..."
+echo ""
+echo "Starting gunicorn on 0.0.0.0:${PORT}..."
+echo "Health check endpoint: http://0.0.0.0:${PORT}/health"
+echo ""
 
-# Run gunicorn with error handling
+# Run gunicorn with error handling and verbose logging
+# --worker-class: Use uvicorn workers for async support
 exec gunicorn main:app \
-    -w 2 \
-    -k uvicorn.workers.UvicornWorker \
-    --bind "0.0.0.0:${PORT}" \
-    --timeout 120 \
-    --access-logfile - \
-    --error-logfile - \
-    --log-level info \
-    --preload
+  --workers 2 \
+  --worker-class uvicorn.workers.UvicornWorker \
+  --bind "0.0.0.0:${PORT}" \
+  --timeout 120 \
+  --keepalive 5 \
+  --access-logfile - \
+  --error-logfile - \
+  --log-level info \
+  --capture-output \
+  --enable-stdio-inheritance
 

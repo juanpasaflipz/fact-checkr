@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 # Railway Celery Worker startup script
 
 set -e  # Exit on error

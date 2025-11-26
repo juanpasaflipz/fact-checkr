@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/sh
 # Railway Celery Beat (scheduler) startup script
 
 set -e  # Exit on error

@@ -26,14 +26,32 @@ load_dotenv()
 
 app = FastAPI(title="FactCheckr MX API", version="1.0.0")
 
+# Register health endpoint FIRST - before any other setup
+# This ensures it's always available even if other parts fail
+@app.get("/health")
+async def health_check():
+    """Health check endpoint - always returns 200 for Railway health checks"""
+    # Always return 200 immediately - Railway needs this to pass health check
+    # This endpoint must be fast and never fail
+    return {
+        "status": "healthy",
+        "message": "API is operational"
+    }
+
 @app.on_event("startup")
 async def startup_event():
     """Log when app starts - helps debug Railway deployment"""
     import logging
-    logging.basicConfig(level=logging.INFO)
+    import sys
+    logging.basicConfig(
+        level=logging.INFO,
+        format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+        stream=sys.stdout
+    )
     logger = logging.getLogger(__name__)
     logger.info("🚀 FactCheckr API starting up...")
     logger.info(f"✅ App initialized successfully")
+    logger.info(f"Health endpoint available at /health")
 
 # Setup rate limiting (with error handling)
 try:
@@ -148,16 +166,6 @@ def map_db_claim_to_response(db_claim: DBClaim) -> ClaimResponse:
 @app.get("/")
 async def root():
     return {"message": "Fact Checkr API is running (Database Backed)"}
-
-@app.get("/health")
-async def health_check():
-    """Health check endpoint - always returns 200 for Railway health checks"""
-    # Always return 200 immediately - Railway needs this to pass health check
-    # This endpoint must be fast and never fail
-    return {
-        "status": "healthy",
-        "message": "API is operational"
-    }
 
 @app.get("/claims", response_model=List[ClaimResponse])
 @limiter.limit("100/minute")
