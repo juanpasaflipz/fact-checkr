@@ -19,11 +19,8 @@ COPY . .
 # Create logs directory
 RUN mkdir -p logs
 
-# Expose port (Railway will map to $PORT dynamically)
-EXPOSE 8000
-
-# Health check (Railway handles this externally)
-# HEALTHCHECK removed - Railway uses its own health check
+# Railway handles port mapping automatically - no EXPOSE needed
+# Railway sets $PORT environment variable at runtime
 
 # Run with gunicorn for production
 # Railway sets $PORT automatically - use it in the bind address
