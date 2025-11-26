@@ -14,20 +14,34 @@ from app.rate_limit import limiter, setup_rate_limiting
 from app.auth import get_optional_user, create_access_token
 from datetime import timedelta
 
-# Import routers
-from app.routers import auth, subscriptions, usage, whatsapp, telegraph
+# Import routers (with error handling)
+try:
+    from app.routers import auth, subscriptions, usage, whatsapp, telegraph
+    ROUTERS_AVAILABLE = True
+except ImportError as e:
+    print(f"Warning: Some routers not available: {e}")
+    ROUTERS_AVAILABLE = False
 
 load_dotenv()
 
 app = FastAPI(title="FactCheckr MX API", version="1.0.0")
-setup_rate_limiting(app)
 
-# Register routers
-app.include_router(auth.router)
-app.include_router(subscriptions.router)
-app.include_router(usage.router)
-app.include_router(whatsapp.router)
-app.include_router(telegraph.router)
+# Setup rate limiting (with error handling)
+try:
+    setup_rate_limiting(app)
+except Exception as e:
+    print(f"Warning: Rate limiting setup failed: {e}")
+
+# Register routers (only if available)
+if ROUTERS_AVAILABLE:
+    try:
+        app.include_router(auth.router)
+        app.include_router(subscriptions.router)
+        app.include_router(usage.router)
+        app.include_router(whatsapp.router)
+        app.include_router(telegraph.router)
+    except Exception as e:
+        print(f"Warning: Failed to register some routers: {e}")
 
 # CORS middleware - configurable via environment variable
 cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
