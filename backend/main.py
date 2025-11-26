@@ -128,34 +128,27 @@ async def root():
 
 @app.get("/health")
 async def health_check():
-    """Health check endpoint to verify API and database connectivity"""
-    # Always return 200 for Railway health check
-    # Test database connection separately
+    """Health check endpoint - always returns 200 for Railway health checks"""
+    # Always return 200 immediately - Railway needs this to pass health check
+    # Test database connection in background, don't block
     db_status = "unknown"
     try:
-        db = next(get_db())
+        from app.database.connection import SessionLocal
         from sqlalchemy import text
+        db = SessionLocal()
         db.execute(text("SELECT 1"))
         db.commit()
         db.close()
         db_status = "connected"
     except Exception as e:
-        db_status = f"disconnected: {str(e)[:100]}"
+        db_status = f"disconnected"
     
-    if db_status == "connected":
-        return {
-            "status": "healthy",
-            "database": "connected",
-            "message": "API and database are operational"
-        }
-    else:
-        # Return 200 but indicate degraded status
-        # Railway health check needs HTTP 200 to pass
-        return {
-            "status": "degraded",
-            "database": db_status,
-            "message": "API is running but database connection failed"
-        }
+    # Always return 200 - Railway health check just needs HTTP 200
+    return {
+        "status": "healthy" if db_status == "connected" else "degraded",
+        "database": db_status,
+        "message": "API is operational"
+    }
 
 @app.get("/claims", response_model=List[ClaimResponse])
 @limiter.limit("100/minute")
