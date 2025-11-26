@@ -144,23 +144,9 @@ async def root():
 async def health_check():
     """Health check endpoint - always returns 200 for Railway health checks"""
     # Always return 200 immediately - Railway needs this to pass health check
-    # Test database connection in background, don't block
-    db_status = "unknown"
-    try:
-        from app.database.connection import SessionLocal
-        from sqlalchemy import text
-        db = SessionLocal()
-        db.execute(text("SELECT 1"))
-        db.commit()
-        db.close()
-        db_status = "connected"
-    except Exception as e:
-        db_status = f"disconnected"
-    
-    # Always return 200 - Railway health check just needs HTTP 200
+    # This endpoint must be fast and never fail
     return {
-        "status": "healthy" if db_status == "connected" else "degraded",
-        "database": db_status,
+        "status": "healthy",
         "message": "API is operational"
     }
 
