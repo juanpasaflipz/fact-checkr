@@ -15,6 +15,8 @@ DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://localhost/factcheckr")
 
 # Configure connection pooling for Neon
 # Optimized for Neon's pooled connections (pooler endpoint)
+# Configure connection pooling for Neon
+# Optimized for Neon's pooled connections (pooler endpoint)
 engine = create_engine(
     DATABASE_URL,
     pool_size=3,
