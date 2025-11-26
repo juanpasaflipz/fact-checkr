@@ -1,26 +1,27 @@
 'use client';
 
-import { useState } from 'react';
+import { usePathname } from 'next/navigation';
+import Link from 'next/link';
 
 const menuItems = [
-  { id: 'inicio', label: 'Inicio', icon: 'Home' },
-  { id: 'tendencias', label: 'Tendencias', icon: 'TrendingUp' },
-  { id: 'temas', label: 'Temas', icon: 'Hash' },
-  { id: 'fuentes', label: 'Fuentes', icon: 'Folder' },
-  { id: 'estadisticas', label: 'Estadísticas', icon: 'BarChart3' },
+  { id: 'inicio', label: 'Inicio', icon: 'Home', path: '/' },
+  { id: 'tendencias', label: 'Tendencias', icon: 'TrendingUp', path: '/tendencias' },
+  { id: 'temas', label: 'Temas', icon: 'Hash', path: '/temas' },
+  { id: 'fuentes', label: 'Fuentes', icon: 'Folder', path: '/fuentes' },
+  { id: 'estadisticas', label: 'Estadísticas', icon: 'BarChart3', path: '/estadisticas' },
 ];
 
 export default function Sidebar() {
-  const [activeItem, setActiveItem] = useState('inicio');
+  const pathname = usePathname();
 
   return (
     <>
       {/* Desktop Sidebar */}
       <aside className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col">
-        <div className="flex flex-col flex-grow bg-white border-r border-gray-200 shadow-lg">
+        <div className="flex flex-col grow bg-white border-r border-gray-200 shadow-lg">
           {/* Logo */}
           <div className="flex items-center gap-3 px-6 py-6 border-b border-gray-100">
-            <div className="flex items-center justify-center size-10 rounded-xl bg-gradient-to-br from-[#2563EB] to-[#1e40af] shadow-lg shadow-[#2563EB]/25">
+            <div className="flex items-center justify-center size-10 rounded-xl bg-linear-to-br from-[#2563EB] to-[#1e40af] shadow-lg shadow-[#2563EB]/25">
               <div className="size-6 bg-white rounded-md flex items-center justify-center">
                 <div className="size-3 bg-[#2563EB] rounded-sm"></div>
               </div>
@@ -31,52 +32,54 @@ export default function Sidebar() {
           {/* Navigation */}
           <nav className="flex-1 px-4 py-6 space-y-2">
             {menuItems.map((item) => {
-              const isActive = activeItem === item.id;
+              const isActive = pathname === item.path;
               
               return (
-                <button
+                <Link
                   key={item.id}
-                  onClick={() => setActiveItem(item.id)}
+                  href={item.path}
                   className={`
                     w-full flex items-center gap-3 px-4 py-3 rounded-lg transition-all duration-200
                     ${isActive 
-                      ? 'bg-gradient-to-r from-[#2563EB] to-[#1e40af] text-white shadow-md shadow-[#2563EB]/20' 
+                      ? 'bg-linear-to-r from-[#2563EB] to-[#1e40af] text-white shadow-md shadow-[#2563EB]/20' 
                       : 'text-gray-600 hover:bg-[#F8F9FA] hover:text-gray-900'
                     }
                   `}
                 >
                   <Icon name={item.icon} className="size-5" />
                   <span>{item.label}</span>
-                </button>
+                </Link>
               );
             })}
           </nav>
 
           {/* Pro Version Banner */}
-          <div className="p-4 m-4 rounded-xl bg-gradient-to-br from-[#F97316] to-[#ea580c] text-white shadow-lg">
+          <div className="p-4 m-4 rounded-xl bg-linear-to-br from-[#F97316] to-[#ea580c] text-white shadow-lg">
             <p className="text-xs mb-2 font-semibold">Versión Pro</p>
             <p className="text-xs mb-3 opacity-90">
               Accede a análisis avanzados y reportes detallados
             </p>
-            <button className="w-full px-3 py-2 text-xs bg-white text-[#F97316] rounded-lg hover:bg-gray-50 transition-colors shadow-md font-medium">
-              Actualizar Plan
-            </button>
+            <Link href="/subscription">
+              <button className="w-full px-3 py-2 text-xs bg-white text-[#F97316] rounded-lg hover:bg-gray-50 transition-colors shadow-md font-medium">
+                Actualizar Plan
+              </button>
+            </Link>
           </div>
         </div>
       </aside>
 
       {/* Mobile Bottom Nav */}
       <div className="lg:hidden fixed bottom-0 inset-x-0 bg-white border-t border-gray-200 shadow-lg z-50">
-        <nav className="flex justify-around items-center px-2 py-3">
-          {menuItems.slice(0, 4).map((item) => {
-            const isActive = activeItem === item.id;
+        <nav className="flex justify-around items-center px-1 py-2">
+          {menuItems.map((item) => {
+            const isActive = pathname === item.path;
             
             return (
-              <button
+              <Link
                 key={item.id}
-                onClick={() => setActiveItem(item.id)}
+                href={item.path}
                 className={`
-                  flex flex-col items-center gap-1 px-3 py-2 rounded-lg transition-all
+                  flex flex-col items-center gap-1 px-2 py-1 rounded-lg transition-all flex-1
                   ${isActive 
                     ? 'text-[#2563EB]' 
                     : 'text-gray-500'
@@ -84,8 +87,8 @@ export default function Sidebar() {
                 `}
               >
                 <Icon name={item.icon} className="size-5" />
-                <span className="text-xs">{item.label}</span>
-              </button>
+                <span className="text-xs leading-tight">{item.label}</span>
+              </Link>
             );
           })}
         </nav>

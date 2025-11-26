@@ -43,7 +43,16 @@ async def verify_source(source_id: str):
         from app.database.models import Entity as DBEntity
         entities = await checker._extract_entities(claim_text)
         
-        # 5. Store Claim
+        # 5. Extract Topics
+        from app.database.models import Topic as DBTopic
+        # Get available topics from database
+        available_topics = db.query(DBTopic).all()
+        topics_list = [{"name": t.name, "slug": t.slug} for t in available_topics]
+        
+        # Extract topics using AI
+        topic_names = await checker._extract_topics(claim_text, topics_list)
+        
+        # 6. Store Claim
         claim = Claim(
             id=f"claim_{source.id}",
             source_id=source.id,
@@ -66,10 +75,24 @@ async def verify_source(source_id: str):
                 db.flush()
             # Note: Would need junction table for many-to-many if implementing entity-claim links
         
+        # Link topics to claim
+        from app.database.models import claim_topics
+        linked_topics = []
+        for topic_name in topic_names:
+            db_topic = db.query(DBTopic).filter(DBTopic.name == topic_name).first()
+            if db_topic:
+                # Use the relationship to link topics
+                claim.topics.append(db_topic)
+                linked_topics.append(topic_name)
+            else:
+                logger.warning(f"Topic '{topic_name}' not found in database. Skipping.")
+        
+        db.flush()
+        
         source.processed = 1 # Processed
         db.commit()
         
-        logger.info(f"Verified claim for source {source_id}: {verification.status} with {len(entities)} entities")
+        logger.info(f"Verified claim for source {source_id}: {verification.status} with {len(entities)} entities and {len(linked_topics)} topics: {linked_topics}")
         return claim.id
         
     except Exception as e:

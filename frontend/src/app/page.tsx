@@ -77,14 +77,14 @@ export default function Home() {
           }
         });
       } catch (fetchError) {
+        // Clear timeout on error
+        if (timeoutId) {
+          clearTimeout(timeoutId);
+          timeoutId = null;
+        }
+
         // Intercept AbortError immediately to prevent console logging
         if (fetchError instanceof Error && fetchError.name === 'AbortError') {
-          // Clear timeout and handle silently
-          if (timeoutId) {
-            clearTimeout(timeoutId);
-            timeoutId = null;
-          }
-          
           // Retry if we haven't exceeded limit
           if (retryCount < 2) {
             await new Promise(resolve => setTimeout(resolve, 1000 * (retryCount + 1)));
@@ -94,7 +94,53 @@ export default function Home() {
           setLoading(false);
           return;
         }
-        // Re-throw non-abort errors
+
+        // Handle network errors (backend not running, CORS, etc.)
+        // Check for various network error patterns
+        const isNetworkError = 
+          fetchError instanceof TypeError || 
+          (fetchError instanceof Error && (
+            fetchError.message?.includes('fetch') || 
+            fetchError.message?.includes('Failed to fetch') ||
+            fetchError.message?.includes('NetworkError') ||
+            fetchError.message?.includes('Network request failed') ||
+            fetchError.name === 'TypeError'
+          )) ||
+          // Handle empty error objects (common with fetch failures)
+          (fetchError && typeof fetchError === 'object' && Object.keys(fetchError).length === 0);
+        
+        if (isNetworkError) {
+          // Safely extract error message
+          let errorMessage = 'Network request failed';
+          if (fetchError instanceof Error) {
+            errorMessage = fetchError.message || fetchError.name || 'Network error';
+          } else if (typeof fetchError === 'string') {
+            errorMessage = fetchError;
+          } else if (fetchError && typeof fetchError === 'object') {
+            errorMessage = (fetchError as any).message || JSON.stringify(fetchError) || 'Unknown network error';
+          }
+          
+          const errorDetails = {
+            url,
+            baseUrl,
+            errorMessage,
+            errorType: fetchError instanceof Error ? fetchError.constructor.name : typeof fetchError,
+            troubleshooting: [
+              '1. Check if backend is running: cd backend && uvicorn main:app --reload',
+              '2. Verify API URL in .env.local: NEXT_PUBLIC_API_URL=http://localhost:8000',
+              '3. Check CORS settings in backend/.env: CORS_ORIGINS=http://localhost:3000',
+              '4. Ensure backend is accessible: curl http://localhost:8000/health'
+            ]
+          };
+          
+          console.error('Network error - Backend may not be running', errorDetails);
+          
+          // Don't retry network errors - they're likely configuration issues
+          setLoading(false);
+          return;
+        }
+
+        // Re-throw other errors
         throw fetchError;
       }
 
@@ -154,10 +200,35 @@ export default function Home() {
       }
 
       // Handle other errors
-      console.error('Error fetching claims:', error);
-
       const isNetworkError = error instanceof TypeError || 
-                            (error instanceof Error && error.message.includes('Failed to fetch'));
+                            (error instanceof Error && (
+                              error.message.includes('Failed to fetch') ||
+                              error.message.includes('fetch') ||
+                              error.message.includes('NetworkError') ||
+                              error.message.includes('Network request failed')
+                            ));
+
+      if (isNetworkError) {
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+        const currentUrl = query 
+          ? `${baseUrl}/claims/search?query=${encodeURIComponent(query)}`
+          : `${baseUrl}/claims?skip=${isLoadMore ? skip : 0}&limit=${LIMIT}`;
+        console.error('Network error - Backend may not be running:', {
+          url: currentUrl,
+          baseUrl,
+          error: errorMessage,
+          errorType: error instanceof Error ? error.constructor.name : typeof error,
+          troubleshooting: [
+            '1. Check if backend is running: cd backend && uvicorn main:app --reload',
+            '2. Verify API URL in .env.local: NEXT_PUBLIC_API_URL=http://localhost:8000',
+            '3. Check CORS settings in backend/.env: CORS_ORIGINS=http://localhost:3000',
+            '4. Ensure backend is accessible: curl http://localhost:8000/health'
+          ]
+        });
+      } else {
+        console.error('Error fetching claims:', error);
+      }
 
       if (retryCount < 2 && isNetworkError) {
         console.log(`Retrying... (attempt ${retryCount + 1}/2)`);

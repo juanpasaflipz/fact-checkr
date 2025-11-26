@@ -1,0 +1,42 @@
+# Virtual environment
+venv/
+env/
+.venv
+
+# Logs
+*.log
+logs/
+backend.log
+worker.log
+
+# Python cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Environment files
+.env
+.env.local
+
+# Test files
+test_*.py
+*_test.py
+
+# Documentation
+*.md
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+
+# Celery
+celerybeat-schedule*
+
+# Scripts (keep only what's needed)
+*.sh
+!start_workers.sh
+

@@ -1,0 +1,16 @@
+{
+	"folders": [
+		{
+			"path": "../.."
+		},
+		{
+			"path": "../../../Downloads/Redesign News Fact-Check Website"
+		}
+	],
+	"settings": {
+		"cSpell.words": [
+			"checkr",
+			"venv"
+		]
+	}
+}

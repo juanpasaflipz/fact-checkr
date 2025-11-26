@@ -4,12 +4,17 @@ from jose import JWTError, jwt
 from datetime import datetime, timedelta
 import os
 from typing import Optional
+from sqlalchemy.orm import Session
+
+from app.database.connection import get_db
+from app.database.models import User
+from app.utils import get_user_by_id
 
 SECRET_KEY = os.getenv("JWT_SECRET_KEY", "your-secret-key-change-in-production")
 ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30
+ACCESS_TOKEN_EXPIRE_MINUTES = 30 * 24 * 60  # 30 days for better UX
 
-security = HTTPBearer()
+security = HTTPBearer(auto_error=False)
 
 def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     """Create JWT access token"""
@@ -22,31 +27,58 @@ def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
     encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
     return encoded_jwt
 
-async def get_current_user(credentials: HTTPAuthorizationCredentials = Depends(security)):
-    """Verify JWT token and return user info"""
+async def get_current_user(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+    db: Session = Depends(get_db)
+):
+    """Verify JWT token and return user from database"""
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
         headers={"WWW-Authenticate": "Bearer"},
     )
+    
+    if credentials is None:
+        raise credentials_exception
+    
     try:
         payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
-        username: str = payload.get("sub")
-        if username is None:
+        user_id: int = payload.get("sub")
+        if user_id is None:
             raise credentials_exception
-        return {"username": username}
+        
+        # Get user from database
+        user = get_user_by_id(db, user_id)
+        if user is None or not user.is_active:
+            raise credentials_exception
+        
+        # Update last login
+        user.last_login = datetime.utcnow()
+        db.commit()
+        
+        return user
     except JWTError:
         raise credentials_exception
 
 # Optional dependency for protected routes
-async def get_optional_user(credentials: Optional[HTTPAuthorizationCredentials] = Depends(security)):
+async def get_optional_user(
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
+    db: Session = Depends(get_db)
+):
     """Optional authentication - returns user if token present, None otherwise"""
     if credentials is None:
         return None
     try:
         payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
-        username: str = payload.get("sub")
-        return {"username": username} if username else None
+        user_id: int = payload.get("sub")
+        if user_id is None:
+            return None
+        
+        user = get_user_by_id(db, user_id)
+        if user is None or not user.is_active:
+            return None
+        
+        return user
     except JWTError:
         return None
 

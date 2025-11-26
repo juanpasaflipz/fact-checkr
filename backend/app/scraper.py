@@ -97,6 +97,13 @@ class TwitterScraper(Scraper):
 import feedparser
 import urllib.parse
 
+# Import YouTube scraper
+try:
+    from app.scraper_youtube import YouTubeScraper
+except ImportError:
+    YouTubeScraper = None
+    print("Warning: YouTube scraper not available (missing dependencies)")
+
 class GoogleNewsScraper(Scraper):
     async def fetch_posts(self, keywords: List[str]) -> List[SocialPost]:
         posts = []

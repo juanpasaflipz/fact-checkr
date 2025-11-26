@@ -17,7 +17,7 @@ WHITELIST_SOURCES = [
 
 BLACKLIST_SOURCES = [
     "deforma.com",  # Satire
-    "youtube.com",  # Hard to parse video content
+    # "youtube.com",  # Now supported via YouTube scraper with transcription
     "tiktok.com",   # Hard to parse video content
 ]
 from app.scraper import MockScraper, TwitterScraper, GoogleNewsScraper
@@ -454,5 +454,112 @@ Return JSON format:
                 return [(e[0], e[1]) for e in entities if len(e) == 2]
             except Exception as e:
                 print(f"⚠️  Entity extraction error (OpenAI): {e}")
+        
+        return []
+    
+    async def _extract_topics(self, claim_text: str, available_topics: List[dict] = None) -> List[str]:
+        """Extract topics from claim text. Returns list of topic names that match database topics."""
+        if not self.anthropic_client and not self.openai_client:
+            return []
+        
+        # Build topics list for prompt
+        if available_topics:
+            topics_list = "\n".join([f"- {t['name']}" for t in available_topics])
+        else:
+            # Default topics if none provided
+            topics_list = """- Reforma Judicial
+- Ejecutivo
+- Legislativo
+- Economía
+- Seguridad
+- Salud
+- Educación
+- Infraestructura
+- Medio Ambiente
+- Derechos Humanos
+- Corrupción
+- Relaciones Internacionales
+- Energía
+- Migración
+- Tecnología"""
+        
+        system_prompt = """You are a topic classification system for Mexican political news.
+Classify claims into relevant topics based on Mexican political and social context.
+Return only topic names that match the provided list. If multiple topics apply, return all relevant ones."""
+        
+        user_prompt = f"""CLAIM: "{claim_text}"
+
+AVAILABLE TOPICS:
+{topics_list}
+
+INSTRUCTIONS:
+1. Classify this claim into 1-3 most relevant topics from the list above.
+2. Return only topic names that exactly match the list (case-sensitive).
+3. If no topic fits perfectly, choose the closest match.
+4. Consider the main subject: Executive actions, Legislative bills, Judicial reforms, Economy, Security, Health, Education, Infrastructure, etc.
+
+RESPONSE FORMAT (JSON only, no markdown):
+{{
+    "topics": ["Topic Name 1", "Topic Name 2"]
+}}"""
+        
+        # Try Anthropic first
+        if self.anthropic_client:
+            try:
+                response = self.anthropic_client.messages.create(
+                    model="claude-sonnet-3-5-20241022",
+                    max_tokens=200,
+                    temperature=0.2,
+                    system=system_prompt,
+                    messages=[{"role": "user", "content": user_prompt}]
+                )
+                response_text = response.content[0].text.strip()
+                
+                # Extract JSON from markdown code block if present
+                if response_text.startswith("```"):
+                    json_start = response_text.find("{")
+                    json_end = response_text.rfind("}") + 1
+                    if json_start != -1 and json_end > json_start:
+                        response_text = response_text[json_start:json_end]
+                
+                result = json.loads(response_text)
+                topics = result.get("topics", [])
+                # Ensure topics are strings and filter empty
+                return [str(t).strip() for t in topics if t and str(t).strip()]
+            except json.JSONDecodeError as e:
+                print(f"⚠️  Topic extraction JSON parse error (Anthropic): {e}")
+            except Exception as e:
+                print(f"⚠️  Topic extraction error (Anthropic): {e}")
+        
+        # Fallback to OpenAI
+        if self.openai_client:
+            try:
+                response = self.openai_client.chat.completions.create(
+                    model="gpt-4o-mini",
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt}
+                    ],
+                    max_tokens=200,
+                    temperature=0.2,
+                    response_format={"type": "json_object"}
+                )
+                response_text = response.choices[0].message.content.strip()
+                
+                # Extract JSON from markdown code block if present
+                if response_text.startswith("```"):
+                    json_start = response_text.find("{")
+                    json_end = response_text.rfind("}") + 1
+                    if json_start != -1 and json_end > json_start:
+                        response_text = response_text[json_start:json_end]
+                
+                result = json.loads(response_text)
+                topics = result.get("topics", [])
+                # Ensure topics are strings and filter empty
+                return [str(t).strip() for t in topics if t and str(t).strip()]
+            except json.JSONDecodeError as e:
+                print(f"⚠️  Topic extraction JSON parse error (OpenAI): {e}")
+            except Exception as e:
+                print(f"⚠️  Topic extraction error (OpenAI): {e}")
         
         return []

@@ -1,4 +1,5 @@
 from fastapi import FastAPI, Depends, HTTPException, Query, Request
+from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, or_, func, case
@@ -8,15 +9,25 @@ import os
 
 from app.database.connection import get_db
 from app.database.models import Claim as DBClaim, Source as DBSource, VerificationStatus as DBVerificationStatus, Topic as DBTopic, Entity as DBEntity
-from app.models import Claim as ClaimResponse, VerificationResult, SocialPost, VerificationStatus, Topic as TopicResponse
+from app.models import Claim as ClaimResponse, VerificationResult, SocialPost, VerificationStatus, Topic as TopicResponse, Source as SourceResponse
 from app.rate_limit import limiter, setup_rate_limiting
 from app.auth import get_optional_user, create_access_token
 from datetime import timedelta
+
+# Import routers
+from app.routers import auth, subscriptions, usage, whatsapp, telegraph
 
 load_dotenv()
 
 app = FastAPI(title="FactCheckr MX API", version="1.0.0")
 setup_rate_limiting(app)
+
+# Register routers
+app.include_router(auth.router)
+app.include_router(subscriptions.router)
+app.include_router(usage.router)
+app.include_router(whatsapp.router)
+app.include_router(telegraph.router)
 
 # CORS middleware - configurable via environment variable
 cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000").split(",")
@@ -27,9 +38,6 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
-
-from fastapi import Request
-from fastapi.responses import JSONResponse
 
 from sqlalchemy.exc import OperationalError, DatabaseError
 
@@ -204,17 +212,21 @@ async def search_claims(
     return [map_db_claim_to_response(c) for c in claims]
 
 @app.get("/claims/trending", response_model=List[ClaimResponse])
-async def get_trending_claims(db: Session = Depends(get_db)):
+async def get_trending_claims(
+    days: int = 7,
+    limit: int = 20,
+    db: Session = Depends(get_db)
+):
     """Get trending claims based on recency and verification status"""
     from datetime import datetime, timedelta
     
-    # Get claims from last 7 days, prioritizing verified/debunked (more engagement)
-    week_ago = datetime.utcnow() - timedelta(days=7)
+    # Get claims from specified time window
+    time_ago = datetime.utcnow() - timedelta(days=days)
     
-    # Weight: Verified and Debunked get priority (more interesting)
+    # Weight: Verified and Debunked get priority (more engagement)
     from sqlalchemy import case
     claims = db.query(DBClaim)\
-        .filter(DBClaim.created_at >= week_ago)\
+        .filter(DBClaim.created_at >= time_ago)\
         .order_by(
             desc(
                 # Prioritize verified and debunked claims
@@ -227,10 +239,242 @@ async def get_trending_claims(db: Session = Depends(get_db)):
             ),
             desc(DBClaim.created_at)  # Then by recency
         )\
-        .limit(10)\
+        .limit(limit)\
         .all()
     
     return [map_db_claim_to_response(c) for c in claims]
+
+@app.get("/trends/topics")
+async def get_trending_topics(
+    days: int = 7,
+    limit: int = 10,
+    db: Session = Depends(get_db)
+):
+    """Get trending topics with growth metrics"""
+    from datetime import datetime, timedelta
+    from app.database.models import claim_topics
+    
+    end_date = datetime.utcnow()
+    start_date = end_date - timedelta(days=days)
+    previous_start = start_date - timedelta(days=days)
+    
+    # Current period topic counts
+    current_counts = db.query(
+        DBTopic.id,
+        DBTopic.name,
+        DBTopic.slug,
+        func.count(DBClaim.id).label('current_count')
+    ).join(
+        claim_topics, DBTopic.id == claim_topics.c.topic_id
+    ).join(
+        DBClaim, DBClaim.id == claim_topics.c.claim_id
+    ).filter(
+        DBClaim.created_at >= start_date,
+        DBClaim.created_at < end_date
+    ).group_by(
+        DBTopic.id, DBTopic.name, DBTopic.slug
+    ).subquery()
+    
+    # Previous period topic counts
+    previous_counts = db.query(
+        DBTopic.id,
+        func.count(DBClaim.id).label('previous_count')
+    ).join(
+        claim_topics, DBTopic.id == claim_topics.c.topic_id
+    ).join(
+        DBClaim, DBClaim.id == claim_topics.c.claim_id
+    ).filter(
+        DBClaim.created_at >= previous_start,
+        DBClaim.created_at < start_date
+    ).group_by(
+        DBTopic.id
+    ).subquery()
+    
+    # Join and calculate growth
+    results = db.query(
+        current_counts.c.id,
+        current_counts.c.name,
+        current_counts.c.slug,
+        current_counts.c.current_count,
+        func.coalesce(previous_counts.c.previous_count, 0).label('previous_count')
+    ).outerjoin(
+        previous_counts, current_counts.c.id == previous_counts.c.id
+    ).order_by(
+        desc(current_counts.c.current_count)
+    ).limit(limit).all()
+    
+    trending_topics = []
+    for r in results:
+        growth = 0
+        if r.previous_count > 0:
+            growth = round(((r.current_count - r.previous_count) / r.previous_count) * 100)
+        elif r.current_count > 0:
+            growth = 100  # New trending topic
+        
+        trending_topics.append({
+            "id": r.id,
+            "name": r.name,
+            "slug": r.slug,
+            "claim_count": r.current_count,
+            "previous_count": r.previous_count,
+            "growth_percentage": growth,
+            "trend_up": growth > 0
+        })
+    
+    return trending_topics
+
+@app.get("/trends/entities")
+async def get_trending_entities(
+    days: int = 7,
+    limit: int = 15,
+    db: Session = Depends(get_db)
+):
+    """Get trending entities (people, institutions) with claim counts"""
+    from datetime import datetime, timedelta
+    
+    start_date = datetime.utcnow() - timedelta(days=days)
+    
+    entities = db.query(
+        DBEntity.id,
+        DBEntity.name,
+        DBEntity.entity_type,
+        func.count(DBClaim.id).label('claim_count')
+    ).join(
+        DBClaim, DBClaim.claim_text.ilike(func.concat('%', DBEntity.name, '%'))
+    ).filter(
+        DBClaim.created_at >= start_date
+    ).group_by(
+        DBEntity.id, DBEntity.name, DBEntity.entity_type
+    ).order_by(
+        func.count(DBClaim.id).desc()
+    ).limit(limit).all()
+    
+    return [
+        {
+            "id": e.id,
+            "name": e.name,
+            "type": e.entity_type or "unknown",
+            "claim_count": e.claim_count or 0
+        }
+        for e in entities
+    ]
+
+@app.get("/trends/platforms")
+async def get_trending_platforms(
+    days: int = 7,
+    db: Session = Depends(get_db)
+):
+    """Get platform activity trends with daily breakdown"""
+    from datetime import datetime, timedelta
+    
+    end_date = datetime.utcnow()
+    start_date = end_date - timedelta(days=days)
+    
+    # Platform distribution
+    platform_stats = db.query(
+        DBSource.platform,
+        func.count(DBClaim.id).label('total_count'),
+        func.count(func.case((DBClaim.status == DBVerificationStatus.DEBUNKED, 1))).label('debunked_count'),
+        func.count(func.case((DBClaim.status == DBVerificationStatus.VERIFIED, 1))).label('verified_count')
+    ).join(
+        DBClaim, DBSource.id == DBClaim.source_id
+    ).filter(
+        DBClaim.created_at >= start_date
+    ).group_by(
+        DBSource.platform
+    ).order_by(
+        func.count(DBClaim.id).desc()
+    ).all()
+    
+    # Daily breakdown for chart
+    daily_platform = db.query(
+        func.date(DBClaim.created_at).label('date'),
+        DBSource.platform,
+        func.count(DBClaim.id).label('count')
+    ).join(
+        DBSource, DBSource.id == DBClaim.source_id
+    ).filter(
+        DBClaim.created_at >= start_date
+    ).group_by(
+        func.date(DBClaim.created_at), DBSource.platform
+    ).order_by(
+        func.date(DBClaim.created_at), DBSource.platform
+    ).all()
+    
+    # Organize daily data by platform
+    daily_data = {}
+    for dp in daily_platform:
+        if dp.platform not in daily_data:
+            daily_data[dp.platform] = []
+        daily_data[dp.platform].append({
+            "date": str(dp.date),
+            "count": dp.count
+        })
+    
+    return {
+        "platforms": [
+            {
+                "platform": p.platform,
+                "total_count": p.total_count,
+                "debunked_count": p.debunked_count,
+                "verified_count": p.verified_count
+            }
+            for p in platform_stats
+        ],
+        "daily_breakdown": daily_data
+    }
+
+@app.get("/trends/summary")
+async def get_trends_summary(
+    days: int = 7,
+    db: Session = Depends(get_db)
+):
+    """Get comprehensive trends summary for dashboard"""
+    from datetime import datetime, timedelta
+    
+    end_date = datetime.utcnow()
+    start_date = end_date - timedelta(days=days)
+    previous_start = start_date - timedelta(days=days)
+    
+    # Current period stats
+    current_claims = db.query(func.count(DBClaim.id)).filter(
+        DBClaim.created_at >= start_date
+    ).scalar() or 0
+    
+    # Previous period stats
+    previous_claims = db.query(func.count(DBClaim.id)).filter(
+        DBClaim.created_at >= previous_start,
+        DBClaim.created_at < start_date
+    ).scalar() or 0
+    
+    # Calculate growth
+    growth = 0
+    if previous_claims > 0:
+        growth = round(((current_claims - previous_claims) / previous_claims) * 100)
+    elif current_claims > 0:
+        growth = 100
+    
+    # Status breakdown
+    status_breakdown = db.query(
+        DBClaim.status,
+        func.count(DBClaim.id).label('count')
+    ).filter(
+        DBClaim.created_at >= start_date
+    ).group_by(
+        DBClaim.status
+    ).all()
+    
+    return {
+        "period_days": days,
+        "total_claims": current_claims,
+        "previous_period_claims": previous_claims,
+        "growth_percentage": growth,
+        "trend_up": growth > 0,
+        "status_breakdown": [
+            {"status": str(s.status), "count": s.count}
+            for s in status_breakdown
+        ]
+    }
 
 @app.get("/topics", response_model=List[TopicResponse])
 async def get_topics(db: Session = Depends(get_db)):
@@ -239,18 +483,71 @@ async def get_topics(db: Session = Depends(get_db)):
     topics = db.query(DBTopic).all()
     return [TopicResponse(id=t.id, name=t.name, slug=t.slug, description=t.description) for t in topics]
 
+@app.get("/topics/{topic_slug}/stats")
+async def get_topic_stats(topic_slug: str, db: Session = Depends(get_db)):
+    """Get statistics for a specific topic"""
+    topic = db.query(DBTopic).filter(DBTopic.slug == topic_slug).first()
+    if not topic:
+        raise HTTPException(status_code=404, detail="Topic not found")
+    
+    from app.database.models import claim_topics
+    
+    # Get all claims for this topic
+    claims = db.query(DBClaim)\
+        .join(claim_topics, DBClaim.id == claim_topics.c.claim_id)\
+        .filter(claim_topics.c.topic_id == topic.id)\
+        .all()
+    
+    # Calculate stats
+    total_claims = len(claims)
+    verified_count = sum(1 for c in claims if c.status == DBVerificationStatus.VERIFIED)
+    debunked_count = sum(1 for c in claims if c.status == DBVerificationStatus.DEBUNKED)
+    misleading_count = sum(1 for c in claims if c.status == DBVerificationStatus.MISLEADING)
+    unverified_count = sum(1 for c in claims if c.status == DBVerificationStatus.UNVERIFIED)
+    
+    return {
+        "topic_id": topic.id,
+        "topic_name": topic.name,
+        "topic_slug": topic.slug,
+        "total_claims": total_claims,
+        "verified_count": verified_count,
+        "debunked_count": debunked_count,
+        "misleading_count": misleading_count,
+        "unverified_count": unverified_count
+    }
+
 @app.get("/topics/{topic_slug}/claims", response_model=List[ClaimResponse])
-async def get_claims_by_topic(topic_slug: str, skip: int = 0, limit: int = 20, db: Session = Depends(get_db)):
-    """Get claims filtered by topic"""
+async def get_claims_by_topic(
+    topic_slug: str, 
+    skip: int = 0, 
+    limit: int = 20,
+    status: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """Get claims filtered by topic with optional status filter"""
     topic = db.query(DBTopic).filter(DBTopic.slug == topic_slug).first()
     if not topic:
         raise HTTPException(status_code=404, detail="Topic not found")
     
     # Use the many-to-many relationship through claim_topics table
     from app.database.models import claim_topics
-    claims = db.query(DBClaim)\
+    query = db.query(DBClaim)\
         .join(claim_topics, DBClaim.id == claim_topics.c.claim_id)\
-        .filter(claim_topics.c.topic_id == topic.id)\
+        .filter(claim_topics.c.topic_id == topic.id)
+    
+    # Filter by status if provided
+    if status:
+        status_map = {
+            "verified": DBVerificationStatus.VERIFIED,
+            "debunked": DBVerificationStatus.DEBUNKED,
+            "misleading": DBVerificationStatus.MISLEADING,
+            "unverified": DBVerificationStatus.UNVERIFIED,
+        }
+        status_enum = status_map.get(status.lower())
+        if status_enum:
+            query = query.filter(DBClaim.status == status_enum)
+    
+    claims = query\
         .order_by(desc(DBClaim.created_at))\
         .offset(skip)\
         .limit(limit)\
@@ -489,3 +786,117 @@ async def get_stats(request: Request, db: Session = Depends(get_db)):
             "trend_percentage": 0,
             "trend_up": False
         }
+
+@app.get("/sources", response_model=List[SourceResponse])
+@limiter.limit("100/minute")
+async def get_sources(
+    request: Request,
+    skip: int = 0,
+    limit: int = 20,
+    platform: Optional[str] = None,
+    processed: Optional[int] = None,
+    search: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """Get paginated sources with optional filtering"""
+    try:
+        query = db.query(DBSource)
+        
+        # Filter by platform if provided
+        if platform:
+            query = query.filter(DBSource.platform.ilike(f"%{platform}%"))
+        
+        # Filter by processing status if provided
+        if processed is not None:
+            query = query.filter(DBSource.processed == processed)
+        
+        # Search in content, author, or url
+        if search:
+            search_term = f"%{search}%"
+            query = query.filter(
+                or_(
+                    DBSource.content.ilike(search_term),
+                    DBSource.author.ilike(search_term),
+                    DBSource.url.ilike(search_term)
+                )
+            )
+        
+        # Get sources with claim counts
+        sources = query\
+            .order_by(desc(DBSource.timestamp))\
+            .offset(skip)\
+            .limit(limit)\
+            .all()
+        
+        # Map to response model with claim counts
+        result = []
+        for source in sources:
+            claim_count = db.query(func.count(DBClaim.id))\
+                .filter(DBClaim.source_id == source.id)\
+                .scalar() or 0
+            
+            result.append(SourceResponse(
+                id=source.id,
+                platform=source.platform,
+                content=source.content,
+                author=source.author,
+                url=source.url,
+                timestamp=str(source.timestamp),
+                scraped_at=str(source.scraped_at) if source.scraped_at else "",
+                processed=source.processed or 0,
+                claim_count=claim_count
+            ))
+        
+        return result
+    except (OperationalError, DatabaseError) as e:
+        db.rollback()
+        raise
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail="An unexpected error occurred while fetching sources."
+        )
+
+@app.get("/sources/stats")
+async def get_sources_stats(db: Session = Depends(get_db)):
+    """Get statistics about sources"""
+    try:
+        from sqlalchemy import func
+        
+        # Total sources
+        total_sources = db.query(func.count(DBSource.id)).scalar() or 0
+        
+        # Sources by platform
+        platform_stats = db.query(
+            DBSource.platform,
+            func.count(DBSource.id).label('count')
+        ).group_by(DBSource.platform).all()
+        
+        # Sources by processing status
+        status_stats = db.query(
+            DBSource.processed,
+            func.count(DBSource.id).label('count')
+        ).group_by(DBSource.processed).all()
+        
+        # Sources with claims
+        sources_with_claims = db.query(func.count(func.distinct(DBClaim.source_id))).scalar() or 0
+        
+        return {
+            "total_sources": total_sources,
+            "sources_with_claims": sources_with_claims,
+            "platforms": [
+                {"platform": p.platform, "count": p.count}
+                for p in platform_stats
+            ],
+            "processing_status": [
+                {"status": s.processed, "count": s.count}
+                for s in status_stats
+            ]
+        }
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(
+            status_code=500,
+            detail="An unexpected error occurred while fetching source statistics."
+        )

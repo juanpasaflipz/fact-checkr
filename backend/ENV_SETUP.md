@@ -36,9 +36,39 @@ TWITTER_ACCESS_TOKEN=your_twitter_access_token
 TWITTER_ACCESS_SECRET=your_twitter_access_secret
 TWITTER_BEARER_TOKEN=your_twitter_bearer_token
 
+# YouTube Data API Key (required for YouTube video scraping and transcription)
+# Get your API key from: https://console.cloud.google.com/apis/credentials
+# Enable "YouTube Data API v3" in Google Cloud Console
+YOUTUBE_API_KEY=your_youtube_api_key_here
+
 # JWT Secret Key (for authentication - change in production!)
 # Generate a secure random string for production
 JWT_SECRET_KEY=your-secret-key-change-in-production
+
+# Stripe Configuration (required for subscription management)
+# Get your API keys from: https://dashboard.stripe.com/apikeys
+STRIPE_SECRET_KEY=sk_test_your_stripe_secret_key_here
+STRIPE_WEBHOOK_SECRET=whsec_your_webhook_secret_here
+
+# Stripe Price IDs (create products/prices in Stripe dashboard)
+# Format: price_xxxxxxxxxxxxx
+STRIPE_PRO_MONTHLY_PRICE_ID=price_your_pro_monthly_price_id
+STRIPE_PRO_YEARLY_PRICE_ID=price_your_pro_yearly_price_id
+STRIPE_TEAM_MONTHLY_PRICE_ID=price_your_team_monthly_price_id
+STRIPE_TEAM_YEARLY_PRICE_ID=price_your_team_yearly_price_id
+
+# Frontend URL (for Stripe checkout redirects)
+FRONTEND_URL=http://localhost:3000
+
+# WhatsApp Configuration (optional - for WhatsApp integration)
+# Get credentials from: https://developers.facebook.com/docs/whatsapp
+WHATSAPP_VERIFY_TOKEN=your_custom_verify_token_here
+WHATSAPP_PHONE_NUMBER_ID=123456789012345
+WHATSAPP_ACCESS_TOKEN=your_access_token_here
+
+# Telegraph Configuration (optional - auto-creates account if not provided)
+# Get access token from: https://telegra.ph/api
+TELEGRAPH_ACCESS_TOKEN=your_telegraph_access_token_here
 ```
 
 ## Required vs Optional Variables
@@ -58,6 +88,8 @@ JWT_SECRET_KEY=your-secret-key-change-in-production
 
 - Twitter credentials - If not provided, the app will use mock data for Twitter posts.
 - `JWT_SECRET_KEY` - For authentication endpoints (defaults to insecure key if not set)
+- Stripe configuration - Required for subscription management. See Stripe Dashboard to create products/prices and get API keys.
+- `YOUTUBE_API_KEY` - Required for YouTube video scraping and transcription. Get from [Google Cloud Console](https://console.cloud.google.com/apis/credentials). Enable "YouTube Data API v3".
 
 ## Quick Setup
 

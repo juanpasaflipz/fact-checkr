@@ -30,6 +30,12 @@ ENV/
 # Logs
 *.log
 *.log.*
+logs/
+*.pid
+frontend.log
+backend.log
+worker.log
+backend_test.log
 
 # OS
 .DS_Store
@@ -49,4 +55,29 @@ dist/
 # Build
 build/
 *.egg-info/
+*.tsbuildinfo
+
+# Python
+*.pyc
+*.pyo
+*.pyd
+.Python
+*.so
+*.egg
+dist/
+*.egg-info/
+
+# Test and temporary files
+.pytest_cache/
+.coverage
+htmlcov/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Documentation
+# Keep .md files, but ignore generated docs
+docs/_build/
+docs/.next/
 

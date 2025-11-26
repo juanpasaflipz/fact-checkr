@@ -1,0 +1,202 @@
+# Scraping Activity Report - Last 24 Hours
+
+**Generated:** 2025-11-25 12:25 UTC  
+**Report Period:** 2025-11-24 12:25 UTC to 2025-11-25 12:25 UTC
+
+## Executive Summary
+
+⚠️ **CRITICAL ISSUES DETECTED**
+
+- **Scraping Coverage:** Only 8.3% (2 out of 24 expected hourly runs)
+- **Total Sources Scraped:** 5 sources in the last 24 hours
+- **Celery Workers:** Running but failing due to missing dependencies
+- **Platform Activity:** Only Google News is active (Twitter/YouTube not working)
+
+---
+
+## Detailed Findings
+
+### 1. Scraping Activity Statistics
+
+| Metric | Value |
+|--------|-------|
+| Total Sources Scraped (24h) | 5 |
+| Expected Hourly Runs | 24 |
+| Actual Hourly Runs | 2 |
+| Coverage Rate | 8.3% |
+| Missing Hours | 23 |
+
+### 2. Platform Breakdown
+
+| Platform | Sources | Percentage | Active Hours |
+|----------|---------|------------|--------------|
+| Google News | 5 | 100% | 2 |
+| Twitter/X | 0 | 0% | 0 |
+| YouTube | 0 | 0% | 0 |
+
+**Issue:** Only Google News is successfully scraping. Twitter and YouTube scrapers are not returning data.
+
+### 3. Processing Status
+
+| Status | Count | Percentage |
+|--------|-------|------------|
+| Processed | 3 | 60% |
+| Skipped | 2 | 40% |
+| Pending | 0 | 0% |
+
+### 4. Hourly Activity Timeline
+
+**Active Hours:**
+- ✅ 2025-11-24 13:00 UTC - 3 sources
+- ✅ 2025-11-24 14:00 UTC - 2 sources
+
+**Missing Hours:** 23 hours with no scraping activity
+
+### 5. Most Recent Sources
+
+1. **2025-11-24 14:22 UTC** - Google News - "Exjueces del Poder Judicial Federal iniciarán plantón..."
+2. **2025-11-24 14:22 UTC** - Google News - "HOUSTON, TENEMOS UN PROBLEMA… Y NO ES TRUMP"
+3. **2025-11-24 13:20 UTC** - Google News - "Caos en CDMX: ¿Cuáles son las marchas hoy..."
+4. **2025-11-24 13:20 UTC** - Google News - "Inseguridad y reforma judicial pone en desventaja..."
+5. **2025-11-24 13:20 UTC** - Google News - "Templo Mayor 2025-11-24 - Reforma"
+
+---
+
+## Root Cause Analysis
+
+### Primary Issue: Celery Worker Import Failures
+
+**Error Found:**
+```
+ModuleNotFoundError: No module named 'anthropic'
+```
+
+**Location:** `app/agent.py` line 24
+
+**Impact:** 
+- Celery workers are crashing on startup
+- Tasks cannot be executed
+- Scheduled hourly scraping is failing
+
+**Status Check:**
+- ✅ Redis is running (PONG response)
+- ✅ Celery worker processes are present (PIDs: 28815, 28837, 28838, 28839)
+- ❌ Workers are crashing due to missing `anthropic` module
+- ❌ Celery Beat scheduler cannot execute tasks
+
+### Secondary Issues
+
+1. **Twitter Scraper:** Not returning data (likely API credentials or rate limiting)
+2. **YouTube Scraper:** Not returning data (may need API key configuration)
+3. **Low Coverage:** Only 2 out of 24 hours had successful scraping
+
+---
+
+## Recommendations
+
+### Immediate Actions (Critical)
+
+1. **Fix Missing Dependencies**
+   ```bash
+   cd backend
+   source venv/bin/activate
+   pip install anthropic
+   # Or check requirements.txt and install all dependencies
+   pip install -r requirements.txt
+   ```
+
+2. **Restart Celery Workers**
+   ```bash
+   # Stop existing workers
+   pkill -f "celery.*worker"
+   
+   # Restart with proper environment
+   cd backend
+   source venv/bin/activate
+   ./start_workers.sh
+   ```
+
+3. **Verify Worker Health**
+   ```bash
+   # Check if workers are running properly
+   celery -A app.worker inspect active
+   celery -A app.worker inspect scheduled
+   ```
+
+### Short-term Actions
+
+1. **Check Twitter API Credentials**
+   - Verify `TWITTER_BEARER_TOKEN` in `.env`
+   - Check Twitter API rate limits
+   - Test Twitter scraper manually
+
+2. **Check YouTube API Configuration**
+   - Verify YouTube API key is set
+   - Check if `scraper_youtube.py` is properly configured
+   - Test YouTube scraper manually
+
+3. **Add Monitoring**
+   - Set up alerts for failed scraping runs
+   - Monitor Celery worker health
+   - Track scraping success rates
+
+### Long-term Improvements
+
+1. **Error Handling**
+   - Add retry logic for failed scrapes
+   - Implement fallback mechanisms
+   - Better error logging and alerting
+
+2. **Health Checks**
+   - Create a health check endpoint for scraping status
+   - Monitor hourly scraping coverage
+   - Alert when coverage drops below threshold
+
+3. **Testing**
+   - Test each scraper independently
+   - Verify API credentials are valid
+   - Test Celery task execution
+
+---
+
+## Monitoring Commands
+
+### Check Scraping Activity
+```bash
+cd backend
+source venv/bin/activate
+python scraping_report.py
+```
+
+### Check Celery Worker Status
+```bash
+celery -A app.worker inspect active
+celery -A app.worker inspect registered
+celery -A app.worker inspect stats
+```
+
+### Check Redis Connection
+```bash
+redis-cli ping
+```
+
+### View Worker Logs
+```bash
+tail -f backend/worker.log
+```
+
+---
+
+## Next Steps
+
+1. ✅ Install missing `anthropic` dependency
+2. ✅ Restart Celery workers
+3. ⏳ Verify hourly scraping resumes
+4. ⏳ Check Twitter/YouTube scraper configurations
+5. ⏳ Monitor for next 24 hours
+
+---
+
+**Report Generated By:** `scraping_report.py`  
+**For Questions:** Check worker logs and Celery status
+

@@ -34,3 +34,14 @@ class Claim(BaseModel):
     verification: Optional[VerificationResult] = None
     source_post: Optional[SocialPost] = None
     topics: List[Topic] = []
+
+class Source(BaseModel):
+    id: str
+    platform: str
+    content: str
+    author: Optional[str] = None
+    url: Optional[str] = None
+    timestamp: str
+    scraped_at: str
+    processed: int  # 0 = pending, 1 = processed, 2 = skipped
+    claim_count: int = 0  # Number of claims from this source
