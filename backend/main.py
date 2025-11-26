@@ -26,6 +26,15 @@ load_dotenv()
 
 app = FastAPI(title="FactCheckr MX API", version="1.0.0")
 
+@app.on_event("startup")
+async def startup_event():
+    """Log when app starts - helps debug Railway deployment"""
+    import logging
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
+    logger.info("🚀 FactCheckr API starting up...")
+    logger.info(f"✅ App initialized successfully")
+
 # Setup rate limiting (with error handling)
 try:
     setup_rate_limiting(app)
