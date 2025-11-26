@@ -19,10 +19,13 @@ COPY . .
 # Create logs directory
 RUN mkdir -p logs
 
+# Make startup script executable
+COPY start.sh /app/start.sh
+RUN chmod +x /app/start.sh
+
 # Railway handles port mapping automatically - no EXPOSE needed
 # Railway sets $PORT environment variable at runtime
 
-# Run with gunicorn for production
-# Railway sets $PORT automatically - use it in the bind address
-CMD sh -c 'gunicorn main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:${PORT:-8000} --timeout 120 --access-logfile - --error-logfile -'
+# Run with startup script
+CMD ["/app/start.sh"]
 
