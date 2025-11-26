@@ -19,13 +19,13 @@ COPY . .
 # Create logs directory
 RUN mkdir -p logs
 
-# Expose port
-EXPOSE 8000
+# Expose port (Railway uses $PORT env var)
+EXPOSE $PORT
 
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f http://localhost:8000/health || exit 1
+# Health check (Railway handles this externally)
+# HEALTHCHECK removed - Railway uses its own health check
 
 # Run with gunicorn for production
-CMD ["gunicorn", "main:app", "-w", "4", "-k", "uvicorn.workers.UvicornWorker", "--bind", "0.0.0.0:8000", "--timeout", "120", "--access-logfile", "-", "--error-logfile", "-"]
+# Use $PORT environment variable (Railway provides this)
+CMD gunicorn main:app -w 4 -k uvicorn.workers.UvicornWorker --bind 0.0.0.0:${PORT:-8000} --timeout 120 --access-logfile - --error-logfile -
 
