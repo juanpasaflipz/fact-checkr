@@ -5,6 +5,7 @@ import ClaimCard from '@/components/ClaimCard';
 import Sidebar from '@/components/Sidebar';
 import Header from '@/components/Header';
 import StatsCard from '@/components/StatsCard';
+import { getApiBaseUrl, getConnectionErrorHelp } from '@/lib/api-config';
 
 // Define types matching the backend response
 interface Claim {
@@ -41,7 +42,7 @@ export default function Home() {
     let isAborted = false;
 
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const baseUrl = getApiBaseUrl();
       const currentSkip = isLoadMore ? skip : 0;
 
       let url = '';
@@ -125,12 +126,10 @@ export default function Home() {
             baseUrl,
             errorMessage,
             errorType: fetchError instanceof Error ? fetchError.constructor.name : typeof fetchError,
-            troubleshooting: [
-              '1. Check if backend is running: cd backend && uvicorn main:app --reload',
-              '2. Verify API URL in .env.local: NEXT_PUBLIC_API_URL=http://localhost:8000',
-              '3. Check CORS settings in backend/.env: CORS_ORIGINS=http://localhost:3000',
-              '4. Ensure backend is accessible: curl http://localhost:8000/health'
-            ]
+            troubleshooting: getConnectionErrorHelp(),
+            note: baseUrl.includes('localhost') 
+              ? 'Using localhost backend. Make sure backend is running locally or set NEXT_PUBLIC_API_URL to your Railway backend URL.'
+              : `Using remote backend: ${baseUrl}. Make sure this URL is correct and the backend is accessible.`
           };
           
           console.error('Network error - Backend may not be running', errorDetails);
@@ -210,7 +209,7 @@ export default function Home() {
 
       if (isNetworkError) {
         const errorMessage = error instanceof Error ? error.message : String(error);
-        const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+        const baseUrl = getApiBaseUrl();
         const currentUrl = query 
           ? `${baseUrl}/claims/search?query=${encodeURIComponent(query)}`
           : `${baseUrl}/claims?skip=${isLoadMore ? skip : 0}&limit=${LIMIT}`;
@@ -219,12 +218,7 @@ export default function Home() {
           baseUrl,
           error: errorMessage,
           errorType: error instanceof Error ? error.constructor.name : typeof error,
-          troubleshooting: [
-            '1. Check if backend is running: cd backend && uvicorn main:app --reload',
-            '2. Verify API URL in .env.local: NEXT_PUBLIC_API_URL=http://localhost:8000',
-            '3. Check CORS settings in backend/.env: CORS_ORIGINS=http://localhost:3000',
-            '4. Ensure backend is accessible: curl http://localhost:8000/health'
-          ]
+          troubleshooting: getConnectionErrorHelp()
         });
       } else {
         console.error('Error fetching claims:', error);
@@ -272,7 +266,7 @@ export default function Home() {
 
   const fetchStats = async () => {
     try {
-      const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const baseUrl = getApiBaseUrl();
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
       
