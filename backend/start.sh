@@ -2,6 +2,11 @@
 # Railway startup script
 # Railway sets $PORT automatically
 
+# Immediate output to confirm script is running
+echo "🚀 START.SH SCRIPT STARTING AT $(date)"
+echo "Script location: $0"
+echo "Current directory: $(pwd)"
+
 # Enable trace mode for debugging (shows every command)
 set -x
 
@@ -33,12 +38,30 @@ echo "Files in current dir:"
 ls -la | head -20 || echo "ls failed"
 echo ""
 
-# Check if main.py exists
-if [ ! -f "main.py" ]; then
-    echo "ERROR: main.py not found!"
+# Check if main.py exists (check multiple possible locations)
+if [ ! -f "main.py" ] && [ ! -f "/app/main.py" ] && [ ! -f "backend/main.py" ]; then
+    echo "ERROR: main.py not found in current directory or expected locations!"
+    echo "Current directory: $(pwd)"
     echo "Current directory contents:"
     ls -la
+    echo ""
+    echo "Checking /app:"
+    ls -la /app 2>&1 || echo "Cannot list /app"
+    echo ""
+    echo "Checking backend/:"
+    ls -la backend/ 2>&1 || echo "Cannot list backend/"
     exit 1
+fi
+
+# Set working directory to where main.py is
+if [ -f "/app/main.py" ]; then
+    cd /app
+    echo "Found main.py at /app/main.py, switching to /app"
+elif [ -f "backend/main.py" ]; then
+    cd backend
+    echo "Found main.py at backend/main.py, switching to backend/"
+else
+    echo "Using main.py from current directory: $(pwd)"
 fi
 
 # Test if main.py can be imported
