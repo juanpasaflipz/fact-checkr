@@ -1,25 +1,45 @@
 import logging
 import sys
 import os
-from fastapi import FastAPI, Request
-from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
-from dotenv import load_dotenv
-from sqlalchemy.exc import OperationalError
+import traceback
 
-# Load environment variables
-load_dotenv()
-
-# Configure logging
+# Configure logging FIRST before any imports
 logging.basicConfig(
     level=logging.INFO,
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    stream=sys.stdout
+    stream=sys.stdout,
+    force=True  # Override any existing configuration
 )
 logger = logging.getLogger(__name__)
 
+logger.info("=" * 50)
+logger.info("Initializing FactCheckr API...")
+logger.info("=" * 50)
+
+try:
+    from fastapi import FastAPI, Request
+    from fastapi.middleware.cors import CORSMiddleware
+    from fastapi.responses import JSONResponse
+    from dotenv import load_dotenv
+    from sqlalchemy.exc import OperationalError
+    logger.info("✅ Core imports successful")
+except Exception as e:
+    logger.error(f"❌ Core import failed: {e}")
+    logger.error(traceback.format_exc())
+    raise
+
+# Load environment variables
+load_dotenv()
+logger.info("✅ Environment variables loaded")
+
 # Initialize FastAPI app
-app = FastAPI(title="FactCheckr MX API", version="1.0.0")
+try:
+    app = FastAPI(title="FactCheckr MX API", version="1.0.0")
+    logger.info("✅ FastAPI app created")
+except Exception as e:
+    logger.error(f"❌ Failed to create FastAPI app: {e}")
+    logger.error(traceback.format_exc())
+    raise
 
 # --- Health Check (Priority) ---
 @app.get("/health")
@@ -30,12 +50,15 @@ async def health_check():
         "message": "API is operational"
     }
 
+logger.info("✅ Health check endpoint registered")
+
 @app.on_event("startup")
 async def startup_event():
     """Log when app starts"""
     logger.info("🚀 FactCheckr API starting up...")
-    logger.info(f"✅ App initialized successfully")
-    logger.info(f"Health endpoint available at /health")
+    logger.info("✅ App initialized successfully")
+    logger.info("✅ Health endpoint available at /health")
+    logger.info("=" * 50)
 
 # --- Rate Limiting ---
 try:
@@ -49,17 +72,20 @@ except Exception as e:
 # --- Routers ---
 try:
     from app.routers import auth, subscriptions, usage, whatsapp, telegraph
+    logger.info("✅ Router modules imported")
     
-    app.include_router(auth.router)
-    app.include_router(subscriptions.router)
-    app.include_router(usage.router)
-    app.include_router(whatsapp.router)
-    app.include_router(telegraph.router)
-    logger.info("✅ Routers registered successfully")
+    app.include_router(auth.router, prefix="/api", tags=["auth"])
+    app.include_router(subscriptions.router, prefix="/api", tags=["subscriptions"])
+    app.include_router(usage.router, prefix="/api", tags=["usage"])
+    app.include_router(whatsapp.router, prefix="/api", tags=["whatsapp"])
+    app.include_router(telegraph.router, prefix="/api", tags=["telegraph"])
+    logger.info("✅ All routers registered successfully")
 except ImportError as e:
-    logger.error(f"❌ Failed to import routers: {e}")
+    logger.warning(f"⚠️ Failed to import routers: {e}")
+    logger.warning(traceback.format_exc())
 except Exception as e:
-    logger.error(f"❌ Failed to register routers: {e}")
+    logger.warning(f"⚠️ Failed to register routers: {e}")
+    logger.warning(traceback.format_exc())
 
 # --- CORS Middleware ---
 cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000,https://factcheckr.mx").split(",")
