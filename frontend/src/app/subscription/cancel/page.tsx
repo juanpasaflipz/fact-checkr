@@ -57,8 +57,8 @@ export default function SubscriptionCancelPage() {
               <div className="mt-8 pt-6 border-t border-gray-200 text-sm text-gray-600">
                 <p>
                   Need help? Contact{' '}
-                  <a href="mailto:support@factcheckr.mx" className="text-blue-600 hover:underline">
-                    support@factcheckr.mx
+                  <a href="mailto:support@factcheck.mx" className="text-blue-600 hover:underline">
+                    support@factcheck.mx
                   </a>
                 </p>
               </div>

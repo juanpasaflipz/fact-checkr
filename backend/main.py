@@ -88,7 +88,7 @@ except Exception as e:
     logger.warning(traceback.format_exc())
 
 # --- CORS Middleware ---
-cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000,https://factcheck.mx").split(",")
+cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000,https://factcheck.mx,https://www.factcheck.mx").split(",")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,

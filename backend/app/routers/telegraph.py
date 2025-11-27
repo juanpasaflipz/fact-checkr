@@ -52,7 +52,7 @@ async def create_telegraph_account() -> str:
                 params={
                     "short_name": "FactCheckr MX",
                     "author_name": "FactCheckr MX",
-                    "author_url": "https://factcheckr.mx"
+                    "author_url": "https://factcheck.mx"
                 }
             )
             response.raise_for_status()
@@ -89,7 +89,7 @@ async def create_telegraph_page(
                 "title": title,
                 "content": content,
                 "author_name": author_name,
-                "author_url": author_url or "https://factcheckr.mx",
+                "author_url": author_url or "https://factcheck.mx",
                 "return_content": False
             }
         )
@@ -209,7 +209,7 @@ async def publish_claim_to_telegraph(
             title=title,
             content=content,
             author_name="FactCheckr MX",
-            author_url="https://factcheckr.mx"
+            author_url="https://factcheck.mx"
         )
         
         logger.info(f"Published claim {claim_id} to Telegraph: {page.url}")

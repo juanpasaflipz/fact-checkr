@@ -62,7 +62,7 @@ This allows the backend to accept requests from your frontend domain.
 ## Step 5: Custom Domain (Optional)
 
 1. In Vercel project → **Settings** → **Domains**
-2. Add your custom domain (e.g., `factcheckr.mx`)
+2. Add your custom domain (e.g., `factcheck.mx`)
 3. Follow DNS configuration instructions
 4. Update `FRONTEND_URL` in Railway backend to use custom domain
 
