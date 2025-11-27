@@ -26,6 +26,7 @@ RUN chmod +x /app/start.sh
 # Railway handles port mapping automatically - no EXPOSE needed
 # Railway sets $PORT environment variable at runtime
 
-# Run with startup script
-CMD ["/app/start.sh"]
+# Default: run with startup script
+# The script handles migrations, logging, and gunicorn startup
+CMD ["sh", "/app/start.sh"]
 

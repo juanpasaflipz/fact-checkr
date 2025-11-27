@@ -2,6 +2,9 @@
 # Railway startup script
 # Railway sets $PORT automatically
 
+# Enable trace mode for debugging (shows every command)
+set -x
+
 PORT=${PORT:-8000}
 
 # Force output to be unbuffered so we see logs immediately
