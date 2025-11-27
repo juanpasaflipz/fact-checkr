@@ -37,6 +37,15 @@ echo "Starting gunicorn on 0.0.0.0:${PORT}..."
 echo "Health check endpoint: http://0.0.0.0:${PORT}/health"
 echo ""
 
+# Run migrations (non-fatal to ensure app starts even if DB is flaky)
+echo "Running database migrations..."
+if alembic upgrade head; then
+    echo "✅ Migrations applied successfully"
+else
+    echo "⚠️ Migrations failed - continuing with startup..."
+fi
+echo ""
+
 # Run gunicorn with error handling and verbose logging
 # --worker-class: Use uvicorn workers for async support
 exec gunicorn main:app \
