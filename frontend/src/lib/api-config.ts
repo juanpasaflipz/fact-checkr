@@ -26,11 +26,8 @@ export function getApiBaseUrl(): string {
     
     // If we're on Railway/Vercel (not localhost), try to construct API URL
     if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
-      // Check if there's a Railway backend URL in session storage (set by deployment)
-      const savedApiUrl = sessionStorage.getItem('API_URL');
-      if (savedApiUrl) {
-        return savedApiUrl;
-      }
+      // Default to the custom domain in production if not specified
+      return 'https://factcheck.mx';
     }
   }
 
@@ -77,7 +74,7 @@ export function getConnectionErrorHelp(): string[] {
   } else {
     return [
       `1. Verify Railway backend is deployed and running`,
-      `2. Check NEXT_PUBLIC_API_URL in Vercel/Railway environment variables`,
+      `2. Check NEXT_PUBLIC_API_URL in Vercel/Railway environment variables (should be https://factcheck.mx)`,
       `3. Test backend health: curl ${baseUrl}/health`,
       `4. Ensure CORS is configured in backend to allow requests from ${typeof window !== 'undefined' ? window.location.origin : 'your domain'}`,
       `5. Check Railway backend logs for startup errors`

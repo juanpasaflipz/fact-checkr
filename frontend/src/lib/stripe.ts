@@ -4,6 +4,7 @@
  */
 
 import { loadStripe, Stripe } from '@stripe/stripe-js';
+import { getApiBaseUrl } from './api-config';
 
 let stripePromise: Promise<Stripe | null>;
 
@@ -39,7 +40,7 @@ export const createCheckoutSession = async (
   trialDays: number = 0
 ): Promise<string | null> => {
   try {
-    const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    const apiUrl = getApiBaseUrl();
     
     // Get auth token from localStorage or cookies
     const token = localStorage.getItem('auth_token') || 
