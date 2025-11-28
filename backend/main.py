@@ -88,10 +88,15 @@ except Exception as e:
     logger.warning(traceback.format_exc())
 
 # --- CORS Middleware ---
-cors_origins = os.getenv("CORS_ORIGINS", "http://localhost:3000,https://factcheck.mx,https://www.factcheck.mx").split(",")
+# Default CORS origins: localhost for dev, Railway domain, and custom domain
+default_origins = "http://localhost:3000,https://factcheck.mx,https://www.factcheck.mx,https://fact-checkr-production.up.railway.app"
+cors_origins = os.getenv("CORS_ORIGINS", default_origins).split(",")
+# Clean up any empty strings from splitting
+cors_origins = [origin.strip() for origin in cors_origins if origin.strip()]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
+    allow_origin_regex=r"https://.*\.vercel\.app",  # Allow all Vercel preview deployments
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
