@@ -20,14 +20,14 @@ export function getApiBaseUrl(): string {
     return process.env.NEXT_PUBLIC_API_URL;
   }
 
-  // For production deployments, try to detect Railway backend
+  // For production deployments, use Railway backend URL
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname;
     
-    // If we're on Railway/Vercel (not localhost), try to construct API URL
+    // If we're on Railway/Vercel (not localhost), use Railway backend
     if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
-      // Default to the custom domain in production if not specified
-      return 'https://factcheck.mx';
+      // Railway backend URL - set NEXT_PUBLIC_API_URL env var to override
+      return 'https://fact-checkr-production.up.railway.app';
     }
   }
 
@@ -74,7 +74,7 @@ export function getConnectionErrorHelp(): string[] {
   } else {
     return [
       `1. Verify Railway backend is deployed and running`,
-      `2. Check NEXT_PUBLIC_API_URL in Vercel/Railway environment variables (should be https://factcheck.mx)`,
+      `2. Check NEXT_PUBLIC_API_URL in Vercel environment variables (should be https://fact-checkr-production.up.railway.app)`,
       `3. Test backend health: curl ${baseUrl}/health`,
       `4. Ensure CORS is configured in backend to allow requests from ${typeof window !== 'undefined' ? window.location.origin : 'your domain'}`,
       `5. Check Railway backend logs for startup errors`
