@@ -2,6 +2,14 @@
 # Railway startup script
 # Railway sets $PORT automatically
 
+# CRITICAL: Force immediate output - Railway needs to see this
+echo "==========================================" >&2
+echo "==========================================" >&2
+echo "🚀🚀🚀 START.SH EXECUTING NOW 🚀🚀🚀" >&2
+echo "Timestamp: $(date)" >&2
+echo "==========================================" >&2
+echo "==========================================" >&2
+
 # Immediate output to confirm script is running
 echo "🚀 START.SH SCRIPT STARTING AT $(date)"
 echo "Script location: $0"
