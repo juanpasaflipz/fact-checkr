@@ -3,22 +3,27 @@
 # Railway sets $PORT automatically
 
 # CRITICAL: Force immediate output - Railway needs to see this
-echo "==========================================" >&2
-echo "==========================================" >&2
-echo "🚀🚀🚀 START.SH EXECUTING NOW 🚀🚀🚀" >&2
-echo "Timestamp: $(date)" >&2
-echo "==========================================" >&2
-echo "==========================================" >&2
+echo "==========================================" 1>&2
+echo "==========================================" 1>&2
+echo "🚀🚀🚀 START.SH EXECUTING NOW 🚀🚀🚀" 1>&2
+echo "Timestamp: $(date)" 1>&2
+echo "==========================================" 1>&2
+echo "==========================================" 1>&2
 
 # Immediate output to confirm script is running
 echo "🚀 START.SH SCRIPT STARTING AT $(date)"
 echo "Script location: $0"
 echo "Current directory: $(pwd)"
+echo "PID: $$"
 
 # Enable trace mode for debugging (shows every command)
 set -x
 
+# Get PORT from Railway (Railway sets this automatically)
+# Railway injects $PORT at runtime - if not set, default to 8000
 PORT=${PORT:-8000}
+echo "PORT environment variable: ${PORT}"
+echo "Will bind to: 0.0.0.0:${PORT}"
 
 # Force output to be unbuffered so we see logs immediately
 export PYTHONUNBUFFERED=1
