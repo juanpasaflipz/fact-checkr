@@ -142,17 +142,15 @@ def map_db_claim_to_response(db_claim: DBClaim) -> ClaimResponse:
     # Create VerificationResult
     verification = VerificationResult(
         status=status_str,
-        truth_score=0,  # Default, logic to be refined
         explanation=db_claim.explanation or "No explanation provided",
-        confidence_score=0.0,
-        evidence_sources=db_claim.evidence_sources or [],
-        analysis_timestamp=str(db_claim.updated_at)
+        sources=db_claim.evidence_sources or []
     )
     
     # Create SocialPost from Source
     source_post = None
     if db_claim.source:
         source_post = SocialPost(
+            id=str(db_claim.source.id),
             platform=db_claim.source.platform,
             content=db_claim.source.content,
             author=db_claim.source.author or "Unknown",
@@ -161,7 +159,7 @@ def map_db_claim_to_response(db_claim: DBClaim) -> ClaimResponse:
         )
         
     return ClaimResponse(
-        id=db_claim.id,
+        id=str(db_claim.id),
         original_text=db_claim.original_text,
         claim_text=db_claim.claim_text,
         verification=verification,
