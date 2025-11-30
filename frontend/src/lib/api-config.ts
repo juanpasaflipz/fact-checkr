@@ -1,6 +1,8 @@
 /**
  * API Configuration Utility
  * Centralized configuration for backend API URLs
+ * 
+ * Backend URL: https://fact-checkr-production.up.railway.app
  */
 
 /**
