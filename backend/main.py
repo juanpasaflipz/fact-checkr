@@ -68,27 +68,15 @@ cors_origins = os.getenv("CORS_ORIGINS", default_origins).split(",")
 cors_origins = [origin.strip() for origin in cors_origins if origin.strip()]
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
-    allow_origin_regex=None,
+    allow_origins=cors_origins,
+    allow_origin_regex=r"https://.*\.vercel\.app",  # Allow all Vercel preview deployments
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
-logger.info(f"✅ CORS middleware configured with ALLOW ALL ORIGINS (Temporary Debug Mode)")
+logger.info(f"✅ CORS middleware configured with origins: {cors_origins}")
 
 # --- Health Check (Priority) ---
-@app.get("/debug/routes")
-async def debug_routes():
-    """List all registered routes for debugging"""
-    routes = []
-    for route in app.routes:
-        routes.append({
-            "path": route.path,
-            "name": route.name,
-            "methods": list(route.methods) if hasattr(route, "methods") else None
-        })
-    return routes
-
 @app.get("/health")
 async def health_check():
     """Health check endpoint - always returns 200 for Railway health checks"""
