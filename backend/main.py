@@ -16,11 +16,13 @@ from datetime import timedelta
 
 # Import routers (with error handling)
 try:
-    from app.routers import auth, subscriptions, usage, whatsapp, telegraph
+    from app.routers import auth, subscriptions, usage, whatsapp, telegraph, intelligence
     ROUTERS_AVAILABLE = True
+    INTELLIGENCE_ROUTER_AVAILABLE = True
 except ImportError as e:
     print(f"Warning: Some routers not available: {e}")
     ROUTERS_AVAILABLE = False
+    INTELLIGENCE_ROUTER_AVAILABLE = False
 
 load_dotenv()
 
@@ -67,6 +69,9 @@ if ROUTERS_AVAILABLE:
         app.include_router(usage.router)
         app.include_router(whatsapp.router)
         app.include_router(telegraph.router)
+        if INTELLIGENCE_ROUTER_AVAILABLE:
+            app.include_router(intelligence.router)
+            print("✓ Intelligence API router registered")
     except Exception as e:
         print(f"Warning: Failed to register some routers: {e}")
 
