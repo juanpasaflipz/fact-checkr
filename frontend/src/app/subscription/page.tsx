@@ -66,7 +66,7 @@ export default function SubscriptionPage() {
     },
     {
       name: 'Equipo',
-      price: { month: 79, year: 790 },
+      price: { month: 1399, year: 11000 },
       description: 'Perfecto para redacciones pequeñas, ONGs (2-10 usuarios)',
       features: [
         'Todo lo de Pro, más:',
@@ -82,7 +82,7 @@ export default function SubscriptionPage() {
       cta: 'Suscribirse a Equipo',
       disabled: false,
       highlight: false,
-      savings: { month: 0, year: 158 },
+      savings: { month: 0, year: 5788 }, // 1399 * 12 = 16788, savings = 16788 - 11000 = 5788
     },
   ];
 
