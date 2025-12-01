@@ -18,12 +18,13 @@ function SubscriptionSuccessContent() {
     // using the session_id to verify the payment
     if (sessionId) {
       // Simulate fetching subscription info
+      // TODO: Replace with actual API call to fetch subscription details
       setTimeout(() => {
         setSubscriptionInfo({
           plan: 'Pro',
           billing: 'Monthly',
-          amount: '$19.00',
-          nextBilling: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString(),
+          amount: '$199.00 MXN', // Will be fetched from backend based on actual subscription
+          nextBilling: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000).toLocaleDateString('es-MX'),
         });
         setLoading(false);
       }, 1000);
@@ -55,44 +56,44 @@ function SubscriptionSuccessContent() {
 
               {/* Title */}
               <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                Payment Successful!
+                ¡Pago Exitoso!
               </h1>
               <p className="text-lg text-gray-600 mb-8">
-                Your subscription is now active
+                Tu suscripción ya está activa
               </p>
 
               {loading ? (
                 <div className="py-8">
                   <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto"></div>
-                  <p className="mt-4 text-gray-600">Loading subscription details...</p>
+                  <p className="mt-4 text-gray-600">Cargando detalles de suscripción...</p>
                 </div>
               ) : subscriptionInfo ? (
                 <>
                   {/* Subscription Details Card */}
                   <div className="bg-gray-50 rounded-lg p-6 mb-8 text-left">
                     <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                      Subscription Details
+                      Detalles de Suscripción
                     </h2>
                     <div className="space-y-3">
                       <div className="flex justify-between">
                         <span className="text-gray-600">Plan:</span>
-                        <span className="font-semibold text-gray-900">{subscriptionInfo.plan} Plan</span>
+                        <span className="font-semibold text-gray-900">Plan {subscriptionInfo.plan}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-600">Billing:</span>
-                        <span className="font-semibold text-gray-900">{subscriptionInfo.billing}</span>
+                        <span className="text-gray-600">Facturación:</span>
+                        <span className="font-semibold text-gray-900">{subscriptionInfo.billing === 'Monthly' ? 'Mensual' : 'Anual'}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-600">Amount:</span>
+                        <span className="text-gray-600">Monto:</span>
                         <span className="font-semibold text-gray-900">{subscriptionInfo.amount}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-600">Next billing date:</span>
+                        <span className="text-gray-600">Próxima fecha de facturación:</span>
                         <span className="font-semibold text-gray-900">{subscriptionInfo.nextBilling}</span>
                       </div>
                       <div className="flex justify-between">
-                        <span className="text-gray-600">Payment method:</span>
-                        <span className="font-semibold text-gray-900">Card ending in •••• 4242</span>
+                        <span className="text-gray-600">Método de pago:</span>
+                        <span className="font-semibold text-gray-900">Tarjeta terminada en •••• 4242</span>
                       </div>
                     </div>
                     <div className="mt-4 pt-4 border-t border-gray-200">
@@ -100,7 +101,7 @@ function SubscriptionSuccessContent() {
                         href="#"
                         className="text-blue-600 hover:text-blue-700 text-sm font-medium"
                       >
-                        Download receipt →
+                        Descargar recibo →
                       </a>
                     </div>
                   </div>
@@ -108,37 +109,37 @@ function SubscriptionSuccessContent() {
                   {/* What's Next */}
                   <div className="mb-8 text-left">
                     <h2 className="text-lg font-semibold text-gray-900 mb-4">
-                      What's Next?
+                      ¿Qué Sigue?
                     </h2>
                     <ul className="space-y-3">
                       <li className="flex items-start">
                         <span className="text-green-500 mr-3 mt-1">✅</span>
                         <span className="text-gray-700">
-                          Unlimited verifications are now active
+                          Las verificaciones ilimitadas ya están activas
                         </span>
                       </li>
                       <li className="flex items-start">
                         <span className="text-green-500 mr-3 mt-1">✅</span>
                         <span className="text-gray-700">
-                          Full historical data access enabled
+                          Acceso completo a datos históricos habilitado
                         </span>
                       </li>
                       <li className="flex items-start">
                         <span className="text-green-500 mr-3 mt-1">✅</span>
                         <span className="text-gray-700">
-                          Export functionality unlocked
+                          Funcionalidad de exportación desbloqueada
                         </span>
                       </li>
                       <li className="flex items-start">
                         <span className="text-green-500 mr-3 mt-1">✅</span>
                         <span className="text-gray-700">
-                          API access credentials sent to your email
+                          Credenciales de acceso API enviadas a tu email
                         </span>
                       </li>
                       <li className="flex items-start">
                         <span className="text-green-500 mr-3 mt-1">✅</span>
                         <span className="text-gray-700">
-                          Check your inbox for welcome email
+                          Revisa tu bandeja de entrada para el email de bienvenida
                         </span>
                       </li>
                     </ul>
@@ -150,26 +151,26 @@ function SubscriptionSuccessContent() {
                       onClick={() => router.push('/')}
                       className="w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white py-3 px-6 rounded-lg font-semibold hover:from-blue-700 hover:to-blue-800 shadow-lg hover:shadow-xl transition-all"
                     >
-                      Go to Dashboard
+                      Ir al Panel
                     </button>
                     <button
                       onClick={() => router.push('/subscription')}
                       className="w-full bg-white border-2 border-gray-300 text-gray-700 py-3 px-6 rounded-lg font-semibold hover:border-gray-400 transition-all"
                     >
-                      View Subscription Settings
+                      Ver Configuración de Suscripción
                     </button>
                   </div>
                 </>
               ) : (
                 <div className="py-8">
                   <p className="text-gray-600 mb-4">
-                    Unable to load subscription details. Please check your account settings.
+                    No se pudieron cargar los detalles de la suscripción. Por favor revisa la configuración de tu cuenta.
                   </p>
                   <button
                     onClick={() => router.push('/')}
                     className="bg-blue-600 text-white py-2 px-6 rounded-lg font-semibold hover:bg-blue-700"
                   >
-                    Go to Dashboard
+                    Ir al Panel
                   </button>
                 </div>
               )}
@@ -177,13 +178,13 @@ function SubscriptionSuccessContent() {
               {/* Footer Info */}
               <div className="mt-8 pt-6 border-t border-gray-200 text-sm text-gray-600">
                 <p className="mb-2">
-                  Questions? Contact{' '}
+                  ¿Preguntas? Contacta a{' '}
                   <a href="mailto:support@factcheck.mx" className="text-blue-600 hover:underline">
                     support@factcheck.mx
                   </a>
                 </p>
                 <p className="text-xs text-gray-500">
-                  Your subscription is managed securely by Stripe. You can cancel anytime from your account settings.
+                  Tu suscripción está gestionada de forma segura por Stripe. Puedes cancelar en cualquier momento desde la configuración de tu cuenta.
                 </p>
               </div>
             </div>

@@ -17,69 +17,69 @@ export default function SubscriptionPage() {
     try {
       await redirectToCheckout(tier, billingCycle, trialDays);
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to start checkout');
+      setError(err instanceof Error ? err.message : 'Error al iniciar el pago');
       setLoading(null);
     }
   };
 
   const pricingTiers = [
     {
-      name: 'Free',
+      name: 'Gratis',
       price: { month: 0, year: 0 },
-      description: 'Perfect for casual users',
+      description: 'Perfecto para usuarios casuales',
       features: [
-        '10 manual verifications/month',
-        '100 API requests/day',
-        '50 search queries/day',
-        'Last 7 days of data only',
-        'Basic analytics',
-        'No exports',
-        'No API access',
-        'No alerts',
+        '10 verificaciones manuales/mes',
+        '100 solicitudes API/día',
+        '50 búsquedas/día',
+        'Solo últimos 7 días de datos',
+        'Analíticas básicas',
+        'Sin exportaciones',
+        'Sin acceso API',
+        'Sin alertas',
       ],
-      cta: 'Current Plan',
+      cta: 'Plan Actual',
       disabled: true,
       highlight: false,
     },
     {
       name: 'Pro',
-      price: { month: 19, year: 190 },
-      description: 'Perfect for journalists, researchers, content creators',
+      price: { month: 199, year: 1900 },
+      description: 'Perfecto para periodistas, investigadores, creadores de contenido',
       features: [
-        'Unlimited manual verifications',
-        '10,000 API requests/day',
-        'Unlimited search queries',
-        'Full historical data access (all-time)',
-        'Advanced analytics (365 days)',
-        'Unlimited exports (CSV, JSON, Excel, PDF)',
-        'Custom alerts (5 active alerts)',
-        'Priority processing (2x faster)',
-        'API access (RESTful API)',
-        'Save collections (up to 10)',
-        'Bulk verification',
-        '24-hour email support',
+        'Verificaciones manuales ilimitadas',
+        '10,000 solicitudes API/día',
+        'Búsquedas ilimitadas',
+        'Acceso completo a datos históricos (todo el tiempo)',
+        'Analíticas avanzadas (365 días)',
+        'Exportaciones ilimitadas (CSV, JSON, Excel, PDF)',
+        'Alertas personalizadas (5 alertas activas)',
+        'Procesamiento prioritario (2x más rápido)',
+        'Acceso API (API RESTful)',
+        'Guardar colecciones (hasta 10)',
+        'Verificación masiva',
+        'Soporte por email 24 horas',
       ],
-      cta: 'Start 7-Day Free Trial',
+      cta: 'Iniciar Prueba Gratuita de 7 Días',
       disabled: false,
       highlight: true,
-      savings: { month: 0, year: 38 },
+      savings: { month: 0, year: 488 }, // 199 * 12 = 2388, savings = 2388 - 1900 = 488
     },
     {
-      name: 'Team',
+      name: 'Equipo',
       price: { month: 79, year: 790 },
-      description: 'Perfect for small newsrooms, NGOs (2-10 users)',
+      description: 'Perfecto para redacciones pequeñas, ONGs (2-10 usuarios)',
       features: [
-        'Everything in Pro, plus:',
-        'Up to 10 team members',
-        'Shared collections and dashboards',
-        'Team activity logs',
-        'Role-based permissions',
-        '50,000 API requests/day',
-        '20 active alerts',
-        'Priority email support (12-hour response)',
-        'Custom branding options',
+        'Todo lo de Pro, más:',
+        'Hasta 10 miembros del equipo',
+        'Colecciones y dashboards compartidos',
+        'Registros de actividad del equipo',
+        'Permisos basados en roles',
+        '50,000 solicitudes API/día',
+        '20 alertas activas',
+        'Soporte prioritario por email (respuesta en 12 horas)',
+        'Opciones de marca personalizada',
       ],
-      cta: 'Subscribe to Team',
+      cta: 'Suscribirse a Equipo',
       disabled: false,
       highlight: false,
       savings: { month: 0, year: 158 },
@@ -101,10 +101,10 @@ export default function SubscriptionPage() {
             {/* Header */}
             <div className="text-center mb-12">
               <h1 className="text-4xl font-bold text-gray-900 mb-4">
-                Choose Your Plan
+                Elige Tu Plan
               </h1>
               <p className="text-lg text-gray-600 mb-6">
-                Select the perfect plan for your fact-checking needs
+                Selecciona el plan perfecto para tus necesidades de verificación
               </p>
               
               {/* Billing Toggle */}
@@ -117,7 +117,7 @@ export default function SubscriptionPage() {
                       : 'text-gray-600 hover:text-gray-900'
                   }`}
                 >
-                  Monthly
+                  Mensual
                 </button>
                 <button
                   onClick={() => setBillingCycle('year')}
@@ -127,9 +127,9 @@ export default function SubscriptionPage() {
                       : 'text-gray-600 hover:text-gray-900'
                   }`}
                 >
-                  Annual
+                  Anual
                   <span className="absolute -top-2 -right-2 bg-green-500 text-white text-xs px-2 py-0.5 rounded-full">
-                    Save 17%
+                    Ahorra 17%
                   </span>
                 </button>
               </div>
@@ -163,7 +163,7 @@ export default function SubscriptionPage() {
                     {tier.highlight && (
                       <div className="absolute -top-4 left-1/2 transform -translate-x-1/2">
                         <span className="bg-gradient-to-r from-blue-600 to-blue-700 text-white text-sm font-semibold px-4 py-1 rounded-full shadow-lg">
-                          Most Popular
+                          Más Popular
                         </span>
                       </div>
                     )}
@@ -179,15 +179,15 @@ export default function SubscriptionPage() {
                       <div className="mb-6">
                         <div className="flex items-baseline">
                           <span className="text-5xl font-bold text-gray-900">
-                            ${price}
+                            ${price.toLocaleString('es-MX')}
                           </span>
                           <span className="text-gray-600 ml-2">
-                            /{billingCycle === 'month' ? 'month' : 'year'}
+                            MXN /{billingCycle === 'month' ? 'mes' : 'año'}
                           </span>
                         </div>
                         {billingCycle === 'year' && savings > 0 && (
                           <p className="text-sm text-green-600 font-medium mt-2">
-                            💰 Save ${savings}/year (17% discount)
+                            💰 Ahorra ${savings.toLocaleString('es-MX')} MXN/año ({Math.round((savings / (price * 12)) * 100)}% de descuento)
                           </p>
                         )}
                       </div>
@@ -225,7 +225,7 @@ export default function SubscriptionPage() {
                               <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                               <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                             </svg>
-                            Processing...
+                            Procesando...
                           </span>
                         ) : (
                           tier.cta
@@ -240,11 +240,11 @@ export default function SubscriptionPage() {
             {/* Trust Indicators */}
             <div className="text-center space-y-4">
               <p className="text-gray-600">
-                <span className="font-semibold">30-day money-back guarantee</span> • 
-                Cancel anytime from your account settings
+                <span className="font-semibold">Garantía de devolución de 30 días</span> • 
+                Cancela en cualquier momento desde la configuración de tu cuenta
               </p>
               <p className="text-sm text-gray-500">
-                Secure payment powered by Stripe
+                Pago seguro con Stripe
               </p>
             </div>
           </div>

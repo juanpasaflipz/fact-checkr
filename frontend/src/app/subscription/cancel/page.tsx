@@ -27,15 +27,15 @@ export default function SubscriptionCancelPage() {
               </div>
 
               <h1 className="text-3xl font-bold text-gray-900 mb-2">
-                Payment Cancelled
+                Pago Cancelado
               </h1>
               <p className="text-lg text-gray-600 mb-8">
-                Your subscription was not processed
+                Tu suscripción no fue procesada
               </p>
 
               <div className="mb-8">
                 <p className="text-gray-700 mb-4">
-                  No charges were made to your account. You can try again anytime.
+                  No se realizaron cargos a tu cuenta. Puedes intentar de nuevo en cualquier momento.
                 </p>
               </div>
 
@@ -44,19 +44,19 @@ export default function SubscriptionCancelPage() {
                   onClick={() => router.push('/subscription')}
                   className="w-full bg-gradient-to-r from-blue-600 to-blue-700 text-white py-3 px-6 rounded-lg font-semibold hover:from-blue-700 hover:to-blue-800 shadow-lg hover:shadow-xl transition-all"
                 >
-                  Try Again
+                  Intentar de Nuevo
                 </button>
                 <button
                   onClick={() => router.push('/')}
                   className="w-full bg-white border-2 border-gray-300 text-gray-700 py-3 px-6 rounded-lg font-semibold hover:border-gray-400 transition-all"
                 >
-                  Return to Dashboard
+                  Volver al Panel
                 </button>
               </div>
 
               <div className="mt-8 pt-6 border-t border-gray-200 text-sm text-gray-600">
                 <p>
-                  Need help? Contact{' '}
+                  ¿Necesitas ayuda? Contacta a{' '}
                   <a href="mailto:support@factcheck.mx" className="text-blue-600 hover:underline">
                     support@factcheck.mx
                   </a>

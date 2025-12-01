@@ -131,6 +131,7 @@ async def create_checkout_session(
                 "quantity": 1,
             }],
             mode="subscription",
+            locale="es",  # Spanish locale for checkout page
             success_url=f"{os.getenv('FRONTEND_URL', 'http://localhost:3000')}/subscription/success?session_id={{CHECKOUT_SESSION_ID}}",
             cancel_url=f"{os.getenv('FRONTEND_URL', 'http://localhost:3000')}/subscription/cancel",
             metadata={
@@ -150,7 +151,7 @@ async def create_checkout_session(
         )
 
 @router.post("/webhook")
-async def stripe_webhook(request: Request):
+async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
     """Handle Stripe webhook events"""
     import os
     import json
@@ -158,6 +159,9 @@ async def stripe_webhook(request: Request):
     payload = await request.body()
     sig_header = request.headers.get("stripe-signature")
     webhook_secret = os.getenv("STRIPE_WEBHOOK_SECRET", "")
+    
+    if not webhook_secret:
+        raise HTTPException(status_code=500, detail="Webhook secret not configured")
     
     try:
         event = stripe.Webhook.construct_event(
@@ -169,27 +173,32 @@ async def stripe_webhook(request: Request):
         raise HTTPException(status_code=400, detail="Invalid signature")
     
     # Handle the event
-    db = next(get_db())
-    
-    if event["type"] == "checkout.session.completed":
-        session = event["data"]["object"]
-        # Subscription is created, sync it
-        if session.mode == "subscription":
-            subscription_id = session.subscription
-            stripe_subscription = stripe.Subscription.retrieve(subscription_id)
-            user_id = int(session.metadata.get("user_id"))
-            user = db.query(User).filter(User.id == user_id).first()
-            if user:
+    try:
+        if event["type"] == "checkout.session.completed":
+            session = event["data"]["object"]
+            # Subscription is created, sync it
+            if session.mode == "subscription":
+                subscription_id = session.subscription
+                stripe_subscription = stripe.Subscription.retrieve(subscription_id)
+                user_id = int(session.metadata.get("user_id"))
+                user = db.query(User).filter(User.id == user_id).first()
+                if user:
+                    sync_subscription_from_stripe(db, user, stripe_subscription)
+        
+        elif event["type"] in ["customer.subscription.updated", "customer.subscription.deleted"]:
+            stripe_subscription = event["data"]["object"]
+            # Find subscription in database
+            subscription = db.query(Subscription).filter(
+                Subscription.stripe_subscription_id == stripe_subscription.id
+            ).first()
+            if subscription:
+                user = subscription.user
                 sync_subscription_from_stripe(db, user, stripe_subscription)
-    
-    elif event["type"] in ["customer.subscription.updated", "customer.subscription.deleted"]:
-        stripe_subscription = event["data"]["object"]
-        # Find subscription in database
-        subscription = db.query(Subscription).filter(
-            Subscription.stripe_subscription_id == stripe_subscription.id
-        ).first()
-        if subscription:
-            user = subscription.user
-            sync_subscription_from_stripe(db, user, stripe_subscription)
-    
-    return {"status": "success"}
+        
+        return {"status": "success"}
+    except Exception as e:
+        # Log error but return 200 to Stripe (they'll retry)
+        import logging
+        logger = logging.getLogger(__name__)
+        logger.error(f"Error processing webhook: {e}")
+        raise HTTPException(status_code=500, detail=f"Error processing webhook: {str(e)}")
