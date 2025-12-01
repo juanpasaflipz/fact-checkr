@@ -43,6 +43,21 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
+# Import routers (with error handling)
+try:
+    from app.routers import auth, subscriptions, usage, whatsapp, telegraph, intelligence
+    ROUTERS_AVAILABLE = True
+    INTELLIGENCE_ROUTER_AVAILABLE = True
+except ImportError as e:
+    print(f"Warning: Some routers not available: {e}")
+    try:
+        from app.routers import auth, subscriptions, usage, whatsapp, telegraph
+        ROUTERS_AVAILABLE = True
+        INTELLIGENCE_ROUTER_AVAILABLE = False
+    except ImportError:
+        ROUTERS_AVAILABLE = False
+        INTELLIGENCE_ROUTER_AVAILABLE = False
+
 logger.info("=" * 50)
 logger.info("Initializing FactCheckr API...")
 logger.info("=" * 50)
@@ -102,19 +117,21 @@ except Exception as e:
     logger.error(f"Rate limiting setup failed: {e}")
 
 # --- Routers ---
-try:
-    from app.routers import auth, subscriptions, usage, whatsapp, telegraph
-    logger.info("✅ Router modules imported")
-    
-    app.include_router(auth.router, prefix="/api", tags=["auth"])
-    app.include_router(subscriptions.router, prefix="/api", tags=["subscriptions"])
-    app.include_router(usage.router, prefix="/api", tags=["usage"])
-    app.include_router(whatsapp.router, prefix="/api", tags=["whatsapp"])
-    app.include_router(telegraph.router, prefix="/api", tags=["telegraph"])
-    logger.info("✅ All routers registered successfully")
-except Exception as e:
-    logger.warning(f"⚠️ Failed to register routers: {e}")
-    logger.warning(traceback.format_exc())
+if ROUTERS_AVAILABLE:
+    try:
+        app.include_router(auth.router, prefix="/api", tags=["auth"])
+        app.include_router(subscriptions.router, prefix="/api", tags=["subscriptions"])
+        app.include_router(usage.router, prefix="/api", tags=["usage"])
+        app.include_router(whatsapp.router, prefix="/api", tags=["whatsapp"])
+        app.include_router(telegraph.router, prefix="/api", tags=["telegraph"])
+        logger.info("✅ Base routers registered successfully")
+        
+        if INTELLIGENCE_ROUTER_AVAILABLE:
+            app.include_router(intelligence.router)
+            logger.info("✅ Intelligence API router registered")
+    except Exception as e:
+        logger.warning(f"⚠️ Failed to register routers: {e}")
+        logger.warning(traceback.format_exc())
 
 # --- Helper Functions ---
 def map_db_claim_to_response(db_claim: DBClaim) -> ClaimResponse:
@@ -396,6 +413,3 @@ async def get_entities(db: Session = Depends(get_db)):
     """Get all entities"""
     entities = db.query(DBEntity).all()
     return [{"id": e.id, "name": e.name, "type": e.entity_type} for e in entities]
-
-# Add explicit imports for datetime used in functions
-from datetime import datetime
