@@ -18,7 +18,7 @@ export default function Sidebar() {
   return (
     <>
       {/* Desktop Sidebar */}
-      <aside className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col">
+      <aside className="hidden lg:fixed lg:inset-y-0 lg:flex lg:w-64 lg:flex-col z-50">
         <div className="flex flex-col grow bg-[#0a0a0f] border-r-2 border-[#00f0ff]/30"
              style={{ boxShadow: '0 0 30px rgba(0, 240, 255, 0.1)' }}>
           {/* Logo */}
