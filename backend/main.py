@@ -10,7 +10,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 from sqlalchemy.orm import Session
-from sqlalchemy import desc, or_, func, case
+from sqlalchemy import desc, or_, and_, func, case
 from sqlalchemy.exc import OperationalError
 
 # Import app modules
@@ -21,6 +21,8 @@ from app.database.models import (
     VerificationStatus as DBVerificationStatus, 
     Topic as DBTopic, 
     Entity as DBEntity,
+    Market as DBMarket,
+    MarketStatus,
     claim_topics
 )
 from app.models import (
@@ -29,7 +31,8 @@ from app.models import (
     SocialPost, 
     VerificationStatus, 
     Topic as TopicResponse, 
-    Source as SourceResponse
+    Source as SourceResponse,
+    MarketSummary
 )
 from app.rate_limit import limiter, setup_rate_limiting
 from app.auth import get_optional_user, create_access_token
@@ -45,18 +48,51 @@ logger = logging.getLogger(__name__)
 
 # Import routers (with error handling)
 try:
-    from app.routers import auth, subscriptions, usage, whatsapp, telegraph, intelligence
+    from app.routers import auth, subscriptions, usage, whatsapp, telegraph, intelligence, markets, review, quota
     ROUTERS_AVAILABLE = True
     INTELLIGENCE_ROUTER_AVAILABLE = True
+    MARKETS_ROUTER_AVAILABLE = True
+    REVIEW_ROUTER_AVAILABLE = True
+    QUOTA_ROUTER_AVAILABLE = True
 except ImportError as e:
     print(f"Warning: Some routers not available: {e}")
     try:
-        from app.routers import auth, subscriptions, usage, whatsapp, telegraph
+        from app.routers import auth, subscriptions, usage, whatsapp, telegraph, markets, review, quota
         ROUTERS_AVAILABLE = True
         INTELLIGENCE_ROUTER_AVAILABLE = False
+        MARKETS_ROUTER_AVAILABLE = True
+        REVIEW_ROUTER_AVAILABLE = True
+        QUOTA_ROUTER_AVAILABLE = True
     except ImportError:
-        ROUTERS_AVAILABLE = False
-        INTELLIGENCE_ROUTER_AVAILABLE = False
+        try:
+            from app.routers import auth, subscriptions, usage, whatsapp, telegraph, review, quota
+            ROUTERS_AVAILABLE = True
+            INTELLIGENCE_ROUTER_AVAILABLE = False
+            MARKETS_ROUTER_AVAILABLE = False
+            REVIEW_ROUTER_AVAILABLE = True
+            QUOTA_ROUTER_AVAILABLE = True
+        except ImportError:
+            try:
+                from app.routers import auth, subscriptions, usage, whatsapp, telegraph, quota
+                ROUTERS_AVAILABLE = True
+                INTELLIGENCE_ROUTER_AVAILABLE = False
+                MARKETS_ROUTER_AVAILABLE = False
+                REVIEW_ROUTER_AVAILABLE = False
+                QUOTA_ROUTER_AVAILABLE = True
+            except ImportError:
+                try:
+                    from app.routers import auth, subscriptions, usage, whatsapp, telegraph
+                    ROUTERS_AVAILABLE = True
+                    INTELLIGENCE_ROUTER_AVAILABLE = False
+                    MARKETS_ROUTER_AVAILABLE = False
+                    REVIEW_ROUTER_AVAILABLE = False
+                    QUOTA_ROUTER_AVAILABLE = False
+                except ImportError:
+                    ROUTERS_AVAILABLE = False
+                    INTELLIGENCE_ROUTER_AVAILABLE = False
+                    MARKETS_ROUTER_AVAILABLE = False
+                    REVIEW_ROUTER_AVAILABLE = False
+                    QUOTA_ROUTER_AVAILABLE = False
 
 logger.info("=" * 50)
 logger.info("Initializing FactCheckr API...")
@@ -77,7 +113,7 @@ except Exception as e:
 
 # --- CORS Middleware (CRITICAL: Add BEFORE routes) ---
 # Default CORS origins: localhost for dev, Railway domain, and custom domain
-default_origins = "http://localhost:3000,https://factcheck.mx,https://www.factcheck.mx,https://fact-checkr-production.up.railway.app"
+default_origins = "http://localhost:3000,http://localhost:3001,https://factcheck.mx,https://www.factcheck.mx,https://fact-checkr-production.up.railway.app"
 cors_origins = os.getenv("CORS_ORIGINS", default_origins).split(",")
 # Clean up any empty strings from splitting
 cors_origins = [origin.strip() for origin in cors_origins if origin.strip()]
@@ -126,6 +162,26 @@ if ROUTERS_AVAILABLE:
         app.include_router(telegraph.router, prefix="/api", tags=["telegraph"])
         logger.info("✅ Base routers registered successfully")
         
+        if QUOTA_ROUTER_AVAILABLE:
+            app.include_router(quota.router, prefix="/api", tags=["quota"])
+            logger.info("✅ Quota management router registered")
+        
+        # Keywords router (always available - no external dependencies)
+        try:
+            from app.routers import keywords
+            app.include_router(keywords.router, prefix="/api", tags=["keywords"])
+            logger.info("✅ Keywords management router registered")
+        except ImportError as e:
+            logger.warning(f"Keywords router not available: {e}")
+        
+        if REVIEW_ROUTER_AVAILABLE:
+            app.include_router(review.router, prefix="/api", tags=["review"])
+            logger.info("✅ Review queue router registered")
+        
+        if MARKETS_ROUTER_AVAILABLE:
+            app.include_router(markets.router, prefix="/api", tags=["markets"])
+            logger.info("✅ Markets API router registered")
+        
         if INTELLIGENCE_ROUTER_AVAILABLE:
             app.include_router(intelligence.router)
             logger.info("✅ Intelligence API router registered")
@@ -134,7 +190,7 @@ if ROUTERS_AVAILABLE:
         logger.warning(traceback.format_exc())
 
 # --- Helper Functions ---
-def map_db_claim_to_response(db_claim: DBClaim) -> ClaimResponse:
+def map_db_claim_to_response(db_claim: DBClaim, db: Optional[Session] = None) -> ClaimResponse:
     """Map database claim object to Pydantic response model"""
     
     # Parse verification status
@@ -162,13 +218,49 @@ def map_db_claim_to_response(db_claim: DBClaim) -> ClaimResponse:
             timestamp=str(db_claim.source.timestamp),
             url=db_claim.source.url or ""
         )
+    
+    # Get primary market for this claim (most recent open, or most recent resolved)
+    market_summary = None
+    if db is not None:
+        # Try to get most recent open market first
+        market = db.query(DBMarket).filter(
+            DBMarket.claim_id == db_claim.id,
+            DBMarket.status == MarketStatus.OPEN
+        ).order_by(desc(DBMarket.created_at)).first()
+        
+        # If no open market, get most recent resolved market
+        if not market:
+            market = db.query(DBMarket).filter(
+                DBMarket.claim_id == db_claim.id,
+                DBMarket.status == MarketStatus.RESOLVED
+            ).order_by(desc(DBMarket.created_at)).first()
+        
+        if market:
+            from app.services.markets import yes_probability, no_probability, calculate_volume
+            yes_prob = yes_probability(market)
+            no_prob = no_probability(market)
+            volume = calculate_volume(market, db)
+            
+            market_summary = MarketSummary(
+                id=market.id,
+                slug=market.slug,
+                question=market.question,
+                yes_probability=yes_prob,
+                no_probability=no_prob,
+                volume=volume,
+                closes_at=market.closes_at,
+                status=market.status.value,
+                claim_id=market.claim_id,
+                category=market.category
+            )
         
     return ClaimResponse(
         id=str(db_claim.id),
         original_text=db_claim.original_text,
         claim_text=db_claim.claim_text,
         verification=verification,
-        source_post=source_post
+        source_post=source_post,
+        market=market_summary
     )
 
 # --- Exception Handlers ---
@@ -219,7 +311,7 @@ async def get_claims(
             .limit(limit)\
             .all()
             
-        return [map_db_claim_to_response(c) for c in claims]
+        return [map_db_claim_to_response(c, db) for c in claims]
     except (OperationalError) as e:
         db.rollback()
         raise
@@ -250,7 +342,7 @@ async def search_claims(
         .limit(50)\
         .all()
         
-    return [map_db_claim_to_response(c) for c in claims]
+    return [map_db_claim_to_response(c, db) for c in claims]
 
 @app.get("/stats")
 @limiter.limit("60/minute")
@@ -364,7 +456,7 @@ async def get_claims_by_topic(
             query = query.filter(DBClaim.status == status_enum)
             
     claims = query.order_by(desc(DBClaim.created_at)).offset(skip).limit(limit).all()
-    return [map_db_claim_to_response(c) for c in claims]
+    return [map_db_claim_to_response(c, db) for c in claims]
 
 @app.get("/trends/summary")
 async def get_trends_summary(
@@ -407,6 +499,273 @@ async def get_trends_summary(
             for s in status_breakdown
         ]
     }
+
+@app.get("/trends/topics")
+async def get_trending_topics(
+    days: int = 7,
+    limit: int = 8,
+    db: Session = Depends(get_db)
+):
+    """Get trending topics with claim counts"""
+    today = datetime.utcnow()
+    start_date = today - timedelta(days=days)
+    previous_start = start_date - timedelta(days=days)
+    
+    # Get topics with claim counts for current period
+    topics_data = db.query(
+        DBTopic.id,
+        DBTopic.name,
+        DBTopic.slug,
+        func.count(DBClaim.id).label('claim_count')
+    ).outerjoin(claim_topics, DBTopic.id == claim_topics.c.topic_id)\
+     .outerjoin(DBClaim, and_(
+         DBClaim.id == claim_topics.c.claim_id,
+         DBClaim.created_at >= start_date
+     ))\
+     .group_by(DBTopic.id, DBTopic.name, DBTopic.slug)\
+     .order_by(desc('claim_count'))\
+     .limit(limit)\
+     .all()
+    
+    result = []
+    for topic in topics_data:
+        # Get previous period count
+        previous_count = db.query(func.count(DBClaim.id))\
+            .join(claim_topics, DBClaim.id == claim_topics.c.claim_id)\
+            .filter(
+                claim_topics.c.topic_id == topic.id,
+                DBClaim.created_at >= previous_start,
+                DBClaim.created_at < start_date
+            ).scalar() or 0
+        
+        growth = 0
+        if previous_count > 0:
+            growth = round(((topic.claim_count - previous_count) / previous_count) * 100, 1)
+        
+        result.append({
+            "id": topic.id,
+            "name": topic.name,
+            "slug": topic.slug,
+            "claim_count": topic.claim_count,
+            "previous_count": previous_count,
+            "growth_percentage": growth,
+            "trend_up": growth >= 0
+        })
+    
+    return result
+
+
+@app.get("/trends/entities")
+async def get_trending_entities(
+    days: int = 7,
+    limit: int = 15,
+    db: Session = Depends(get_db)
+):
+    """Get trending entities with mention counts"""
+    today = datetime.utcnow()
+    start_date = today - timedelta(days=days)
+    
+    # Get all entities
+    entities = db.query(DBEntity).all()
+    
+    # Count how many times entity name appears in recent claims
+    result = []
+    for entity in entities:
+        claim_count = db.query(func.count(DBClaim.id))\
+            .filter(
+                DBClaim.created_at >= start_date,
+                or_(
+                    DBClaim.claim_text.ilike(f"%{entity.name}%"),
+                    DBClaim.original_text.ilike(f"%{entity.name}%")
+                )
+            ).scalar() or 0
+        
+        if claim_count > 0:
+            result.append({
+                "id": entity.id,
+                "name": entity.name,
+                "type": entity.entity_type or "unknown",
+                "claim_count": claim_count
+            })
+    
+    # Sort by claim count and limit
+    result.sort(key=lambda x: x["claim_count"], reverse=True)
+    return result[:limit]
+
+
+@app.get("/trends/platforms")
+async def get_platform_activity(
+    days: int = 7,
+    db: Session = Depends(get_db)
+):
+    """Get platform activity breakdown"""
+    today = datetime.utcnow()
+    start_date = today - timedelta(days=days)
+    
+    # Get claims by platform
+    platform_data = db.query(
+        DBSource.platform,
+        func.count(DBClaim.id).label('total_count'),
+        func.sum(case((DBClaim.status == DBVerificationStatus.DEBUNKED, 1), else_=0)).label('debunked_count'),
+        func.sum(case((DBClaim.status == DBVerificationStatus.VERIFIED, 1), else_=0)).label('verified_count')
+    ).join(DBClaim, DBClaim.source_id == DBSource.id)\
+     .filter(DBClaim.created_at >= start_date)\
+     .group_by(DBSource.platform)\
+     .order_by(desc('total_count'))\
+     .all()
+    
+    platforms = [
+        {
+            "platform": p.platform or "Unknown",
+            "total_count": p.total_count or 0,
+            "debunked_count": p.debunked_count or 0,
+            "verified_count": p.verified_count or 0
+        }
+        for p in platform_data
+    ]
+    
+    return {
+        "platforms": platforms,
+        "daily_breakdown": {}
+    }
+
+
+@app.get("/claims/trending", response_model=List[ClaimResponse])
+async def get_trending_claims(
+    days: int = 7,
+    limit: int = 20,
+    db: Session = Depends(get_db)
+):
+    """Get trending/recent claims"""
+    today = datetime.utcnow()
+    start_date = today - timedelta(days=days)
+    
+    claims = db.query(DBClaim)\
+        .filter(DBClaim.created_at >= start_date)\
+        .order_by(desc(DBClaim.created_at))\
+        .limit(limit)\
+        .all()
+    
+    return [map_db_claim_to_response(c, db) for c in claims]
+
+
+@app.get("/sources")
+async def get_sources(
+    skip: int = 0,
+    limit: int = 20,
+    platform: Optional[str] = None,
+    processed: Optional[int] = None,
+    search: Optional[str] = None,
+    db: Session = Depends(get_db)
+):
+    """Get paginated sources"""
+    query = db.query(DBSource)
+    
+    if platform:
+        query = query.filter(DBSource.platform == platform)
+    
+    if processed is not None:
+        query = query.filter(DBSource.processed == processed)
+    
+    if search:
+        search_term = f"%{search}%"
+        query = query.filter(
+            or_(
+                DBSource.content.ilike(search_term),
+                DBSource.author.ilike(search_term)
+            )
+        )
+    
+    sources = query.order_by(desc(DBSource.timestamp))\
+        .offset(skip)\
+        .limit(limit)\
+        .all()
+    
+    result = []
+    for s in sources:
+        # Count claims for this source
+        claim_count = db.query(func.count(DBClaim.id))\
+            .filter(DBClaim.source_id == s.id)\
+            .scalar() or 0
+        
+        result.append({
+            "id": str(s.id),
+            "platform": s.platform,
+            "content": s.content,
+            "author": s.author,
+            "url": s.url,
+            "timestamp": s.timestamp.isoformat() if s.timestamp else None,
+            "scraped_at": s.scraped_at.isoformat() if s.scraped_at else None,
+            "processed": s.processed,
+            "claim_count": claim_count
+        })
+    
+    return result
+
+
+@app.get("/sources/stats")
+async def get_source_stats(db: Session = Depends(get_db)):
+    """Get source statistics"""
+    total = db.query(func.count(DBSource.id)).scalar() or 0
+    
+    # Sources that have claims
+    sources_with_claims = db.query(func.count(func.distinct(DBClaim.source_id))).scalar() or 0
+    
+    # Platform breakdown
+    platforms = db.query(
+        DBSource.platform,
+        func.count(DBSource.id).label('count')
+    ).group_by(DBSource.platform).all()
+    
+    # Processing status breakdown
+    processing_status = db.query(
+        DBSource.processed,
+        func.count(DBSource.id).label('count')
+    ).group_by(DBSource.processed).all()
+    
+    return {
+        "total_sources": total,
+        "sources_with_claims": sources_with_claims,
+        "platforms": [{"platform": p.platform or "Unknown", "count": p.count} for p in platforms],
+        "processing_status": [{"status": s.processed, "count": s.count} for s in processing_status]
+    }
+
+
+@app.get("/analytics")
+async def get_analytics(
+    days: int = 30,
+    db: Session = Depends(get_db)
+):
+    """Get analytics data"""
+    today = datetime.utcnow()
+    start_date = today - timedelta(days=days)
+    
+    # Claims by day
+    daily_claims = db.query(
+        func.date(DBClaim.created_at).label('date'),
+        func.count(DBClaim.id).label('count')
+    ).filter(DBClaim.created_at >= start_date)\
+     .group_by(func.date(DBClaim.created_at))\
+     .order_by('date')\
+     .all()
+    
+    # Status distribution
+    status_dist = db.query(
+        DBClaim.status,
+        func.count(DBClaim.id).label('count')
+    ).filter(DBClaim.created_at >= start_date)\
+     .group_by(DBClaim.status)\
+     .all()
+    
+    return {
+        "period_days": days,
+        "daily_claims": [{"date": str(d.date), "count": d.count} for d in daily_claims],
+        "status_distribution": [
+            {"status": str(s.status.value) if hasattr(s.status, 'value') else str(s.status), "count": s.count}
+            for s in status_dist
+        ]
+    }
+
 
 @app.get("/entities")
 async def get_entities(db: Session = Depends(get_db)):
