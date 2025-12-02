@@ -14,16 +14,16 @@ import os
 import redis
 r = redis.from_url(os.getenv('REDIS_URL', 'redis://localhost:6379/0'))
 r.ping()
-print('✅ Redis connection successful')
+print('[OK] Redis connection successful')
 " || {
-    echo "❌ Failed to connect to Redis"
+    echo "[ERROR] Failed to connect to Redis"
     exit 1
 }
 
 # Test if worker module can be imported
 echo "Testing worker import..."
-python -c "from app.worker import celery_app; print('✅ Worker module imported successfully')" || {
-    echo "❌ Failed to import worker module"
+python -c "from app.worker import celery_app; print('[OK] Worker module imported successfully')" || {
+    echo "[ERROR] Failed to import worker module"
     exit 1
 }
 
@@ -36,4 +36,3 @@ exec celery -A app.worker.celery_app worker \
     --max-tasks-per-child=50 \
     --time-limit=900 \
     --soft-time-limit=840
-
