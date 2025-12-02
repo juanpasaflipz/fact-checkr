@@ -135,7 +135,9 @@ export default function ClaimCard({ claim }: ClaimProps) {
         style={{
           boxShadow: `0 0 15px ${config.neon}50`
         }}>
-          <Icon name={StatusIcon} className="size-4" style={{ filter: `drop-shadow(0 0 3px ${config.neon})` }} />
+          <span style={{ filter: `drop-shadow(0 0 3px ${config.neon})` }}>
+            <Icon name={StatusIcon} className="size-4" />
+          </span>
           {config.label}
         </span>
       </div>
