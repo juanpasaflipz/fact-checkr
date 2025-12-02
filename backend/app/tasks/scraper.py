@@ -25,10 +25,20 @@ async def fetch_and_store(keywords):
         google = GoogleNewsScraper()
         youtube = YouTubeScraper() if YOUTUBE_AVAILABLE else None
         
-        # Fetch concurrently with individual error handling
+        # Check quota and fetch Twitter separately (with quota management)
+        from app.services.quota_manager import quota_manager
+        can_fetch, max_twitter_posts = quota_manager.can_fetch_posts(100, db)  # Request up to 100
+        
+        if not can_fetch:
+            logger.warning("Twitter quota exhausted. Skipping Twitter scraping this run.")
+            twitter_posts = []
+        else:
+            # Fetch Twitter posts with quota limit
+            logger.info(f"Fetching Twitter posts (quota-limited to {max_twitter_posts} posts)")
+            twitter_posts = await twitter.fetch_posts(keywords, max_results=max_twitter_posts)
+        
+        # Fetch other sources concurrently (Google, YouTube)
         tasks = [
-            twitter.fetch_posts(keywords),
-            # reddit.fetch_posts(keywords),
             google.fetch_posts(keywords)
         ]
         
@@ -36,10 +46,14 @@ async def fetch_and_store(keywords):
         if youtube:
             tasks.append(youtube.fetch_posts(keywords))
         
+        # Fetch other sources in parallel
         results = await asyncio.gather(*tasks, return_exceptions=True)
         
-        all_posts = []
-        scraper_names = ["Twitter", "Google", "YouTube"] if youtube else ["Twitter", "Google"]
+        # Start with Twitter posts (already fetched)
+        all_posts = list(twitter_posts) if can_fetch else []
+        
+        # Add results from other sources
+        scraper_names = ["Google", "YouTube"] if youtube else ["Google"]
         for i, res in enumerate(results):
             if isinstance(res, Exception):
                 logger.error(f"Error in {scraper_names[i]} scraper: {res}")
@@ -54,14 +68,33 @@ async def fetch_and_store(keywords):
             # Check if exists
             exists = db.query(Source).filter(Source.id == post.id).first()
             if not exists:
+                # Parse timestamp
+                try:
+                    if post.timestamp:
+                        # Try ISO format first
+                        if isinstance(post.timestamp, str):
+                            post_timestamp = datetime.fromisoformat(post.timestamp.replace('Z', '+00:00'))
+                        else:
+                            post_timestamp = post.timestamp
+                    else:
+                        post_timestamp = datetime.utcnow()
+                except:
+                    post_timestamp = datetime.utcnow()
+                
                 source = Source(
                     id=post.id,
                     platform=post.platform,
                     content=post.content,
                     author=post.author,
                     url=post.url,
-                    timestamp=post.timestamp or datetime.utcnow(),
-                    processed=0 # Pending
+                    timestamp=post_timestamp,
+                    processed=0,  # Pending
+                    # Enhanced data fields (if available)
+                    engagement_metrics=post.engagement_metrics if hasattr(post, 'engagement_metrics') and post.engagement_metrics else None,
+                    author_metadata=post.author_metadata if hasattr(post, 'author_metadata') and post.author_metadata else None,
+                    media_urls=post.media_urls if hasattr(post, 'media_urls') and post.media_urls else None,
+                    context_data=post.context_data if hasattr(post, 'context_data') and post.context_data else None,
+                    credibility_score=0.5  # Default, can be calculated later
                 )
                 db.add(source)
                 db.commit()
@@ -92,15 +125,16 @@ def scrape_all_sources(self):
     
     Automatically retries on failure with exponential backoff.
     """
-    keywords = [
-        "Reforma Judicial", 
-        "Sheinbaum", 
-        "México", 
-        "Morena",
-        "política mexicana",
-        "AMLO",
-        "Congreso México"
-    ]
+    # Get keywords from configuration
+    # Can be overridden via environment variable: SCRAPING_KEYWORD_PRIORITY
+    # Options: "high", "medium", "low", "all", "default"
+    import os
+    from app.config.scraping_keywords import get_keywords_for_scraping
+    
+    priority = os.getenv("SCRAPING_KEYWORD_PRIORITY", "default")
+    keywords = get_keywords_for_scraping(priority)
+    
+    logger.info(f"Using {len(keywords)} keywords for scraping (priority: {priority})")
     
     try:
         # Run async function in sync Celery task

@@ -4,7 +4,7 @@ from fastapi.security import HTTPBearer
 from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr
 from datetime import datetime
-from typing import Optional
+from typing import Optional, List
 
 from app.database.connection import get_db
 from app.database.models import User
@@ -15,6 +15,7 @@ from app.utils import (
     verify_password,
     get_password_hash,
     create_default_subscription,
+    create_default_user_balance,
 )
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -38,6 +39,8 @@ class UserResponse(BaseModel):
     is_active: bool
     is_verified: bool
     created_at: datetime
+    preferred_categories: Optional[List[str]] = None
+    onboarding_completed: Optional[bool] = False
 
 class TokenResponse(BaseModel):
     access_token: str
@@ -92,6 +95,9 @@ async def register(
     # Create default FREE subscription
     create_default_subscription(db, user.id)
     
+    # Create default user balance with demo credits
+    create_default_user_balance(db, user.id)
+    
     # Create access token
     access_token = create_access_token(data={"sub": user.id})
     
@@ -104,7 +110,9 @@ async def register(
             full_name=user.full_name,
             is_active=user.is_active,
             is_verified=user.is_verified,
-            created_at=user.created_at
+            created_at=user.created_at,
+            preferred_categories=user.preferred_categories,
+            onboarding_completed=user.onboarding_completed or False
         )
     )
 
@@ -152,7 +160,9 @@ async def login(
             full_name=user.full_name,
             is_active=user.is_active,
             is_verified=user.is_verified,
-            created_at=user.created_at
+            created_at=user.created_at,
+            preferred_categories=user.preferred_categories,
+            onboarding_completed=user.onboarding_completed or False
         )
     )
 
@@ -168,5 +178,45 @@ async def get_current_user_info(
         full_name=user.full_name,
         is_active=user.is_active,
         is_verified=user.is_verified,
-        created_at=user.created_at
+        created_at=user.created_at,
+        preferred_categories=user.preferred_categories,
+        onboarding_completed=user.onboarding_completed or False
+    )
+
+class UpdatePreferencesRequest(BaseModel):
+    preferred_categories: List[str]
+    onboarding_completed: bool = True
+
+@router.put("/me/preferences", response_model=UserResponse)
+async def update_preferences(
+    preferences: UpdatePreferencesRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Update user preferences for market categories"""
+    # Validate categories
+    valid_categories = ['politics', 'economy', 'security', 'rights', 'environment', 'mexico-us-relations', 'institutions']
+    for cat in preferences.preferred_categories:
+        if cat not in valid_categories:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"Invalid category: {cat}. Must be one of: {', '.join(valid_categories)}"
+            )
+    
+    # Update user preferences
+    user.preferred_categories = preferences.preferred_categories
+    user.onboarding_completed = preferences.onboarding_completed
+    db.commit()
+    db.refresh(user)
+    
+    return UserResponse(
+        id=user.id,
+        email=user.email,
+        username=user.username,
+        full_name=user.full_name,
+        is_active=user.is_active,
+        is_verified=user.is_verified,
+        created_at=user.created_at,
+        preferred_categories=user.preferred_categories,
+        onboarding_completed=user.onboarding_completed
     )

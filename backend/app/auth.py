@@ -82,3 +82,14 @@ async def get_optional_user(
     except JWTError:
         return None
 
+async def get_admin_user(
+    user: User = Depends(get_current_user)
+) -> User:
+    """Require admin privileges - raises 403 if user is not admin"""
+    if not user.is_admin:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Admin access required"
+        )
+    return user
+

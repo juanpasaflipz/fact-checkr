@@ -47,12 +47,37 @@ celery_app.conf.update(
     task_send_sent_event=True,
     
     # Periodic tasks configuration (Beats)
+    # Using crontab-style scheduling for specific times
+    from celery.schedules import crontab
+    
     beat_schedule={
-        "scrape-every-hour": {
+        # Twitter scraping: 4 times per day at 6 AM, 12 PM, 6 PM, and midnight (Mexico City time)
+        "scrape-twitter-6am": {
             "task": "app.tasks.scraper.scrape_all_sources",
-            "schedule": 3600.0,  # 1 hour (3600 seconds)
+            "schedule": crontab(hour=6, minute=0),  # 6:00 AM
             "options": {
-                "expires": 7200,  # Task expires if not executed within 2 hours (more lenient)
+                "expires": 21600,  # Expires after 6 hours
+            }
+        },
+        "scrape-twitter-12pm": {
+            "task": "app.tasks.scraper.scrape_all_sources",
+            "schedule": crontab(hour=12, minute=0),  # 12:00 PM (noon)
+            "options": {
+                "expires": 21600,  # Expires after 6 hours
+            }
+        },
+        "scrape-twitter-6pm": {
+            "task": "app.tasks.scraper.scrape_all_sources",
+            "schedule": crontab(hour=18, minute=0),  # 6:00 PM
+            "options": {
+                "expires": 21600,  # Expires after 6 hours
+            }
+        },
+        "scrape-twitter-midnight": {
+            "task": "app.tasks.scraper.scrape_all_sources",
+            "schedule": crontab(hour=0, minute=0),  # 12:00 AM (midnight)
+            "options": {
+                "expires": 21600,  # Expires after 6 hours
             }
         },
         "health-check-every-5min": {

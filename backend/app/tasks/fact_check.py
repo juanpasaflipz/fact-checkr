@@ -1,7 +1,10 @@
 import asyncio
+import os
 from celery import shared_task
 from app.database import SessionLocal, Source, Claim, VerificationStatus
 from app.agent import FactChecker
+from app.models import VerificationResult
+from app.services.rag_pipeline import RAGPipeline
 import logging
 import json
 
@@ -19,8 +22,9 @@ async def verify_source(source_id: str):
             logger.info(f"Source {source_id} already processed")
             return
 
-        # Initialize FactChecker
+        # Initialize FactChecker and RAG Pipeline
         checker = FactChecker()
+        rag = RAGPipeline()
         
         # 1. Extract Claim
         claim_text = await checker._extract_claim(source.content)
@@ -29,15 +33,89 @@ async def verify_source(source_id: str):
             source.processed = 2 # Skipped
             db.commit()
             return
-            
-        # 2. Search Evidence (using checker's method if available or direct search)
-        # We need to access search_web from agent.py or utils
-        from app.agent import search_web
-        evidence_links = await search_web(claim_text)
-        filtered_evidence = checker._filter_sources(evidence_links)
         
-        # 3. Verify
-        verification = await checker._verify_claim(claim_text, filtered_evidence)
+        # 2. Build rich context using RAG pipeline
+        logger.info(f"Building verification context for claim: {claim_text[:100]}...")
+        context = await rag.build_verification_context(
+            claim_text=claim_text,
+            original_text=source.content,
+            source_url=source.url
+        )
+        
+        # 3. Check for similar claims (deduplication)
+        similar_claims = context.get("similar_claims", [])
+        if similar_claims and similar_claims[0].get("similarity", 0) > 0.95:
+            # Very similar claim exists - check if we can reuse
+            similar_claim_id = similar_claims[0].get("claim_id")
+            if similar_claim_id:
+                existing_claim = db.query(Claim).filter(
+                    Claim.id == similar_claim_id
+                ).first()
+                if existing_claim:
+                    # Link to existing claim instead of re-verifying
+                    source.processed = 1
+                    db.commit()
+                    logger.info(f"Linked source {source_id} to existing claim {similar_claim_id} (similarity: {similar_claims[0].get('similarity', 0):.2f})")
+                    return existing_claim.id
+        
+        # 4. Get evidence with actual content
+        evidence_urls = context.get("evidence_urls", [])
+        evidence_texts = context.get("evidence_texts", [])
+        
+        # If no evidence texts, try to fetch them
+        if not evidence_texts and evidence_urls:
+            logger.info(f"Fetching content from {len(evidence_urls)} evidence URLs...")
+            evidence_texts = await rag._fetch_evidence_content(evidence_urls[:5])
+        
+        # 5. Verify with enhanced context and evidence content
+        # Option: Use multi-agent system for higher accuracy (can be toggled)
+        use_multi_agent = os.getenv("USE_MULTI_AGENT_VERIFICATION", "false").lower() == "true"
+        
+        if use_multi_agent:
+            logger.info(f"Using multi-agent verification system...")
+            from app.agents.verification_team import VerificationOrchestrator
+            
+            orchestrator = VerificationOrchestrator()
+            agent_result = await orchestrator.verify_claim(claim_text, context)
+            
+            final_verdict = agent_result["final_verdict"]
+            
+            # Convert to VerificationResult format
+            status_map = {
+                "Verified": VerificationStatus.VERIFIED,
+                "Debunked": VerificationStatus.DEBUNKED,
+                "Misleading": VerificationStatus.MISLEADING,
+                "Unverified": VerificationStatus.UNVERIFIED
+            }
+            
+            # Map final verdict to VerificationResult
+            verdict_status = final_verdict.get("status", "Unverified")
+            # Handle case where status might be full enum value
+            if isinstance(verdict_status, str):
+                verdict_status = status_map.get(verdict_status, VerificationStatus.UNVERIFIED)
+            else:
+                verdict_status = VerificationStatus.UNVERIFIED
+            
+            verification = VerificationResult(
+                status=verdict_status,
+                explanation=final_verdict.get("explanation", "No se pudo verificar."),
+                sources=evidence_urls,
+                confidence=final_verdict.get("confidence", 0.5),
+                evidence_strength="strong" if final_verdict.get("confidence", 0.5) > 0.7 else "moderate" if final_verdict.get("confidence", 0.5) > 0.5 else "weak",
+                key_evidence_points=final_verdict.get("key_evidence", [])
+            )
+            
+            # Store agent findings
+            agent_findings = agent_result.get("agent_results", [])
+        else:
+            logger.info(f"Verifying claim with {len(evidence_texts)} evidence sources...")
+            verification = await checker._verify_claim_with_evidence(
+                claim_text,
+                evidence_urls,
+                evidence_texts,
+                context
+            )
+            agent_findings = None
         
         # 4. Extract Entities
         from app.database.models import Entity as DBEntity
@@ -52,7 +130,15 @@ async def verify_source(source_id: str):
         # Extract topics using AI
         topic_names = await checker._extract_topics(claim_text, topics_list)
         
-        # 6. Store Claim
+        # 6. Store Claim with enhanced fields
+        # Determine if review is needed based on confidence
+        needs_review = verification.confidence < 0.6
+        review_priority = None
+        if verification.confidence < 0.4:
+            review_priority = "high"
+        elif verification.confidence < 0.6:
+            review_priority = "medium"
+        
         claim = Claim(
             id=f"claim_{source.id}",
             source_id=source.id,
@@ -60,7 +146,13 @@ async def verify_source(source_id: str):
             claim_text=claim_text,
             status=VerificationStatus(verification.status),
             explanation=verification.explanation,
-            evidence_sources=verification.sources
+            evidence_sources=verification.sources,
+            confidence=verification.confidence,
+            evidence_strength=verification.evidence_strength,
+            key_evidence_points=verification.key_evidence_points,
+            needs_review=needs_review,
+            review_priority=review_priority,
+            agent_findings=json.dumps(agent_findings) if agent_findings else None
         )
         
         db.add(claim)
@@ -92,7 +184,13 @@ async def verify_source(source_id: str):
         source.processed = 1 # Processed
         db.commit()
         
-        logger.info(f"Verified claim for source {source_id}: {verification.status} with {len(entities)} entities and {len(linked_topics)} topics: {linked_topics}")
+        logger.info(
+            f"Verified claim for source {source_id}: {verification.status} "
+            f"(confidence: {verification.confidence:.2f}, evidence: {verification.evidence_strength}) "
+            f"with {len(entities)} entities and {len(linked_topics)} topics: {linked_topics}"
+        )
+        if needs_review:
+            logger.warning(f"Claim {claim.id} flagged for review (priority: {review_priority})")
         return claim.id
         
     except Exception as e:

@@ -48,7 +48,7 @@ class BaseAgent(ABC):
             except Exception as e:
                 logger.warning(f"Failed to init OpenAI: {e}")
         
-        self.primary_model = "claude-sonnet-4-20250514"
+        self.primary_model = "claude-sonnet-3-5-20241022"  # Use same model as main verification
         self.fallback_model = "gpt-4o-mini"
     
     @property

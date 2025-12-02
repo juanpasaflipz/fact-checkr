@@ -3,7 +3,7 @@ from passlib.context import CryptContext
 from datetime import datetime, timedelta
 from typing import Optional
 from sqlalchemy.orm import Session
-from app.database.models import User, Subscription, SubscriptionTier, UsageTracking
+from app.database.models import User, Subscription, SubscriptionTier, SubscriptionStatus, UsageTracking, UserBalance
 
 # Password hashing context
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
@@ -50,6 +50,23 @@ def create_default_subscription(db: Session, user_id: int) -> Subscription:
     db.commit()
     db.refresh(subscription)
     return subscription
+
+def create_default_user_balance(db: Session, user_id: int) -> UserBalance:
+    """Create a default user balance with 1000 demo credits for a new user"""
+    # Check if balance already exists
+    existing_balance = db.query(UserBalance).filter(UserBalance.user_id == user_id).first()
+    if existing_balance:
+        return existing_balance
+    
+    balance = UserBalance(
+        user_id=user_id,
+        available_credits=1000.0,
+        locked_credits=0.0
+    )
+    db.add(balance)
+    db.commit()
+    db.refresh(balance)
+    return balance
 
 # Tier limits configuration
 TIER_LIMITS = {
