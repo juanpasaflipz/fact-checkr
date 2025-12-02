@@ -11,38 +11,114 @@ interface StatsCardProps {
 
 export default function StatsCard({ title, value, trend, trendUp, icon, color }: StatsCardProps) {
   const colorStyles = {
-    blue: { bg: "bg-blue-50", iconColor: "text-blue-600", gradient: "from-blue-500 to-blue-600" },
-    emerald: { bg: "bg-green-50", iconColor: "text-green-600", gradient: "from-green-500 to-green-600" },
-    rose: { bg: "bg-red-50", iconColor: "text-red-600", gradient: "from-red-500 to-red-600" },
-    amber: { bg: "bg-orange-50", iconColor: "text-orange-600", gradient: "from-orange-500 to-orange-600" },
+    blue: { 
+      neon: "#00f0ff",
+      bg: "bg-[#111118]",
+      border: "border-[#00f0ff]",
+      text: "text-[#00f0ff]",
+      glow: "glow-cyan"
+    },
+    emerald: { 
+      neon: "#00ff88",
+      bg: "bg-[#111118]",
+      border: "border-[#00ff88]",
+      text: "text-[#00ff88]",
+      glow: "glow-green"
+    },
+    rose: { 
+      neon: "#ff00ff",
+      bg: "bg-[#111118]",
+      border: "border-[#ff00ff]",
+      text: "text-[#ff00ff]",
+      glow: "glow-pink"
+    },
+    amber: { 
+      neon: "#ffaa00",
+      bg: "bg-[#111118]",
+      border: "border-[#ffaa00]",
+      text: "text-[#ffaa00]",
+      glow: "glow-cyan"
+    },
   };
 
   const style = colorStyles[color];
 
   return (
-    <div className="bg-white rounded-2xl p-6 shadow-lg hover:shadow-xl transition-shadow duration-300 border border-gray-100">
-      <div className="flex items-start justify-between mb-4">
-        <div className={`${style.bg} p-3 rounded-xl`}>
-          <Icon name={icon} className={`size-6 ${style.iconColor}`} />
-        </div>
-        {trend && (
-          <div className={`flex items-center gap-1 px-2 py-1 rounded-full text-xs ${
-            trendUp 
-              ? 'bg-green-50 text-green-700' 
-              : 'bg-red-50 text-red-700'
-          }`}>
-            <TrendIcon up={trendUp} className="size-3" />
+    <div className={`
+      group relative ${style.bg} rounded-lg p-6 
+      border-2 ${style.border}
+      ${style.glow}
+      transition-all duration-300 
+      hover:-translate-y-1 hover:scale-[1.02]
+      overflow-hidden
+      before:absolute before:inset-0 before:bg-gradient-to-br before:from-transparent before:via-transparent before:to-[${style.neon}]/5
+      before:opacity-0 group-hover:before:opacity-100 before:transition-opacity before:duration-300
+    `}
+    style={{
+      boxShadow: `0 0 20px ${style.neon}40, inset 0 0 20px ${style.neon}10`
+    }}>
+      {/* Grid pattern overlay */}
+      <div className="absolute inset-0 opacity-10" style={{
+        backgroundImage: `
+          linear-gradient(${style.neon}40 1px, transparent 1px),
+          linear-gradient(90deg, ${style.neon}40 1px, transparent 1px)
+        `,
+        backgroundSize: '20px 20px'
+      }} />
+      
+      <div className="relative z-10">
+        <div className="flex items-start justify-between mb-4">
+          <div className={`
+            p-3.5 rounded-lg 
+            border-2 ${style.border}
+            ${style.glow}
+            group-hover:scale-110 
+            transition-transform duration-300
+            bg-[#1a1a24]
+          `}
+          style={{
+            boxShadow: `0 0 15px ${style.neon}60`
+          }}>
+            <Icon name={icon} className={`size-6 ${style.text}`} style={{
+              filter: `drop-shadow(0 0 5px ${style.neon})`
+            }} />
           </div>
+          {trend && (
+            <div className={`
+              flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-bold
+              ${trendUp 
+                ? 'bg-[#1a1a24] border-2 border-[#00ff88] text-[#00ff88]' 
+                : 'bg-[#1a1a24] border-2 border-[#ff00ff] text-[#ff00ff]'
+              }
+            `}
+            style={{
+              boxShadow: trendUp 
+                ? '0 0 10px rgba(0, 255, 136, 0.5)'
+                : '0 0 10px rgba(255, 0, 255, 0.5)'
+            }}>
+              <TrendIcon up={trendUp} className="size-3.5" />
+            </div>
+          )}
+        </div>
+        
+        <h3 className={`text-3xl mb-1.5 font-bold tracking-tight ${style.text} transition-colors`}
+            style={{
+              textShadow: `0 0 10px ${style.neon}, 0 0 20px ${style.neon}80`
+            }}>
+          {value}
+        </h3>
+        <p className="text-sm text-gray-400 mb-2 font-semibold">{title}</p>
+        {trend && (
+          <p className={`text-xs font-bold ${trendUp ? 'text-[#00ff88]' : 'text-[#ff00ff]'}`}
+             style={{
+               textShadow: trendUp 
+                 ? '0 0 5px #00ff88'
+                 : '0 0 5px #ff00ff'
+             }}>
+            {trend}
+          </p>
         )}
       </div>
-      
-      <h3 className="text-3xl text-gray-900 mb-1 font-bold">{value}</h3>
-      <p className="text-sm text-gray-500 mb-2 font-medium">{title}</p>
-      {trend && (
-        <p className={`text-xs ${trendUp ? 'text-green-600' : 'text-red-600'} font-medium`}>
-          {trend}
-        </p>
-      )}
     </div>
   );
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 import Sidebar from '@/components/Sidebar';
 import Header from '@/components/Header';
 import TopicCard from '@/components/TopicCard';
@@ -125,12 +126,20 @@ export default function TopicsPage() {
         <main className="p-6 lg:p-8">
           <div className="max-w-7xl mx-auto space-y-6">
             
-            {/* Header */}
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900">Temas</h1>
-                <p className="text-gray-600 mt-1">Explora y navega todos los temas de verificación</p>
-              </div>
+            {/* Header - Enhanced */}
+            <div className="bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 rounded-2xl p-6 border-2 border-indigo-200/50 shadow-xl">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-xl">
+                    <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h1 className="text-3xl font-bold text-gray-900">Temas</h1>
+                    <p className="text-gray-600 mt-1">Explora y navega todos los temas de verificación</p>
+                  </div>
+                </div>
               
               <div className="flex items-center gap-3">
                 {/* View Mode Toggle */}
@@ -178,28 +187,143 @@ export default function TopicsPage() {
                   <option value="recent">Más recientes</option>
                 </select>
               </div>
+              </div>
             </div>
 
-            {/* Stats Summary */}
+            {/* Topic Discovery Banner - Enhanced */}
+            {topics.length > 0 && (
+              <div className="bg-gradient-to-r from-blue-500 via-indigo-600 to-purple-600 rounded-2xl p-6 text-white shadow-xl border-2 border-blue-400/50 relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full blur-3xl"></div>
+                <div className="relative z-10">
+                  <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
+                    <div>
+                      <h3 className="text-xl font-bold mb-2 flex items-center gap-2">
+                        <span>🔍</span>
+                        <span>Descubre Temas Nuevos</span>
+                      </h3>
+                      <p className="text-blue-100 text-sm mb-3">
+                        Explora {topics.length} temas activos con {topics.reduce((sum, t) => sum + (t.total_claims || 0), 0).toLocaleString('es-MX')} afirmaciones verificadas
+                      </p>
+                      <div className="flex items-center gap-4 text-sm">
+                        <div className="flex items-center gap-2">
+                          <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                          <span className="text-blue-100">
+                            {topics.filter(t => (t.total_claims || 0) > 0).length} temas con actividad
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                          </svg>
+                          <span className="text-blue-100">Actualizado en tiempo real</span>
+                        </div>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 px-4 py-2 bg-white/20 backdrop-blur-sm rounded-lg border border-white/30">
+                      <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                      </svg>
+                      <span className="font-semibold text-sm">Nuevo</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Trending Topics Quick View */}
+            {topics.length > 0 && (
+              <div className="bg-gradient-to-br from-orange-50 to-red-50 rounded-2xl p-6 border-2 border-orange-200/50 shadow-xl">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 bg-gradient-to-br from-orange-500 to-red-500 rounded-xl flex items-center justify-center shadow-lg">
+                    <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-900">🔥 Temas Más Activos</h3>
+                    <p className="text-sm text-gray-600">Los temas con mayor actividad reciente</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  {topics
+                    .filter(t => (t.total_claims || 0) > 0)
+                    .sort((a, b) => (b.total_claims || 0) - (a.total_claims || 0))
+                    .slice(0, 3)
+                    .map((topic, index) => (
+                      <Link
+                        key={topic.id}
+                        href={`/temas/${topic.slug}`}
+                        className="group bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-orange-200/50 hover:border-orange-400 hover:shadow-lg transition-all duration-300"
+                      >
+                        <div className="flex items-start justify-between mb-2">
+                          <div className="flex items-center gap-2">
+                            <div className={`w-6 h-6 rounded-lg flex items-center justify-center text-white font-bold text-xs ${
+                              index === 0 ? 'bg-gradient-to-br from-amber-500 to-yellow-500' :
+                              index === 1 ? 'bg-gradient-to-br from-gray-400 to-gray-500' :
+                              'bg-gradient-to-br from-orange-600 to-amber-600'
+                            }`}>
+                              {index === 0 ? '🥇' : index === 1 ? '🥈' : '🥉'}
+                            </div>
+                            <span className="text-xs font-semibold text-gray-600 uppercase">#{index + 1}</span>
+                          </div>
+                        </div>
+                        <h4 className="font-bold text-gray-900 group-hover:text-orange-600 transition-colors mb-2 line-clamp-2">
+                          {topic.name}
+                        </h4>
+                        <div className="flex items-center justify-between">
+                          <span className="text-lg font-bold text-gray-900">
+                            {(topic.total_claims || 0).toLocaleString('es-MX')}
+                          </span>
+                          <span className="text-xs text-gray-600">afirmaciones</span>
+                        </div>
+                      </Link>
+                    ))}
+                </div>
+              </div>
+            )}
+
+            {/* Stats Summary - Enhanced */}
             {!loading && topics.length > 0 && (
-              <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                  <div>
-                    <p className="text-sm text-gray-600 mb-1">Total de Temas</p>
-                    <p className="text-3xl font-bold text-gray-900">{topics.length}</p>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl p-6 border-2 border-blue-200/50 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Total de Temas</p>
+                    <div className="w-10 h-10 bg-blue-500 rounded-xl flex items-center justify-center shadow-md">
+                      <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
+                      </svg>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm text-gray-600 mb-1">Temas Activos</p>
-                    <p className="text-3xl font-bold text-[#2563EB]">
-                      {topics.filter(t => (t.total_claims || 0) > 0).length}
-                    </p>
+                  <p className="text-4xl font-bold text-gray-900">{topics.length}</p>
+                  <p className="text-xs text-gray-600 mt-2">Temas monitoreados</p>
+                </div>
+                <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl p-6 border-2 border-green-200/50 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Temas Activos</p>
+                    <div className="w-10 h-10 bg-green-500 rounded-xl flex items-center justify-center shadow-md">
+                      <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                      </svg>
+                    </div>
                   </div>
-                  <div>
-                    <p className="text-sm text-gray-600 mb-1">Total Afirmaciones</p>
-                    <p className="text-3xl font-bold text-gray-900">
-                      {topics.reduce((sum, t) => sum + (t.total_claims || 0), 0).toLocaleString('es-MX')}
-                    </p>
+                  <p className="text-4xl font-bold text-[#2563EB]">
+                    {topics.filter(t => (t.total_claims || 0) > 0).length}
+                  </p>
+                  <p className="text-xs text-gray-600 mt-2">Con afirmaciones</p>
+                </div>
+                <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl p-6 border-2 border-purple-200/50 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
+                  <div className="flex items-center justify-between mb-3">
+                    <p className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Total Afirmaciones</p>
+                    <div className="w-10 h-10 bg-purple-500 rounded-xl flex items-center justify-center shadow-md">
+                      <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                      </svg>
+                    </div>
                   </div>
+                  <p className="text-4xl font-bold text-gray-900">
+                    {topics.reduce((sum, t) => sum + (t.total_claims || 0), 0).toLocaleString('es-MX')}
+                  </p>
+                  <p className="text-xs text-gray-600 mt-2">Afirmaciones verificadas</p>
                 </div>
               </div>
             )}
@@ -240,14 +364,30 @@ export default function TopicsPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
                   </svg>
                 </div>
-                <p className="text-gray-900 font-semibold text-lg">
+                <p className="text-gray-900 font-semibold text-lg mb-2">
                   {searchQuery ? 'No se encontraron temas' : 'No hay temas disponibles'}
                 </p>
-                <p className="text-gray-500 mt-1">
+                <p className="text-gray-500 mb-6">
                   {searchQuery 
                     ? 'Intenta ajustar tu búsqueda.' 
                     : 'Los temas aparecerán aquí una vez que se agreguen al sistema.'}
                 </p>
+                {!searchQuery && (
+                  <div className="flex flex-wrap items-center justify-center gap-3">
+                    <a
+                      href="/tendencias"
+                      className="px-4 py-2 bg-gradient-to-r from-orange-500 to-red-500 text-white rounded-lg hover:from-orange-600 hover:to-red-600 transition-all text-sm font-medium shadow-md"
+                    >
+                      Ver Tendencias
+                    </a>
+                    <a
+                      href="/"
+                      className="px-4 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors text-sm font-medium"
+                    >
+                      Ver Feed Principal
+                    </a>
+                  </div>
+                )}
               </div>
             ) : (
               <div className={`

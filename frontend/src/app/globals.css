@@ -4,49 +4,248 @@
   :root {
     --font-noto-sans: 'Noto Sans', system-ui, sans-serif;
     --font-noto-serif: 'Noto Serif', Georgia, serif;
+    --neon-cyan: #00f0ff;
+    --neon-pink: #ff00ff;
+    --neon-blue: #0066ff;
+    --neon-green: #00ff88;
+    --neon-purple: #8b5cf6;
+    --dark-bg: #0a0a0f;
+    --dark-surface: #111118;
+    --dark-elevated: #1a1a24;
   }
   
   body {
     font-family: var(--font-noto-sans);
-    background-color: rgb(248 250 252);
-    color: rgb(15 23 42);
+    background: var(--dark-bg);
+    background-image: 
+      linear-gradient(rgba(0, 240, 255, 0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0, 240, 255, 0.03) 1px, transparent 1px);
+    background-size: 50px 50px;
+    color: #e0e0e0;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    position: relative;
+    overflow-x: hidden;
+  }
+
+  body::before {
+    content: '';
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: 
+      radial-gradient(circle at 20% 50%, rgba(0, 240, 255, 0.1) 0%, transparent 50%),
+      radial-gradient(circle at 80% 80%, rgba(255, 0, 255, 0.1) 0%, transparent 50%);
+    pointer-events: none;
+    z-index: 0;
   }
   
   body::selection {
-    background-color: rgb(219 234 254);
-    color: rgb(30 58 138);
+    background-color: rgba(0, 240, 255, 0.3);
+    color: #00f0ff;
   }
   
   h1, h2, h3, h4, h5, h6 {
-    font-family: var(--font-noto-serif);
+    font-family: var(--font-noto-sans);
+    font-weight: 700;
+    letter-spacing: -0.02em;
   }
 
-  /* Custom Scrollbar */
+  /* Custom Scrollbar - Cyberpunk */
   ::-webkit-scrollbar {
-    width: 8px;
-    height: 8px;
+    width: 10px;
+    height: 10px;
   }
   
   ::-webkit-scrollbar-track {
-    background: transparent;
+    background: var(--dark-surface);
+    border-left: 1px solid rgba(0, 240, 255, 0.2);
   }
   
   ::-webkit-scrollbar-thumb {
-    background-color: rgb(203 213 225);
-    border-radius: 9999px;
-    border: 2px solid transparent;
-    background-clip: content-box;
+    background: linear-gradient(180deg, #00f0ff 0%, #0066ff 100%);
+    border-radius: 5px;
+    border: 1px solid rgba(0, 240, 255, 0.5);
+    box-shadow: 0 0 10px rgba(0, 240, 255, 0.5);
   }
   
   ::-webkit-scrollbar-thumb:hover {
-    background-color: rgb(148 163 184);
+    background: linear-gradient(180deg, #00ffff 0%, #00f0ff 100%);
+    box-shadow: 0 0 15px rgba(0, 240, 255, 0.8);
   }
 }
 
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+
+  /* Cyberpunk Animations */
+  @keyframes fadeInUp {
+    from {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  @keyframes neon-glow {
+    0%, 100% {
+      text-shadow: 
+        0 0 5px currentColor,
+        0 0 10px currentColor,
+        0 0 15px currentColor,
+        0 0 20px currentColor;
+    }
+    50% {
+      text-shadow: 
+        0 0 2px currentColor,
+        0 0 5px currentColor,
+        0 0 8px currentColor,
+        0 0 12px currentColor;
+    }
+  }
+
+  @keyframes border-glow {
+    0%, 100% {
+      box-shadow: 
+        0 0 5px currentColor,
+        0 0 10px currentColor,
+        inset 0 0 5px currentColor;
+    }
+    50% {
+      box-shadow: 
+        0 0 10px currentColor,
+        0 0 20px currentColor,
+        0 0 30px currentColor,
+        inset 0 0 10px currentColor;
+    }
+  }
+
+  @keyframes scan-line {
+    0% {
+      transform: translateY(-100%);
+      opacity: 0;
+    }
+    50% {
+      opacity: 1;
+    }
+    100% {
+      transform: translateY(100vh);
+      opacity: 0;
+    }
+  }
+
+  @keyframes pulse-neon {
+    0%, 100% {
+      opacity: 1;
+      filter: brightness(1);
+    }
+    50% {
+      opacity: 0.8;
+      filter: brightness(1.2);
+    }
+  }
+
+  @keyframes glitch {
+    0% {
+      transform: translate(0);
+    }
+    20% {
+      transform: translate(-2px, 2px);
+    }
+    40% {
+      transform: translate(-2px, -2px);
+    }
+    60% {
+      transform: translate(2px, 2px);
+    }
+    80% {
+      transform: translate(2px, -2px);
+    }
+    100% {
+      transform: translate(0);
+    }
+  }
+
+  .animate-fade-in-up {
+    animation: fadeInUp 0.5s ease-out;
+  }
+
+  .animate-neon-glow {
+    animation: neon-glow 2s ease-in-out infinite;
+  }
+
+  .animate-border-glow {
+    animation: border-glow 2s ease-in-out infinite;
+  }
+
+  .animate-pulse-neon {
+    animation: pulse-neon 2s ease-in-out infinite;
+  }
+
+  /* Cyberpunk Utility Classes */
+  .cyberpunk-border {
+    border: 1px solid;
+    border-image: linear-gradient(135deg, #00f0ff, #ff00ff) 1;
+    box-shadow: 
+      0 0 10px rgba(0, 240, 255, 0.5),
+      inset 0 0 10px rgba(0, 240, 255, 0.1);
+  }
+
+  .neon-text-cyan {
+    color: #00f0ff;
+    text-shadow: 
+      0 0 5px #00f0ff,
+      0 0 10px #00f0ff,
+      0 0 15px #00f0ff;
+  }
+
+  .neon-text-pink {
+    color: #ff00ff;
+    text-shadow: 
+      0 0 5px #ff00ff,
+      0 0 10px #ff00ff,
+      0 0 15px #ff00ff;
+  }
+
+  .neon-text-green {
+    color: #00ff88;
+    text-shadow: 
+      0 0 5px #00ff88,
+      0 0 10px #00ff88,
+      0 0 15px #00ff88;
+  }
+
+  .glow-cyan {
+    box-shadow: 0 0 10px rgba(0, 240, 255, 0.5), 0 0 20px rgba(0, 240, 255, 0.3);
+  }
+
+  .glow-pink {
+    box-shadow: 0 0 10px rgba(255, 0, 255, 0.5), 0 0 20px rgba(255, 0, 255, 0.3);
+  }
+
+  .glow-green {
+    box-shadow: 0 0 10px rgba(0, 255, 136, 0.5), 0 0 20px rgba(0, 255, 136, 0.3);
+  }
+
+  /* Hide scrollbar but keep functionality */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Touch manipulation for better mobile performance */
+  .touch-manipulation {
+    touch-action: manipulation;
   }
 }

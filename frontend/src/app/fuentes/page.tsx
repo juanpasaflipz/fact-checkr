@@ -166,42 +166,132 @@ export default function FuentesPage() {
         <main className="p-6 lg:p-8">
           <div className="max-w-7xl mx-auto space-y-6">
             
-            {/* Header */}
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900">Fuentes</h1>
-                <p className="text-gray-600 mt-1">Explora todas las fuentes de información monitoreadas</p>
+            {/* Header - Enhanced */}
+            <div className="bg-gradient-to-br from-cyan-50 via-blue-50 to-indigo-50 rounded-2xl p-6 border-2 border-cyan-200/50 shadow-xl">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-xl">
+                    <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h1 className="text-3xl font-bold text-gray-900">Fuentes</h1>
+                    <p className="text-gray-600 mt-1">Explora todas las fuentes de información monitoreadas</p>
+                  </div>
+                </div>
+                {stats && (
+                  <div className="flex items-center gap-3 px-4 py-2 bg-white/80 backdrop-blur-sm rounded-lg border border-cyan-200/50 shadow-sm">
+                    <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                    <span className="text-sm font-semibold text-gray-700">
+                      {stats.sources_with_claims} fuentes activas
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
 
-            {/* Stats Summary */}
+            {/* Stats Summary - Enhanced */}
             {stats && (
-              <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
+              <>
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                  <div>
-                    <p className="text-sm text-gray-600 mb-1">Total de Fuentes</p>
-                    <p className="text-3xl font-bold text-gray-900">{stats.total_sources.toLocaleString('es-MX')}</p>
+                  <div className="bg-gradient-to-br from-blue-50 to-cyan-50 rounded-2xl p-6 border-2 border-blue-200/50 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Total de Fuentes</p>
+                      <div className="w-10 h-10 bg-blue-500 rounded-xl flex items-center justify-center shadow-md">
+                        <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
+                        </svg>
+                      </div>
+                    </div>
+                    <p className="text-4xl font-bold text-gray-900">{stats.total_sources.toLocaleString('es-MX')}</p>
+                    <p className="text-xs text-gray-600 mt-2">Fuentes monitoreadas</p>
                   </div>
-                  <div>
-                    <p className="text-sm text-gray-600 mb-1">Con Afirmaciones</p>
-                    <p className="text-3xl font-bold text-[#2563EB]">
+                  <div className="bg-gradient-to-br from-green-50 to-emerald-50 rounded-2xl p-6 border-2 border-green-200/50 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Con Afirmaciones</p>
+                      <div className="w-10 h-10 bg-green-500 rounded-xl flex items-center justify-center shadow-md">
+                        <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                        </svg>
+                      </div>
+                    </div>
+                    <p className="text-4xl font-bold text-[#2563EB]">
                       {stats.sources_with_claims.toLocaleString('es-MX')}
                     </p>
+                    <p className="text-xs text-gray-600 mt-2">Fuentes activas</p>
                   </div>
-                  <div>
-                    <p className="text-sm text-gray-600 mb-1">Plataformas</p>
-                    <p className="text-3xl font-bold text-gray-900">
+                  <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl p-6 border-2 border-purple-200/50 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Plataformas</p>
+                      <div className="w-10 h-10 bg-purple-500 rounded-xl flex items-center justify-center shadow-md">
+                        <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+                        </svg>
+                      </div>
+                    </div>
+                    <p className="text-4xl font-bold text-gray-900">
                       {stats.platforms.length}
                     </p>
+                    <p className="text-xs text-gray-600 mt-2">Plataformas diferentes</p>
                   </div>
-                  <div>
-                    <p className="text-sm text-gray-600 mb-1">Pendientes</p>
-                    <p className="text-3xl font-bold text-yellow-600">
+                  <div className="bg-gradient-to-br from-amber-50 to-orange-50 rounded-2xl p-6 border-2 border-amber-200/50 shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105">
+                    <div className="flex items-center justify-between mb-3">
+                      <p className="text-sm font-semibold text-gray-700 uppercase tracking-wide">Pendientes</p>
+                      <div className="w-10 h-10 bg-amber-500 rounded-xl flex items-center justify-center shadow-md">
+                        <svg className="w-5 h-5 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                      </div>
+                    </div>
+                    <p className="text-4xl font-bold text-yellow-600">
                       {stats.processing_status.find(s => s.status === 0)?.count || 0}
                     </p>
+                    <p className="text-xs text-gray-600 mt-2">En cola de procesamiento</p>
                   </div>
                 </div>
-              </div>
+
+                {/* Platform Distribution Insights */}
+                {stats.platforms.length > 0 && (
+                  <div className="bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 rounded-2xl p-6 border-2 border-indigo-200/50 shadow-xl">
+                    <div className="flex items-center gap-3 mb-4">
+                      <div className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center shadow-lg">
+                        <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                        </svg>
+                      </div>
+                      <div>
+                        <h3 className="text-lg font-bold text-gray-900">📊 Distribución por Plataforma</h3>
+                        <p className="text-sm text-gray-600">Fuentes agrupadas por plataforma de origen</p>
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                      {stats.platforms
+                        .sort((a, b) => b.count - a.count)
+                        .slice(0, 6)
+                        .map((platform) => {
+                          const total = stats.platforms.reduce((sum, p) => sum + p.count, 0);
+                          const percentage = total > 0 ? (platform.count / total) * 100 : 0;
+                          return (
+                            <div key={platform.platform} className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-indigo-200/50">
+                              <div className="flex items-center justify-between mb-2">
+                                <span className="font-semibold text-gray-900">{platform.platform}</span>
+                                <span className="text-sm font-bold text-gray-700">{platform.count}</span>
+                              </div>
+                              <div className="relative h-2 bg-gray-200 rounded-full overflow-hidden">
+                                <div
+                                  className="absolute top-0 left-0 h-full bg-gradient-to-r from-indigo-500 to-purple-600 rounded-full transition-all duration-500"
+                                  style={{ width: `${percentage}%` }}
+                                ></div>
+                              </div>
+                              <p className="text-xs text-gray-600 mt-1">{percentage.toFixed(1)}% del total</p>
+                            </div>
+                          );
+                        })}
+                    </div>
+                  </div>
+                )}
+              </>
             )}
 
             {/* Filters */}
@@ -303,14 +393,35 @@ export default function FuentesPage() {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" />
                   </svg>
                 </div>
-                <p className="text-gray-900 font-semibold text-lg">
+                <p className="text-gray-900 font-semibold text-lg mb-2">
                   {searchQuery ? 'No se encontraron fuentes' : 'No hay fuentes disponibles'}
                 </p>
-                <p className="text-gray-500 mt-1">
+                <p className="text-gray-500 mb-6">
                   {searchQuery 
                     ? 'Intenta ajustar tu búsqueda o filtros.' 
                     : 'Las fuentes aparecerán aquí una vez que se agreguen al sistema.'}
                 </p>
+                {!searchQuery && (
+                  <div className="flex flex-wrap items-center justify-center gap-3">
+                    <button
+                      onClick={() => {
+                        setFilterStatus('all');
+                        setSelectedPlatform('all');
+                        setSearchQuery('');
+                        fetchSources();
+                      }}
+                      className="px-4 py-2 bg-gradient-to-r from-cyan-500 to-blue-500 text-white rounded-lg hover:from-cyan-600 hover:to-blue-600 transition-all text-sm font-medium shadow-md"
+                    >
+                      Limpiar Filtros
+                    </button>
+                    <a
+                      href="/"
+                      className="px-4 py-2 bg-blue-50 text-blue-700 rounded-lg hover:bg-blue-100 transition-colors text-sm font-medium"
+                    >
+                      Ver Feed Principal
+                    </a>
+                  </div>
+                )}
               </div>
             ) : (
               <>

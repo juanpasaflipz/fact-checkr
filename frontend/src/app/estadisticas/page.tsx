@@ -115,9 +115,9 @@ export default function EstadisticasPage() {
   };
 
   return (
-    <div className="min-h-screen bg-[#F8F9FA]">
+    <div className="min-h-screen bg-[#0a0a0f] relative">
       <Sidebar />
-      <div className="lg:pl-64">
+      <div className="lg:pl-64 relative z-10">
         <Header 
           searchQuery={searchQuery} 
           setSearchQuery={setSearchQuery} 
@@ -126,29 +126,38 @@ export default function EstadisticasPage() {
         <main className="p-6 lg:p-8">
           <div className="max-w-7xl mx-auto space-y-8">
             
-            {/* Header with Time Period Selector */}
-            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-              <div>
-                <h1 className="text-3xl font-bold text-gray-900">Estadísticas</h1>
-                <p className="text-gray-600 mt-1">Análisis completo y métricas en tiempo real</p>
-              </div>
+            {/* Header with Time Period Selector - Enhanced */}
+            <div className="bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 rounded-2xl p-6 border-2 border-indigo-200/50 shadow-xl">
+              <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                <div className="flex items-center gap-4">
+                  <div className="w-14 h-14 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl flex items-center justify-center shadow-xl">
+                    <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h1 className="text-3xl font-bold text-gray-900">Estadísticas</h1>
+                    <p className="text-gray-600 mt-1">Análisis completo y métricas en tiempo real</p>
+                  </div>
+                </div>
               
-              <div className="flex gap-2 bg-white rounded-lg p-1 border border-gray-200 shadow-sm">
-                {([7, 30, 90] as const).map((period) => (
-                  <button
-                    key={period}
-                    onClick={() => setTimePeriod(period)}
-                    className={`
-                      px-4 py-2 rounded-md text-sm font-medium transition-all
-                      ${timePeriod === period
-                        ? 'bg-[#2563EB] text-white shadow-md'
-                        : 'text-gray-600 hover:bg-gray-50'
-                      }
-                    `}
-                  >
-                    {period === 7 ? '7 días' : period === 30 ? '30 días' : '90 días'}
-                  </button>
-                ))}
+                <div className="flex gap-2 bg-white rounded-lg p-1 border border-gray-200 shadow-sm">
+                  {([7, 30, 90] as const).map((period) => (
+                    <button
+                      key={period}
+                      onClick={() => setTimePeriod(period)}
+                      className={`
+                        px-4 py-2 rounded-md text-sm font-medium transition-all
+                        ${timePeriod === period
+                          ? 'bg-[#2563EB] text-white shadow-md'
+                          : 'text-gray-600 hover:bg-gray-50'
+                        }
+                      `}
+                    >
+                      {period === 7 ? '7 días' : period === 30 ? '30 días' : '90 días'}
+                    </button>
+                  ))}
+                </div>
               </div>
             </div>
 
@@ -181,35 +190,41 @@ export default function EstadisticasPage() {
               </div>
             )}
 
-            {/* Real-time Stats Cards */}
+            {/* Real-time Stats Cards - Enhanced with Live Indicator */}
             {stats && (
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                <StatsCard
-                  title="Total Analizadas"
-                  value={stats.total_analyzed.toLocaleString('es-MX')}
-                  icon="DocumentSearch"
-                  color="blue"
-                  trend={stats.trend_up ? `+${stats.trend_percentage}%` : `${stats.trend_percentage}%`}
-                  trendUp={stats.trend_up}
-                />
-                <StatsCard
-                  title="Fake News Detectadas"
-                  value={stats.fake_news_detected.toLocaleString('es-MX')}
-                  icon="AlertTriangle"
-                  color="rose"
-                />
-                <StatsCard
-                  title="Verificadas"
-                  value={stats.verified.toLocaleString('es-MX')}
-                  icon="ShieldCheck"
-                  color="emerald"
-                />
-                <StatsCard
-                  title="Fuentes Activas"
-                  value={stats.active_sources.toLocaleString('es-MX')}
-                  icon="Activity"
-                  color="amber"
-                />
+              <div className="space-y-6">
+                <div className="flex items-center gap-2 px-4 py-2 bg-green-50 rounded-lg border border-green-200 w-fit">
+                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+                  <span className="text-sm font-semibold text-green-700">Datos en tiempo real • Actualizado hace unos momentos</span>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                  <StatsCard
+                    title="Total Analizadas"
+                    value={stats.total_analyzed.toLocaleString('es-MX')}
+                    icon="DocumentSearch"
+                    color="blue"
+                    trend={stats.trend_up ? `+${stats.trend_percentage}%` : `${stats.trend_percentage}%`}
+                    trendUp={stats.trend_up}
+                  />
+                  <StatsCard
+                    title="Fake News Detectadas"
+                    value={stats.fake_news_detected.toLocaleString('es-MX')}
+                    icon="AlertTriangle"
+                    color="rose"
+                  />
+                  <StatsCard
+                    title="Verificadas"
+                    value={stats.verified.toLocaleString('es-MX')}
+                    icon="ShieldCheck"
+                    color="emerald"
+                  />
+                  <StatsCard
+                    title="Fuentes Activas"
+                    value={stats.active_sources.toLocaleString('es-MX')}
+                    icon="Activity"
+                    color="amber"
+                  />
+                </div>
               </div>
             )}
 
@@ -365,16 +380,85 @@ export default function EstadisticasPage() {
               </div>
             )}
 
+            {/* Key Metrics Summary */}
+            {stats && analytics && (
+              <div className="bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 rounded-2xl p-6 border-2 border-blue-200/50 shadow-xl">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg">
+                    <svg className="w-6 h-6 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h3 className="text-lg font-bold text-gray-900">📈 Resumen de Métricas</h3>
+                    <p className="text-sm text-gray-600">Análisis del período seleccionado</p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-blue-200/50">
+                    <p className="text-xs text-gray-600 mb-2 font-semibold uppercase tracking-wide">Tasa de Verificación</p>
+                    <p className="text-3xl font-bold text-green-600 mb-1">
+                      {stats.total_analyzed > 0 
+                        ? ((stats.verified / stats.total_analyzed) * 100).toFixed(1)
+                        : '0'
+                      }%
+                    </p>
+                    <p className="text-xs text-gray-600">{stats.verified.toLocaleString('es-MX')} de {stats.total_analyzed.toLocaleString('es-MX')} verificadas</p>
+                  </div>
+                  <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-blue-200/50">
+                    <p className="text-xs text-gray-600 mb-2 font-semibold uppercase tracking-wide">Tasa de Fake News</p>
+                    <p className="text-3xl font-bold text-red-600 mb-1">
+                      {stats.total_analyzed > 0 
+                        ? ((stats.fake_news_detected / stats.total_analyzed) * 100).toFixed(1)
+                        : '0'
+                      }%
+                    </p>
+                    <p className="text-xs text-gray-600">{stats.fake_news_detected.toLocaleString('es-MX')} detectadas</p>
+                  </div>
+                  <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-blue-200/50">
+                    <p className="text-xs text-gray-600 mb-2 font-semibold uppercase tracking-wide">Actividad Reciente</p>
+                    <p className="text-3xl font-bold text-blue-600 mb-1">
+                      {stats.recent_24h.toLocaleString('es-MX')}
+                    </p>
+                    <p className="text-xs text-gray-600">Afirmaciones en últimas 24h</p>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Empty State */}
             {!loading && stats && analytics && analytics.daily_claims.length === 0 && (
-              <div className="bg-white rounded-2xl p-12 border border-gray-100 shadow-sm text-center">
-                <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <svg className="w-10 h-10 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <div className="bg-[#111118] rounded-lg p-12 border-2 border-[#00f0ff]/30 text-center"
+                   style={{ boxShadow: '0 0 30px rgba(0, 240, 255, 0.2)' }}>
+                <div className="w-20 h-20 bg-[#1a1a24] border-2 border-[#00f0ff]/50 rounded-full flex items-center justify-center mx-auto mb-4"
+                     style={{ boxShadow: '0 0 20px rgba(0, 240, 255, 0.3)' }}>
+                  <svg className="w-10 h-10 text-[#00f0ff]" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                       style={{ filter: 'drop-shadow(0 0 5px #00f0ff)' }}>
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                   </svg>
                 </div>
-                <p className="text-gray-900 font-semibold text-lg">No hay datos de análisis disponibles</p>
-                <p className="text-gray-500 mt-1">Los datos aparecerán aquí una vez que se analicen afirmaciones.</p>
+                <p className="text-[#00f0ff] font-semibold text-lg mb-2"
+                   style={{ textShadow: '0 0 5px rgba(0, 240, 255, 0.5)' }}>No hay datos de análisis disponibles</p>
+                <p className="text-gray-300 mb-6">Los datos aparecerán aquí una vez que se analicen afirmaciones.</p>
+                <div className="flex flex-wrap items-center justify-center gap-3">
+                  <button
+                    onClick={() => {
+                      setTimePeriod(7);
+                      fetchStatistics();
+                    }}
+                    className="px-4 py-2 bg-gradient-to-r from-[#00f0ff] to-[#0066ff] text-[#0a0a0f] rounded-lg hover:from-[#00ffff] hover:to-[#00f0ff] transition-all text-sm font-bold border-2 border-[#00f0ff]"
+                    style={{ boxShadow: '0 0 15px rgba(0, 240, 255, 0.5)' }}
+                  >
+                    Cambiar Período
+                  </button>
+                  <a
+                    href="/"
+                    className="px-4 py-2 bg-[#1a1a24] border-2 border-[#00f0ff]/50 text-[#00f0ff] rounded-lg hover:border-[#00f0ff] transition-colors text-sm font-bold"
+                    style={{ boxShadow: '0 0 10px rgba(0, 240, 255, 0.3)' }}
+                  >
+                    Ver Feed Principal
+                  </a>
+                </div>
               </div>
             )}
           </div>

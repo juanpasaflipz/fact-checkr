@@ -5,6 +5,7 @@ import ClaimCard from '@/components/ClaimCard';
 import Sidebar from '@/components/Sidebar';
 import Header from '@/components/Header';
 import StatsCard from '@/components/StatsCard';
+import OnboardingModal from '@/components/OnboardingModal';
 import { getApiBaseUrl, getConnectionErrorHelp } from '@/lib/api-config';
 
 // Define types matching the backend response
@@ -32,6 +33,8 @@ export default function Home() {
   const [skip, setSkip] = useState(0);
   const [hasMore, setHasMore] = useState(true);
   const [activeTab, setActiveTab] = useState('todos');
+  const [showOnboarding, setShowOnboarding] = useState(false);
+  const [userOnboardingStatus, setUserOnboardingStatus] = useState<boolean | null>(null);
   const LIMIT = 20;
 
   const fetchClaims = async (query?: string, isLoadMore = false, retryCount = 0, statusFilter?: string) => {
@@ -118,6 +121,7 @@ export default function Home() {
           } else if (typeof fetchError === 'string') {
             errorMessage = fetchError;
           } else if (fetchError && typeof fetchError === 'object') {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             errorMessage = (fetchError as any).message || JSON.stringify(fetchError) || 'Unknown network error';
           }
           
@@ -199,27 +203,63 @@ export default function Home() {
       }
 
       // Handle other errors
-      const isNetworkError = error instanceof TypeError || 
-                            (error instanceof Error && (
-                              error.message.includes('Failed to fetch') ||
-                              error.message.includes('fetch') ||
-                              error.message.includes('NetworkError') ||
-                              error.message.includes('Network request failed')
-                            ));
+      // Safely extract error information
+      let errorMessage = 'Unknown error';
+      let errorType = 'unknown';
+      
+      if (error instanceof Error) {
+        errorMessage = error.message || error.name || 'Error occurred';
+        errorType = error.constructor.name;
+      } else if (typeof error === 'string') {
+        errorMessage = error;
+        errorType = 'string';
+      } else if (error && typeof error === 'object') {
+        // Handle empty objects or objects with error info
+        if (Object.keys(error).length === 0) {
+          errorMessage = 'Empty error object - likely network/CORS issue';
+          errorType = 'empty_object';
+        } else {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          errorMessage = (error as any).message || (error as any).detail || JSON.stringify(error);
+          errorType = typeof error;
+        }
+      } else {
+        errorMessage = String(error);
+        errorType = typeof error;
+      }
+
+      const isNetworkError = errorType === 'TypeError' || 
+                            errorMessage.includes('Failed to fetch') ||
+                            errorMessage.includes('fetch') ||
+                            errorMessage.includes('NetworkError') ||
+                            errorMessage.includes('Network request failed') ||
+                            errorMessage.includes('network') ||
+                            errorType === 'empty_object';
 
       if (isNetworkError) {
-        const errorMessage = error instanceof Error ? error.message : String(error);
         const baseUrl = getApiBaseUrl();
         const currentUrl = query 
           ? `${baseUrl}/claims/search?query=${encodeURIComponent(query)}`
           : `${baseUrl}/claims?skip=${isLoadMore ? skip : 0}&limit=${LIMIT}`;
-        console.error('Network error - Backend may not be running:', {
+        
+        // Log detailed error information
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const errorDetails: Record<string, any> = {
           url: currentUrl,
           baseUrl,
-          error: errorMessage,
-          errorType: error instanceof Error ? error.constructor.name : typeof error,
+          errorMessage: errorMessage,
+          errorType: errorType,
           troubleshooting: getConnectionErrorHelp()
-        });
+        };
+        
+        // Only include error object if it has useful information
+        if (error && typeof error === 'object' && Object.keys(error).length > 0) {
+          errorDetails.errorObject = error;
+        } else if (error) {
+          errorDetails.rawError = String(error);
+        }
+        
+        console.error('Network error - Backend may not be running:', errorDetails);
       } else {
         console.error('Error fetching claims:', error);
       }
@@ -232,7 +272,20 @@ export default function Home() {
 
       if (retryCount >= 2) {
         let errorMsg = 'No se pudieron cargar las afirmaciones.';
-        if (error instanceof Error) {
+        const baseUrl = getApiBaseUrl();
+        
+        if (isNetworkError) {
+          if (baseUrl.includes('localhost')) {
+            errorMsg = 'No se pudo conectar con el servidor local. Verifica que el backend esté ejecutándose:\n\n' +
+                       'cd backend\n' +
+                       'source venv/bin/activate\n' +
+                       'python main.py\n\n' +
+                       `O verifica: ${baseUrl}/health`;
+          } else {
+            errorMsg = `No se pudo conectar con el servidor remoto: ${baseUrl}\n\n` +
+                       'Verifica que el backend esté desplegado y accesible.';
+          }
+        } else if (error instanceof Error) {
           if (error.message.includes('Database connection timeout') || 
               error.message.includes('temporarily unavailable') ||
               error.message.includes('database_connection_error')) {
@@ -240,13 +293,21 @@ export default function Home() {
           } else if (error.message.includes('Database connection error') || 
                      error.message.includes('Database error')) {
             errorMsg = 'Error de conexión a la base de datos. Por favor, intenta de nuevo más tarde.';
-          } else if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
-            errorMsg = 'No se pudo conectar con el servidor. Verifica que el backend esté ejecutándose en http://localhost:8000';
           } else {
-            errorMsg = `Error: ${error.message}`;
+            errorMsg = `Error: ${errorMessage}`;
+          }
+        } else {
+          errorMsg = `Error desconocido: ${errorMessage}`;
+        }
+        
+        // Only show alert if we have a meaningful error message
+        if (errorMessage && errorMessage !== 'Unknown error') {
+          console.error('Final error after retries:', errorMsg);
+          // Don't show alert for network errors in development - just log
+          if (!baseUrl.includes('localhost') || process.env.NODE_ENV === 'production') {
+            alert(errorMsg);
           }
         }
-        alert(errorMsg);
       }
     } finally {
       // Ensure timeout is cleared
@@ -344,7 +405,35 @@ export default function Home() {
     fetchStats();
     // Refresh stats every 30 seconds
     const statsInterval = setInterval(fetchStats, 30000);
+    
+    // Check onboarding status
+    const checkOnboarding = async () => {
+      const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
+      if (token) {
+        try {
+          const baseUrl = getApiBaseUrl();
+          const response = await fetch(`${baseUrl}/api/auth/me`, {
+            headers: {
+              'Accept': 'application/json',
+              'Authorization': `Bearer ${token}`
+            }
+          });
+          if (response.ok) {
+            const user = await response.json();
+            setUserOnboardingStatus(user.onboarding_completed);
+            if (!user.onboarding_completed) {
+              setShowOnboarding(true);
+            }
+          }
+        } catch (error) {
+          console.error('Error checking onboarding status:', error);
+        }
+      }
+    };
+    checkOnboarding();
+    
     return () => clearInterval(statsInterval);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Refetch claims when tab changes
@@ -372,10 +461,62 @@ export default function Home() {
     { id: 'sin-verificar', label: 'Sin verificar' },
   ];
 
+  // Get recent claims for breaking news
+  const [breakingNews, setBreakingNews] = useState<Claim[]>([]);
+  const [trendingNow, setTrendingNow] = useState<Claim[]>([]);
+
+  useEffect(() => {
+    const fetchBreakingNews = async () => {
+      try {
+        const baseUrl = getApiBaseUrl();
+        const response = await fetch(`${baseUrl}/claims?skip=0&limit=3&status=unverified`, {
+          headers: { 'Accept': 'application/json' }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setBreakingNews(data.slice(0, 3));
+        }
+      } catch (error) {
+        console.error('Error fetching breaking news:', error);
+      }
+    };
+
+    const fetchTrendingNow = async () => {
+      try {
+        const baseUrl = getApiBaseUrl();
+        const response = await fetch(`${baseUrl}/claims/trending?days=1&limit=5`, {
+          headers: { 'Accept': 'application/json' }
+        });
+        if (response.ok) {
+          const data = await response.json();
+          setTrendingNow(data);
+        }
+      } catch (error) {
+        // Endpoint might not exist, that's okay
+      }
+    };
+
+    fetchBreakingNews();
+    fetchTrendingNow();
+  }, []);
+
   return (
-    <div className="min-h-screen bg-[#F8F9FA]">
+    <div className="min-h-screen bg-[#0a0a0f] relative">
+      {/* Animated scan line effect */}
+      <div className="fixed inset-0 pointer-events-none z-0 opacity-5">
+        <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-transparent via-[#00f0ff] to-transparent animate-scan-line"></div>
+      </div>
+      
+      {showOnboarding && (
+        <OnboardingModal
+          onComplete={() => {
+            setShowOnboarding(false);
+            setUserOnboardingStatus(true);
+          }}
+        />
+      )}
       <Sidebar />
-      <div className="lg:pl-64">
+      <div className="lg:pl-64 relative z-10">
         <Header 
           searchQuery={searchQuery} 
           setSearchQuery={setSearchQuery} 
@@ -384,36 +525,242 @@ export default function Home() {
         <main className="p-6 lg:p-8">
           <div className="max-w-7xl mx-auto space-y-8">
             
+            {/* Breaking News Banner */}
+            {breakingNews.length > 0 && (
+              <div className="bg-[#1a1a24] rounded-lg p-4 border-2 border-[#ff00ff]/50 animate-pulse-neon"
+                   style={{ boxShadow: '0 0 30px rgba(255, 0, 255, 0.4), inset 0 0 30px rgba(255, 0, 255, 0.1)' }}>
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="flex items-center gap-2 bg-[#0a0a0f] border-2 border-[#ff00ff]/50 px-3 py-1.5 rounded-lg"
+                       style={{ boxShadow: '0 0 15px rgba(255, 0, 255, 0.5)' }}>
+                    <svg className="w-5 h-5 text-[#ff00ff] animate-pulse" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                         style={{ filter: 'drop-shadow(0 0 5px #ff00ff)' }}>
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                    <span className="text-[#ff00ff] font-bold text-sm"
+                          style={{ textShadow: '0 0 5px rgba(255, 0, 255, 0.5)' }}>NOTICIA DE ÚLTIMA HORA</span>
+                  </div>
+                </div>
+                <div className="bg-[#111118] border-2 border-[#ff00ff]/30 rounded-lg p-4"
+                     style={{ boxShadow: '0 0 20px rgba(255, 0, 255, 0.2)' }}>
+                  <h3 className="font-bold text-[#00f0ff] mb-2 line-clamp-2"
+                      style={{ textShadow: '0 0 5px rgba(0, 240, 255, 0.3)' }}>
+                    {breakingNews[0].claim_text}
+                  </h3>
+                  <p className="text-sm text-gray-300">
+                    {breakingNews[0].source_post?.author || 'Fuente'} • {breakingNews[0].source_post?.platform || 'Plataforma'} • Verificando ahora...
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Stats Grid */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-6 animate-fade-in-up">
               {stats.map((stat, index) => (
-                <StatsCard key={index} {...stat} />
+                <div key={index} style={{ animationDelay: `${index * 100}ms` }} className="animate-fade-in-up">
+                  <StatsCard {...stat} />
+                </div>
               ))}
             </div>
 
-            {/* Main Content Area */}
-            <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
-              {/* Header */}
-              <div className="px-6 py-5 border-b border-gray-100">
-                <h2 className="text-gray-900 mb-4 text-xl font-bold">Feed de Verificación</h2>
-                
-                {/* Tabs */}
-                <div className="flex gap-2 overflow-x-auto">
-                  {tabs.map((tab) => (
-                    <button
-                      key={tab.id}
-                      onClick={() => setActiveTab(tab.id)}
-                      className={`
-                        px-4 py-2 rounded-lg text-sm transition-all duration-200 whitespace-nowrap font-medium
-                        ${activeTab === tab.id
-                          ? 'bg-[#2563EB] text-white shadow-md shadow-[#2563EB]/20'
-                          : 'text-gray-600 hover:bg-[#F8F9FA] hover:text-gray-900'
-                        }
-                      `}
-                    >
-                      {tab.label}
-                    </button>
+            {/* Trending Now Section */}
+            {trendingNow.length > 0 && (
+              <div className="bg-[#111118] rounded-lg border-2 border-[#00f0ff]/30 overflow-hidden"
+                   style={{ boxShadow: '0 0 30px rgba(0, 240, 255, 0.2), inset 0 0 30px rgba(0, 240, 255, 0.05)' }}>
+                <div className="px-6 py-5 border-b-2 border-[#00f0ff]/20 bg-[#1a1a24]">
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 bg-[#0a0a0f] border-2 border-[#ff00ff]/50 rounded-lg flex items-center justify-center"
+                           style={{ boxShadow: '0 0 15px rgba(255, 0, 255, 0.5)' }}>
+                        <svg className="w-6 h-6 text-[#ff00ff]" fill="none" viewBox="0 0 24 24" stroke="currentColor"
+                             style={{ filter: 'drop-shadow(0 0 3px #ff00ff)' }}>
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
+                        </svg>
+                      </div>
+                      <div>
+                        <h2 className="text-xl font-bold text-[#00f0ff]"
+                            style={{ textShadow: '0 0 5px rgba(0, 240, 255, 0.5)' }}>Tendiendo Ahora</h2>
+                        <p className="text-sm text-gray-400">Las afirmaciones más relevantes en este momento</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2 px-3 py-1.5 bg-[#0a0a0f] border-2 border-[#ff00ff]/50 rounded-lg"
+                         style={{ boxShadow: '0 0 10px rgba(255, 0, 255, 0.4)' }}>
+                      <div className="w-2 h-2 bg-[#ff00ff] rounded-full animate-pulse"
+                           style={{ boxShadow: '0 0 5px rgba(255, 0, 255, 0.8)' }}></div>
+                      <span className="text-xs font-bold text-[#ff00ff]"
+                            style={{ textShadow: '0 0 3px rgba(255, 0, 255, 0.5)' }}>EN VIVO</span>
+                    </div>
+                  </div>
+                </div>
+                <div className="divide-y divide-gray-800">
+                  {trendingNow.slice(0, 3).map((claim, index) => (
+                    <div key={claim.id} className="p-4 hover:bg-[#1a1a24] transition-colors">
+                      <div className="flex items-start gap-3">
+                        <div className="flex-shrink-0 w-8 h-8 bg-[#0a0a0f] border-2 border-[#ff00ff]/50 rounded-lg flex items-center justify-center text-[#ff00ff] font-bold text-sm"
+                             style={{ boxShadow: '0 0 10px rgba(255, 0, 255, 0.4)' }}>
+                          {index + 1}
+                        </div>
+                        <div className="flex-1 min-w-0">
+                          <p className="font-semibold text-gray-200 line-clamp-2 mb-1">{claim.claim_text}</p>
+                          <div className="flex items-center gap-3 text-xs text-gray-400">
+                            <span>{claim.source_post?.author || 'Desconocido'}</span>
+                            <span>•</span>
+                            <span>{claim.source_post?.platform || 'Unknown'}</span>
+                            {claim.verification && (
+                              <>
+                                <span>•</span>
+                                <span className={`font-semibold ${
+                                  claim.verification.status === 'Verified' ? 'text-[#00ff88]' :
+                                  claim.verification.status === 'Debunked' ? 'text-[#ff00ff]' :
+                                  'text-[#00f0ff]'
+                                }`}
+                                style={{
+                                  textShadow: claim.verification.status === 'Verified' ? '0 0 3px rgba(0, 255, 136, 0.5)' :
+                                             claim.verification.status === 'Debunked' ? '0 0 3px rgba(255, 0, 255, 0.5)' :
+                                             '0 0 3px rgba(0, 240, 255, 0.5)'
+                                }}>
+                                  {claim.verification.status === 'Verified' ? 'Verificado' :
+                                   claim.verification.status === 'Debunked' ? 'Falso' :
+                                   'En verificación'}
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
                   ))}
+                </div>
+              </div>
+            )}
+
+            {/* Main Content Area */}
+            <div className="bg-[#111118] rounded-lg border-2 border-[#00f0ff]/30 overflow-hidden"
+                 style={{ boxShadow: '0 0 30px rgba(0, 240, 255, 0.2), inset 0 0 30px rgba(0, 240, 255, 0.05)' }}>
+              {/* Header */}
+              <div className="px-6 py-6 border-b-2 border-[#00f0ff]/20 bg-[#1a1a24]">
+                <h2 className="text-[#00f0ff] mb-5 text-2xl font-bold"
+                    style={{ textShadow: '0 0 10px rgba(0, 240, 255, 0.5)' }}>
+                  Feed de Verificación
+                </h2>
+                
+                {/* Tabs with Counts */}
+                <div className="relative">
+                  <div 
+                    className="flex gap-2 sm:gap-3 overflow-x-auto pb-1 scrollbar-hide"
+                    style={{
+                      scrollbarWidth: 'none',
+                      msOverflowStyle: 'none',
+                      WebkitOverflowScrolling: 'touch',
+                      scrollSnapType: 'x mandatory'
+                    }}
+                    onMouseDown={(e) => {
+                      // Allow scrolling but don't prevent clicks on buttons
+                      const target = e.target as HTMLElement;
+                      if (target.tagName !== 'BUTTON' && !target.closest('button')) {
+                        // Only prevent default if clicking on the scroll container itself
+                        return;
+                      }
+                    }}
+                  >
+                    {tabs.map((tab) => {
+                      // Calculate counts for each tab
+                      let count = 0;
+                      if (tab.id === 'todos') {
+                        count = stats.reduce((sum, s) => {
+                          const num = parseInt(s.value.replace(/,/g, '')) || 0;
+                          return sum + num;
+                        }, 0);
+                      } else if (tab.id === 'verificados') {
+                        count = parseInt(stats.find(s => s.title === 'Verificadas')?.value.replace(/,/g, '') || '0');
+                      } else if (tab.id === 'falsos') {
+                        count = parseInt(stats.find(s => s.title === 'Fake News Detectadas')?.value.replace(/,/g, '') || '0');
+                      } else if (tab.id === 'sin-verificar') {
+                        // Estimate unverified as total - verified - fake news
+                        const total = parseInt(stats.find(s => s.title === 'Noticias Analizadas')?.value.replace(/,/g, '') || '0');
+                        const verified = parseInt(stats.find(s => s.title === 'Verificadas')?.value.replace(/,/g, '') || '0');
+                        const fake = parseInt(stats.find(s => s.title === 'Fake News Detectadas')?.value.replace(/,/g, '') || '0');
+                        count = Math.max(0, total - verified - fake);
+                      }
+                      
+                      return (
+                        <button
+                          key={tab.id}
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setActiveTab(tab.id);
+                          }}
+                          className={`
+                            relative flex-shrink-0 px-3 sm:px-5 py-2 sm:py-2.5 rounded-lg 
+                            text-xs sm:text-sm transition-all duration-300 whitespace-nowrap font-bold
+                            border-2 touch-manipulation cursor-pointer
+                            ${activeTab === tab.id
+                              ? 'bg-[#1a1a24] border-[#00f0ff] text-[#00f0ff] active:scale-100'
+                              : 'border-transparent text-gray-400 active:bg-[#1a1a24] active:border-[#00f0ff]/30 active:text-[#00f0ff]'
+                            }
+                            hover:bg-[#1a1a24] hover:border-[#00f0ff]/30 hover:text-[#00f0ff]
+                          `}
+                          style={{
+                            scrollSnapAlign: 'start',
+                            minWidth: 'fit-content',
+                            pointerEvents: 'auto',
+                            zIndex: 10,
+                            ...(activeTab === tab.id ? {
+                              boxShadow: '0 0 20px rgba(0, 240, 255, 0.4), inset 0 0 20px rgba(0, 240, 255, 0.1)'
+                            } : {})
+                          }}
+                          onTouchStart={(e) => {
+                            // Prevent double-tap zoom on mobile but allow clicks
+                            if (e.touches.length > 1) {
+                              e.preventDefault();
+                            }
+                            e.stopPropagation();
+                          }}
+                          onMouseDown={(e) => {
+                            e.stopPropagation();
+                          }}
+                          onMouseEnter={(e) => {
+                            if (!activeTab || activeTab !== tab.id) {
+                              e.currentTarget.style.boxShadow = '0 0 15px rgba(0, 240, 255, 0.2)';
+                            }
+                          }}
+                          onMouseLeave={(e) => {
+                            if (!activeTab || activeTab !== tab.id) {
+                              e.currentTarget.style.boxShadow = '';
+                            }
+                          }}
+                        >
+                          <span 
+                            className="pointer-events-none"
+                            style={activeTab === tab.id ? { textShadow: '0 0 5px rgba(0, 240, 255, 0.5)' } : {}}
+                          >
+                            {tab.label}
+                          </span>
+                          {count > 0 && (
+                            <span 
+                              className={`
+                                ml-1.5 sm:ml-2 px-1.5 sm:px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-bold pointer-events-none
+                                ${activeTab === tab.id
+                                  ? 'bg-[#00f0ff]/20 text-[#00f0ff] border border-[#00f0ff]/50'
+                                  : 'bg-[#1a1a24] text-gray-400 border border-gray-700'
+                                }
+                              `}
+                              style={activeTab === tab.id ? {
+                                boxShadow: '0 0 10px rgba(0, 240, 255, 0.3)'
+                              } : {}}
+                            >
+                              {count > 999 ? `${(count / 1000).toFixed(1)}k` : count}
+                            </span>
+                          )}
+                          {activeTab === tab.id && (
+                            <div className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-1 h-1 bg-[#00f0ff] rounded-full pointer-events-none"
+                                 style={{ boxShadow: '0 0 5px rgba(0, 240, 255, 0.8)' }}></div>
+                          )}
+                        </button>
+                      );
+                    })}
+                  </div>
                 </div>
               </div>
 
@@ -421,36 +768,140 @@ export default function Home() {
               {loading && claims.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-24">
                   <div className="relative">
-                    <div className="w-16 h-16 border-4 border-blue-100 rounded-full"></div>
-                    <div className="w-16 h-16 border-4 border-[#2563EB] border-t-transparent rounded-full animate-spin absolute top-0"></div>
+                    <div className="w-20 h-20 border-4 border-[#00f0ff]/20 rounded-full"></div>
+                    <div className="w-20 h-20 border-4 border-[#00f0ff] border-t-transparent rounded-full animate-spin absolute top-0"
+                         style={{ boxShadow: '0 0 20px rgba(0, 240, 255, 0.5)' }}></div>
+                    <div className="absolute inset-0 flex items-center justify-center">
+                      <div className="w-8 h-8 bg-gradient-to-br from-[#00f0ff] to-[#0066ff] rounded-full animate-pulse"
+                           style={{ boxShadow: '0 0 15px rgba(0, 240, 255, 0.8)' }}></div>
+                    </div>
                   </div>
-                  <p className="mt-6 text-gray-600 font-medium animate-pulse">Analizando publicaciones recientes...</p>
+                  <p className="mt-8 text-[#00f0ff] font-bold text-lg animate-pulse"
+                     style={{ textShadow: '0 0 10px rgba(0, 240, 255, 0.5)' }}>
+                    Analizando publicaciones recientes...
+                  </p>
                 </div>
               ) : (
                 <>
-                  <div className="divide-y divide-gray-100">
-                    {claims.map((claim) => (
-                      <ClaimCard key={claim.id} claim={claim} />
+                  <div className="divide-y divide-gray-800">
+                    {claims.map((claim, index) => (
+                      <div key={claim.id} style={{ animationDelay: `${index * 50}ms` }} className="animate-fade-in-up">
+                        <ClaimCard claim={claim} />
+                      </div>
                     ))}
                   </div>
 
                   {claims.length === 0 && (
-                    <div className="text-center py-24">
-                      <div className="w-20 h-20 bg-gray-50 rounded-full flex items-center justify-center mx-auto mb-4">
-                        <svg className="w-10 h-10 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <div className="text-center py-24 px-6">
+                      <div className="w-32 h-32 bg-[#1a1a24] border-2 border-[#00f0ff]/50 rounded-full flex items-center justify-center mx-auto mb-6 relative"
+                           style={{ boxShadow: '0 0 30px rgba(0, 240, 255, 0.3)' }}>
+                        <div className="absolute inset-0 bg-gradient-to-br from-[#00f0ff]/20 to-[#0066ff]/20 rounded-full animate-pulse"></div>
+                        <svg className="w-16 h-16 text-[#00f0ff] relative z-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                             style={{ filter: 'drop-shadow(0 0 10px #00f0ff)' }}>
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
                         </svg>
                       </div>
-                      <p className="text-gray-900 font-semibold text-lg">No se encontraron resultados</p>
-                      <p className="text-gray-500 mt-1">Intenta ajustar tu búsqueda o verifica los filtros.</p>
+                      <h3 className="text-[#00f0ff] font-bold text-2xl mb-3"
+                          style={{ textShadow: '0 0 10px rgba(0, 240, 255, 0.5)' }}>No se encontraron resultados</h3>
+                      <p className="text-gray-300 font-medium mb-6 max-w-md mx-auto">
+                        {activeTab === 'todos' 
+                          ? 'Aún no hay afirmaciones verificadas. Nuestro sistema está analizando contenido en tiempo real.'
+                          : activeTab === 'verificados'
+                          ? 'No hay afirmaciones verificadas en este momento. Revisa otros filtros para ver contenido.'
+                          : activeTab === 'falsos'
+                          ? 'No hay afirmaciones falsas detectadas. ¡Eso es una buena señal!'
+                          : 'Hay afirmaciones pendientes de verificación. Vuelve pronto para ver los resultados.'}
+                      </p>
+                      
+                      {/* Quick Stats Preview */}
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-2xl mx-auto mb-8">
+                        {stats.map((stat, index) => (
+                          <div key={index} className="bg-[#1a1a24] border-2 border-[#00f0ff]/30 rounded-lg p-4 hover:border-[#00f0ff]/50 transition-all duration-300"
+                               style={{ boxShadow: '0 0 15px rgba(0, 240, 255, 0.1)' }}>
+                            <p className="text-xs text-gray-400 mb-1 font-medium">{stat.title}</p>
+                            <p className="text-2xl font-bold text-[#00f0ff]"
+                               style={{ textShadow: '0 0 5px rgba(0, 240, 255, 0.3)' }}>{stat.value}</p>
+                          </div>
+                        ))}
+                      </div>
+
+                      <div className="flex flex-wrap items-center justify-center gap-3 mb-8">
+                        <button
+                          onClick={() => setActiveTab('todos')}
+                          className="px-6 py-3 bg-gradient-to-r from-[#00f0ff] to-[#0066ff] text-[#0a0a0f] font-bold rounded-lg hover:from-[#00ffff] hover:to-[#00f0ff] transition-all duration-300 border-2 border-[#00f0ff] hover:scale-105"
+                          style={{ boxShadow: '0 0 20px rgba(0, 240, 255, 0.5)' }}
+                        >
+                          Ver Todas las Afirmaciones
+                        </button>
+                        <button
+                          onClick={() => {
+                            setSearchQuery('');
+                            fetchClaims();
+                          }}
+                          className="px-6 py-3 bg-[#1a1a24] border-2 border-[#00f0ff]/50 text-[#00f0ff] font-bold rounded-lg hover:border-[#00f0ff] transition-all duration-300 hover:scale-105"
+                          style={{ boxShadow: '0 0 15px rgba(0, 240, 255, 0.3)' }}
+                        >
+                          Actualizar Feed
+                        </button>
+                      </div>
+                      
+                      {/* Enhanced Navigation Cards */}
+                      <div className="mt-8 pt-8 border-t border-gray-800">
+                        <p className="text-sm text-gray-400 mb-6 font-semibold">Explora otras secciones:</p>
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-4xl mx-auto">
+                          <a href="/tendencias" className="group bg-[#1a1a24] border-2 border-[#ff00ff]/30 rounded-lg p-4 hover:border-[#ff00ff] transition-all duration-300 text-center"
+                             style={{ boxShadow: '0 0 15px rgba(255, 0, 255, 0.2)' }}>
+                            <div className="text-3xl mb-2">📈</div>
+                            <p className="text-sm font-bold text-[#ff00ff] group-hover:text-[#ff00ff]"
+                               style={{ textShadow: '0 0 5px rgba(255, 0, 255, 0.3)' }}>Tendencias</p>
+                            <p className="text-xs text-gray-400 mt-1">Análisis en tiempo real</p>
+                          </a>
+                          <a href="/temas" className="group bg-[#1a1a24] border-2 border-[#8b5cf6]/30 rounded-lg p-4 hover:border-[#8b5cf6] transition-all duration-300 text-center"
+                             style={{ boxShadow: '0 0 15px rgba(139, 92, 246, 0.2)' }}>
+                            <div className="text-3xl mb-2">#</div>
+                            <p className="text-sm font-bold text-[#8b5cf6]"
+                               style={{ textShadow: '0 0 5px rgba(139, 92, 246, 0.3)' }}>Temas</p>
+                            <p className="text-xs text-gray-400 mt-1">Explora por categoría</p>
+                          </a>
+                          <a href="/mercados" className="group bg-[#1a1a24] border-2 border-[#00f0ff]/30 rounded-lg p-4 hover:border-[#00f0ff] transition-all duration-300 text-center"
+                             style={{ boxShadow: '0 0 15px rgba(0, 240, 255, 0.2)' }}>
+                            <div className="text-3xl mb-2">💰</div>
+                            <p className="text-sm font-bold text-[#00f0ff]"
+                               style={{ textShadow: '0 0 5px rgba(0, 240, 255, 0.3)' }}>Mercados</p>
+                            <p className="text-xs text-gray-400 mt-1">Predicciones colectivas</p>
+                          </a>
+                          <a href="/estadisticas" className="group bg-[#1a1a24] border-2 border-[#00ff88]/30 rounded-lg p-4 hover:border-[#00ff88] transition-all duration-300 text-center"
+                             style={{ boxShadow: '0 0 15px rgba(0, 255, 136, 0.2)' }}>
+                            <div className="text-3xl mb-2">📊</div>
+                            <p className="text-sm font-bold text-[#00ff88]"
+                               style={{ textShadow: '0 0 5px rgba(0, 255, 136, 0.3)' }}>Estadísticas</p>
+                            <p className="text-xs text-gray-400 mt-1">Métricas detalladas</p>
+                          </a>
+                        </div>
+                      </div>
                     </div>
                   )}
 
                   {!loading && claims.length > 0 && hasMore && !searchQuery && (
-                    <div className="px-6 py-6 text-center border-t border-gray-100">
+                    <div className="px-6 py-6 text-center border-t-2 border-gray-800 bg-[#1a1a24]">
                       <button
                         onClick={handleLoadMore}
-                        className="px-8 py-3 bg-white border border-gray-200 text-gray-700 font-semibold rounded-xl hover:bg-gray-50 hover:border-[#2563EB] hover:text-[#2563EB] transition-all duration-200 shadow-sm hover:shadow-md"
+                        className="
+                          px-10 py-3.5 
+                          bg-gradient-to-r from-[#00f0ff] to-[#0066ff] 
+                          text-[#0a0a0f] font-bold rounded-lg 
+                          hover:from-[#00ffff] hover:to-[#00f0ff] 
+                          transition-all duration-300 
+                          hover:scale-105
+                          border-2 border-[#00f0ff]
+                        "
+                        style={{ boxShadow: '0 0 20px rgba(0, 240, 255, 0.5)' }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.boxShadow = '0 0 30px rgba(0, 240, 255, 0.8)';
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.boxShadow = '0 0 20px rgba(0, 240, 255, 0.5)';
+                        }}
                       >
                         Cargar más noticias
                       </button>
