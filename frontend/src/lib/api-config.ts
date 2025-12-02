@@ -2,7 +2,7 @@
  * API Configuration Utility
  * Centralized configuration for backend API URLs
  * 
- * Backend URL: https://fact-checkr-production.up.railway.app
+ * Backend URL: https://backend-production-72ea.up.railway.app
  */
 
 /**
@@ -27,14 +27,21 @@ export function getApiBaseUrl(): string {
     const hostname = window.location.hostname;
     
     // If we're on Railway/Vercel (not localhost), use Railway backend
-    if (hostname !== 'localhost' && hostname !== '127.0.0.1') {
+    // Also check for local IP addresses (192.168.x.x, 10.x.x.x) to avoid hitting production from local network
+    const isLocal = hostname === 'localhost' || 
+                    hostname === '127.0.0.1' || 
+                    hostname.startsWith('192.168.') || 
+                    hostname.startsWith('10.') ||
+                    hostname.endsWith('.local');
+
+    if (!isLocal) {
       // Railway backend URL - set NEXT_PUBLIC_API_URL env var to override
-      return 'https://fact-checkr-production.up.railway.app';
+      return 'https://backend-production-72ea.up.railway.app';
     }
   }
 
-  // Default to localhost for local development
-  return 'http://localhost:8000';
+  // Default to relative path for local development to use Next.js proxy (avoids CORS)
+  return '';
 }
 
 /**
@@ -76,7 +83,7 @@ export function getConnectionErrorHelp(): string[] {
   } else {
     return [
       `1. Verify Railway backend is deployed and running`,
-      `2. Check NEXT_PUBLIC_API_URL in Vercel environment variables (should be https://fact-checkr-production.up.railway.app)`,
+      `2. Check NEXT_PUBLIC_API_URL in Vercel environment variables (should be https://backend-production-72ea.up.railway.app)`,
       `3. Test backend health: curl ${baseUrl}/health`,
       `4. Ensure CORS is configured in backend to allow requests from ${typeof window !== 'undefined' ? window.location.origin : 'your domain'}`,
       `5. Check Railway backend logs for startup errors`
