@@ -68,8 +68,9 @@ export default function Sidebar() {
                     }
                   }}
                 >
-                  <Icon name={item.icon} className={`size-5 ${isActive ? 'text-[#00f0ff]' : 'text-gray-500 group-hover:text-[#00f0ff]'} transition-colors`}
-                        style={isActive ? { filter: 'drop-shadow(0 0 3px #00f0ff)' } : {}} />
+                  <span style={isActive ? { filter: 'drop-shadow(0 0 3px #00f0ff)' } : {}}>
+                    <Icon name={item.icon} className={`size-5 ${isActive ? 'text-[#00f0ff]' : 'text-gray-500 group-hover:text-[#00f0ff]'} transition-colors`} />
+                  </span>
                   <span style={isActive ? { textShadow: '0 0 5px rgba(0, 240, 255, 0.5)' } : {}}>{item.label}</span>
                 </Link>
               );

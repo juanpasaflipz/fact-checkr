@@ -79,9 +79,9 @@ export default function StatsCard({ title, value, trend, trendUp, icon, color }:
           style={{
             boxShadow: `0 0 15px ${style.neon}60`
           }}>
-            <Icon name={icon} className={`size-6 ${style.text}`} style={{
-              filter: `drop-shadow(0 0 5px ${style.neon})`
-            }} />
+            <span style={{ filter: `drop-shadow(0 0 5px ${style.neon})` }}>
+              <Icon name={icon} className={`size-6 ${style.text}`} />
+            </span>
           </div>
           {trend && (
             <div className={`
