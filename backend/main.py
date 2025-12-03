@@ -150,6 +150,14 @@ logger.info("✅ Health check endpoint registered")
 async def startup_event():
     """Log when app starts"""
     logger.info("🚀 FactCheckr API starting up...")
+    
+    # Validate Stripe configuration
+    try:
+        from app.config.stripe_config import log_stripe_config_status
+        log_stripe_config_status()
+    except Exception as e:
+        logger.warning(f"⚠️  Stripe configuration validation failed: {e}")
+    
     logger.info("✅ App initialized successfully")
     logger.info("✅ Health endpoint available at /health")
     logger.info("=" * 50)

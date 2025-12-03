@@ -1,7 +1,9 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import Link from 'next/link';
 import { getApiBaseUrl } from '@/lib/api-config';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface HeaderProps {
   searchQuery: string;
@@ -15,6 +17,7 @@ interface UserBalance {
 }
 
 export default function Header({ searchQuery, setSearchQuery, onSearch }: HeaderProps) {
+  const { user, isAuthenticated, logout } = useAuth();
   const [balance, setBalance] = useState<UserBalance | null>(null);
 
   useEffect(() => {
@@ -123,20 +126,42 @@ export default function Header({ searchQuery, setSearchQuery, onSearch }: Header
             </div>
           )}
           
-          <div className="flex items-center gap-3 pl-4 border-l-2 border-[#00f0ff]/30">
-            <div className="text-right hidden sm:block">
-              <p className="text-sm text-[#00f0ff] font-bold"
-                 style={{ textShadow: '0 0 5px rgba(0, 240, 255, 0.3)' }}>Juan Pérez</p>
-              <p className="text-xs text-gray-400 font-medium">Analista Senior</p>
-            </div>
-            <div className="size-11 rounded-lg bg-[#111118] p-0.5 border-2 border-[#00f0ff]/50 hover:border-[#00f0ff] transition-all duration-300 hover:scale-110"
-                 style={{ boxShadow: '0 0 15px rgba(0, 240, 255, 0.3)' }}>
-              <div className="w-full h-full rounded-lg bg-[#1a1a24] flex items-center justify-center text-[#00f0ff] font-bold text-sm"
-                   style={{ textShadow: '0 0 5px rgba(0, 240, 255, 0.5)' }}>
-                JP
+          {isAuthenticated && user ? (
+            <div className="flex items-center gap-3 pl-4 border-l-2 border-[#00f0ff]/30">
+              <div className="text-right hidden sm:block">
+                <p className="text-sm text-[#00f0ff] font-bold"
+                   style={{ textShadow: '0 0 5px rgba(0, 240, 255, 0.3)' }}>
+                  {user.full_name || user.username}
+                </p>
+                <p className="text-xs text-gray-400 font-medium">{user.email}</p>
               </div>
+              <div className="size-11 rounded-lg bg-[#111118] p-0.5 border-2 border-[#00f0ff]/50 hover:border-[#00f0ff] transition-all duration-300 hover:scale-110"
+                   style={{ boxShadow: '0 0 15px rgba(0, 240, 255, 0.3)' }}>
+                <div className="w-full h-full rounded-lg bg-[#1a1a24] flex items-center justify-center text-[#00f0ff] font-bold text-sm"
+                     style={{ textShadow: '0 0 5px rgba(0, 240, 255, 0.5)' }}>
+                  {user.full_name 
+                    ? user.full_name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2)
+                    : user.username.slice(0, 2).toUpperCase()}
+                </div>
+              </div>
+              <button
+                onClick={logout}
+                className="px-3 py-2 text-sm text-[#00f0ff]/60 hover:text-[#00f0ff] hover:bg-[#111118] rounded-lg transition-all duration-300 border-2 border-transparent hover:border-[#00f0ff]/50"
+                title="Cerrar sesión"
+              >
+                Salir
+              </button>
             </div>
-          </div>
+          ) : (
+            <div className="flex items-center gap-3 pl-4 border-l-2 border-[#00f0ff]/30">
+              <Link
+                href="/signin"
+                className="px-4 py-2 text-sm font-semibold text-[#00f0ff] hover:bg-[#111118] rounded-lg transition-all duration-300 border-2 border-[#00f0ff]/50 hover:border-[#00f0ff]"
+              >
+                Iniciar Sesión
+              </Link>
+            </div>
+          )}
         </div>
       </div>
     </header>

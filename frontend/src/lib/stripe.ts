@@ -60,6 +60,11 @@ export const createCheckoutSession = async (
     });
     
     if (!response.ok) {
+      if (response.status === 401) {
+        // Redirect to signin if not authenticated
+        window.location.href = '/signin?redirect=/subscription';
+        throw new Error('Authentication required');
+      }
       const error = await response.json();
       throw new Error(error.detail || 'Failed to create checkout session');
     }

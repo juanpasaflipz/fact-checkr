@@ -1,14 +1,42 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useRouter } from 'next/navigation';
 import { redirectToCheckout } from '@/lib/stripe';
+import { useAuth } from '@/contexts/AuthContext';
 import Sidebar from '@/components/Sidebar';
 import Header from '@/components/Header';
 
 export default function SubscriptionPage() {
+  const router = useRouter();
+  const { isAuthenticated, loading: authLoading } = useAuth();
   const [billingCycle, setBillingCycle] = useState<'month' | 'year'>('month');
   const [loading, setLoading] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    // Redirect to signin if not authenticated
+    if (!authLoading && !isAuthenticated) {
+      router.push('/signin?redirect=/subscription');
+    }
+  }, [isAuthenticated, authLoading, router]);
+
+  // Show loading state while checking auth
+  if (authLoading) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600 mx-auto mb-4"></div>
+          <p className="text-gray-600">Cargando...</p>
+        </div>
+      </div>
+    );
+  }
+
+  // Don't render if not authenticated (will redirect)
+  if (!isAuthenticated) {
+    return null;
+  }
 
   const handleSubscribe = async (tier: 'pro' | 'team', trialDays: number = 7) => {
     setLoading(tier);
