@@ -20,7 +20,7 @@ COPY . .
 RUN mkdir -p logs
 
 # Make startup script executable
-COPY start.sh /app/start.sh
+COPY scripts/start.sh /app/start.sh
 RUN chmod +x /app/start.sh
 
 # Railway handles port mapping automatically - no EXPOSE needed

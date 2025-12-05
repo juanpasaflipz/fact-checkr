@@ -28,6 +28,12 @@ ANTHROPIC_API_KEY=your_anthropic_api_key_here
 # Get your API key from: https://platform.openai.com/api-keys
 OPENAI_API_KEY=your_openai_api_key_here
 
+# Market Intelligence Model (optional)
+# Default: "haiku" (Claude Haiku 3.5 - fast and cheap, recommended)
+# Options: "haiku", "sonnet", "gpt-mini", "gpt-4o"
+# The system will automatically use Sonnet for high-value markets (politics, economy)
+MARKET_INTELLIGENCE_MODEL=haiku
+
 # Serper API Key (required for web search/evidence gathering)
 # Get your API key from: https://serper.dev/
 SERPER_API_KEY=your_serper_api_key_here

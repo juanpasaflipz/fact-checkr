@@ -151,3 +151,91 @@ def scrape_all_sources(self):
         logger.error(f"Scraping task failed: {exc}", exc_info=True)
         # Re-raise to trigger automatic retry
         raise self.retry(exc=exc)
+
+
+@shared_task(
+    bind=True,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_backoff_max=600,
+    retry_jitter=True,
+    max_retries=3,
+)
+def detect_and_prioritize_topics(self):
+    """Periodic task to detect trending topics and prioritize them"""
+    logger.info("Starting trending topic detection and prioritization...")
+    
+    async def run_detection():
+        from app.services.topic_prioritizer import TopicPrioritizer
+        prioritizer = TopicPrioritizer()
+        prioritized = await prioritizer.prioritize_topics(limit=20)
+        
+        logger.info(f"Prioritized {len(prioritized)} topics")
+        return len(prioritized)
+    
+    try:
+        # Run async function in sync Celery task
+        loop = asyncio.get_event_loop()
+        if loop.is_closed():
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        
+        result = loop.run_until_complete(run_detection())
+        logger.info(f"Trending topic detection completed. Topics prioritized: {result}")
+        return result
+        
+    except Exception as exc:
+        logger.error(f"Trending topic detection failed: {exc}", exc_info=True)
+        raise self.retry(exc=exc)
+
+
+@shared_task(
+    bind=True,
+    autoretry_for=(Exception,),
+    retry_backoff=True,
+    retry_backoff_max=600,
+    retry_jitter=True,
+    max_retries=3,
+)
+def scrape_prioritized_topics(self):
+    """Scrape sources for prioritized topics"""
+    logger.info("Scraping sources for prioritized topics...")
+    
+    async def run_scraping():
+        from app.services.topic_prioritizer import TopicPrioritizer
+        prioritizer = TopicPrioritizer()
+        topics = await prioritizer.get_next_topics_to_process(limit=5)
+        
+        if not topics:
+            logger.info("No topics in priority queue")
+            return 0
+        
+        # Get keywords from topics
+        all_keywords = []
+        for topic in topics:
+            all_keywords.extend(topic.topic_keywords)
+        
+        # Remove duplicates
+        unique_keywords = list(set(all_keywords))
+        
+        logger.info(f"Scraping for {len(unique_keywords)} keywords from {len(topics)} topics")
+        
+        # Use existing fetch_and_store function
+        new_count = await fetch_and_store(unique_keywords)
+        
+        return new_count
+    
+    try:
+        # Run async function in sync Celery task
+        loop = asyncio.get_event_loop()
+        if loop.is_closed():
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+        
+        result = loop.run_until_complete(run_scraping())
+        logger.info(f"Prioritized topic scraping completed. New sources: {result}")
+        return result
+        
+    except Exception as exc:
+        logger.error(f"Prioritized topic scraping failed: {exc}", exc_info=True)
+        raise self.retry(exc=exc)

@@ -6,6 +6,7 @@ import Sidebar from '@/components/Sidebar';
 import Header from '@/components/Header';
 import StatsCard from '@/components/StatsCard';
 import OnboardingModal from '@/components/OnboardingModal';
+import TrendingTopics from '@/components/TrendingTopics';
 import { getApiBaseUrl, getConnectionErrorHelp } from '@/lib/api-config';
 
 // Define types matching the backend response
@@ -632,6 +633,11 @@ export default function Home() {
                 </div>
               </div>
             )}
+
+            {/* Trending Topics Section */}
+            <div className="mb-6">
+              <TrendingTopics />
+            </div>
 
             {/* Main Content Area */}
             <div className="bg-[#111118] rounded-lg border-2 border-[#00f0ff]/30 overflow-hidden"

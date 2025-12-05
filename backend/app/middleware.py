@@ -6,6 +6,7 @@ from functools import wraps
 
 from app.database.connection import get_db
 from app.database.models import User, SubscriptionTier
+from sqlalchemy.orm import Session
 from app.utils import (
     get_user_tier,
     check_user_limit,
@@ -23,15 +24,32 @@ class TierChecker:
         """Decorator to require specific subscription tiers"""
         def decorator(func: Callable):
             @wraps(func)
-            async def wrapper(request: Request, *args, **kwargs):
-                user = await get_optional_user(request)
+            async def wrapper(*args, **kwargs):
+                # Extract user and db from kwargs (FastAPI dependency injection)
+                user = None
+                db = None
+                
+                for arg in args:
+                    if isinstance(arg, User):
+                        user = arg
+                    elif isinstance(arg, Session):
+                        db = arg
+                
+                for key, value in kwargs.items():
+                    if isinstance(value, User):
+                        user = value
+                    elif isinstance(value, Session):
+                        db = value
+                
                 if not user:
                     raise HTTPException(
                         status_code=status.HTTP_401_UNAUTHORIZED,
                         detail="Authentication required"
                     )
                 
-                db: Session = next(get_db())
+                if not db:
+                    db = next(get_db())
+                
                 tier = get_user_tier(db, user.id)
                 
                 if tier not in allowed_tiers:
@@ -40,7 +58,7 @@ class TierChecker:
                         detail=f"This feature requires one of these tiers: {', '.join([t.value for t in allowed_tiers])}. Your current tier: {tier.value}"
                     )
                 
-                return await func(request, *args, **kwargs)
+                return await func(*args, **kwargs)
             return wrapper
         return decorator
     
@@ -49,9 +67,25 @@ class TierChecker:
         """Decorator to check usage limits before executing function"""
         def decorator(func: Callable):
             @wraps(func)
-            async def wrapper(request: Request, *args, **kwargs):
-                user = await get_optional_user(request)
-                db: Session = next(get_db())
+            async def wrapper(*args, **kwargs):
+                # Extract user and db from kwargs (FastAPI dependency injection)
+                user = None
+                db = None
+                
+                for arg in args:
+                    if isinstance(arg, User):
+                        user = arg
+                    elif isinstance(arg, Session):
+                        db = arg
+                
+                for key, value in kwargs.items():
+                    if isinstance(value, User):
+                        user = value
+                    elif isinstance(value, Session):
+                        db = value
+                
+                if not db:
+                    db = next(get_db())
                 
                 if user:
                     # Check limit for authenticated user
@@ -69,7 +103,7 @@ class TierChecker:
                     if track:
                         track_usage(db, user.id, limit_type)
                 
-                return await func(request, *args, **kwargs)
+                return await func(*args, **kwargs)
             return wrapper
         return decorator
 

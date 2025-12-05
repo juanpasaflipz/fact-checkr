@@ -37,13 +37,13 @@ class MarketIntelligenceAgent(BaseAgent):
         
         # Model selection map
         model_map = {
-            "haiku": "claude-3-5-haiku-20241022",  # Fastest, cheapest (recommended)
+            "haiku": "claude-3-haiku-20240307",  # Fastest, cheapest (recommended) - using stable version
             "sonnet": "claude-sonnet-3-5-20241022",  # Better reasoning, more expensive
             "gpt-mini": "gpt-4o-mini",  # OpenAI budget option
             "gpt-4o": "gpt-4o"  # OpenAI premium
         }
         
-        self.primary_model = model_map.get(preference, "claude-3-5-haiku-20241022")
+        self.primary_model = model_map.get(preference, "claude-3-haiku-20240307")
         self.fallback_model = "gpt-4o-mini"  # Always use mini as fallback
         
         # Log model selection
@@ -56,6 +56,19 @@ class MarketIntelligenceAgent(BaseAgent):
     @property
     def description(self) -> str:
         return "Provides efficient probability assessments for prediction markets"
+    
+    async def analyze(self, claim: str, context: Dict) -> 'AgentResult':
+        """
+        Required by BaseAgent interface, but not used for market intelligence.
+        Market intelligence uses assess_market_probability() instead.
+        """
+        from app.agents.base_agent import AgentResult
+        return AgentResult(
+            agent_name=self.name,
+            confidence=0.0,
+            findings="{}",
+            error="Use assess_market_probability() instead of analyze() for market intelligence"
+        )
     
     async def assess_market_probability(
         self,
@@ -80,7 +93,7 @@ class MarketIntelligenceAgent(BaseAgent):
         original_model = self.primary_model
         if force_model:
             model_map = {
-                "haiku": "claude-3-5-haiku-20241022",
+                "haiku": "claude-3-haiku-20240307",
                 "sonnet": "claude-sonnet-3-5-20241022",
                 "gpt-mini": "gpt-4o-mini",
                 "gpt-4o": "gpt-4o"

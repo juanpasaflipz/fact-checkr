@@ -1,5 +1,5 @@
 from pydantic import BaseModel
-from typing import List, Optional, Literal
+from typing import List, Optional, Literal, Dict
 from enum import Enum
 from datetime import datetime
 
@@ -121,3 +121,88 @@ class CreateMarketRequest(BaseModel):
 class ResolveMarketRequest(BaseModel):
     winning_outcome: Literal["yes", "no"]
     resolution_source: Optional[str] = None
+
+
+# Market Proposal Schemas
+class MarketProposalResponse(BaseModel):
+    id: int
+    user_id: int
+    question: str
+    description: Optional[str] = None
+    category: Optional[str] = None
+    resolution_criteria: Optional[str] = None
+    status: str  # pending, approved, rejected
+    created_at: datetime
+    reviewed_at: Optional[datetime] = None
+    reviewed_by: Optional[int] = None
+
+    class Config:
+        from_attributes = True
+
+
+# User Market Stats Schemas
+class UserPerformanceResponse(BaseModel):
+    total_trades: int
+    winning_trades: int
+    losing_trades: int
+    accuracy_rate: float
+    total_volume: float
+    credits_earned: float
+    rank: Optional[int] = None
+
+    class Config:
+        from_attributes = True
+
+
+# Market Notification Schemas
+class MarketNotificationResponse(BaseModel):
+    id: int
+    market_id: int
+    notification_type: str
+    message: Optional[str] = None
+    read: bool
+    created_at: datetime
+
+    class Config:
+        from_attributes = True
+
+
+# Market Analytics Schemas
+class MarketHistoryPoint(BaseModel):
+    timestamp: str
+    yes_probability: float
+    no_probability: float
+    volume: float
+
+
+class MarketAnalyticsResponse(BaseModel):
+    market_id: int
+    history: List[MarketHistoryPoint]
+    category_trends: Optional[Dict] = None
+    current_probability: Dict[str, float]  # {"yes": float, "no": float}
+
+
+# AI Insights Schemas
+class RiskAssessment(BaseModel):
+    level: str  # high, medium, low
+    reasons: List[str]
+
+
+class MarketInsightsResponse(BaseModel):
+    key_factors: List[str]
+    historical_context: str
+    risk_assessment: RiskAssessment
+    recommendation: str  # comprar_si, comprar_no, esperar, evitar
+
+
+# Leaderboard Schemas
+class LeaderboardEntry(BaseModel):
+    rank: int
+    username: str
+    accuracy_rate: float
+    total_trades: int
+    total_volume: float
+    credits_earned: float
+
+    class Config:
+        from_attributes = True

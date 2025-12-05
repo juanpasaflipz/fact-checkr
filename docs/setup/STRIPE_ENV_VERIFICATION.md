@@ -105,7 +105,11 @@ Validating Stripe configuration...
 
 1. In Stripe Dashboard, go to **Developers > Webhooks**
 2. Click **Add endpoint**
-3. Set endpoint URL: `https://your-domain.com/api/subscriptions/webhook`
+3. Set endpoint URL: `https://abstrak.to/api/payments/stripe/webhook` (Production)
+   - For local testing, use [Stripe CLI](https://stripe.com/docs/stripe-cli):
+     ```bash
+     stripe listen --forward-to localhost:8000/api/subscriptions/webhook
+     ```
 4. Select events to listen to:
    - `checkout.session.completed`
    - `customer.subscription.updated`
@@ -173,7 +177,7 @@ Before going live:
 
 - [ ] Switch to live API keys (`sk_live_...` and `pk_live_...`)
 - [ ] Update `FRONTEND_URL` to production domain
-- [ ] Create production webhook endpoint in Stripe Dashboard
+- [ ] Create production webhook endpoint in Stripe Dashboard: `https://abstrak.to/api/payments/stripe/webhook`
 - [ ] Update `STRIPE_WEBHOOK_SECRET` with production webhook secret
 - [ ] Verify all price IDs are correct for production products
 - [ ] Test checkout flow end-to-end

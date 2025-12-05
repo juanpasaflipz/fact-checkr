@@ -3,6 +3,7 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from jose import JWTError, jwt
 from datetime import datetime, timedelta
 import os
+import logging
 from typing import Optional
 from sqlalchemy.orm import Session
 
@@ -10,7 +11,14 @@ from app.database.connection import get_db
 from app.database.models import User
 from app.utils import get_user_by_id
 
+logger = logging.getLogger(__name__)
+
 SECRET_KEY = os.getenv("JWT_SECRET_KEY", "your-secret-key-change-in-production")
+if SECRET_KEY == "your-secret-key-change-in-production":
+    logger.warning("⚠️ Using default insecure JWT_SECRET_KEY!")
+else:
+    logger.info("✅ Loaded JWT_SECRET_KEY from environment")
+
 ALGORITHM = "HS256"
 ACCESS_TOKEN_EXPIRE_MINUTES = 30 * 24 * 60  # 30 days for better UX
 
@@ -39,17 +47,35 @@ async def get_current_user(
     )
     
     if credentials is None:
+        logger.warning("Missing authentication credentials")
+        raise credentials_exception
+    
+    if not credentials.credentials or not credentials.credentials.strip():
+        logger.warning("Empty authentication credentials")
         raise credentials_exception
     
     try:
-        payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id: int = payload.get("sub")
-        if user_id is None:
+        token = credentials.credentials.strip()
+        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
+        user_id_str = payload.get("sub")
+        if user_id_str is None:
+            logger.warning("Token missing 'sub' claim")
+            raise credentials_exception
+        
+        try:
+            user_id = int(user_id_str)
+        except (ValueError, TypeError):
+            logger.warning(f"Token 'sub' claim is not a valid integer: {user_id_str}")
             raise credentials_exception
         
         # Get user from database
         user = get_user_by_id(db, user_id)
-        if user is None or not user.is_active:
+        if user is None:
+            logger.warning(f"User not found for id: {user_id}")
+            raise credentials_exception
+            
+        if not user.is_active:
+            logger.warning(f"User {user_id} is inactive")
             raise credentials_exception
         
         # Update last login
@@ -57,7 +83,11 @@ async def get_current_user(
         db.commit()
         
         return user
-    except JWTError:
+    except JWTError as e:
+        logger.warning(f"JWT validation error: {str(e)}")
+        raise credentials_exception
+    except Exception as e:
+        logger.error(f"Unexpected auth error: {str(e)}")
         raise credentials_exception
 
 # Optional dependency for protected routes

@@ -19,7 +19,7 @@ COPY backend/alembic ./alembic
 COPY backend/alembic.ini .
 
 # Copy beat startup script
-COPY backend/start-beat.sh /app/start-beat.sh
+COPY backend/scripts/start-beat.sh /app/start-beat.sh
 RUN chmod +x /app/start-beat.sh
 
 # Create logs directory

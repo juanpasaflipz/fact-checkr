@@ -1,5 +1,5 @@
 """API routers"""
-from . import auth, subscriptions, usage, whatsapp, telegraph, intelligence
+from . import auth, subscriptions, usage, whatsapp, telegraph, intelligence, analytics
 
-__all__ = ["auth", "subscriptions", "usage", "whatsapp", "telegraph", "intelligence"]
+__all__ = ["auth", "subscriptions", "usage", "whatsapp", "telegraph", "intelligence", "analytics"]
 

@@ -1,5 +1,6 @@
 import os
 from celery import Celery
+from celery.schedules import crontab
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -11,7 +12,7 @@ celery_app = Celery(
     "factcheckr_worker",
     broker=REDIS_URL,
     backend=REDIS_URL,
-    include=["app.tasks.scraper", "app.tasks.fact_check", "app.tasks.health_check"]
+    include=["app.tasks.scraper", "app.tasks.fact_check", "app.tasks.health_check", "app.tasks.credit_topup", "app.tasks.market_notifications", "app.tasks.market_intelligence"]
 )
 
 celery_app.conf.update(
@@ -48,8 +49,6 @@ celery_app.conf.update(
     
     # Periodic tasks configuration (Beats)
     # Using crontab-style scheduling for specific times
-    from celery.schedules import crontab
-    
     beat_schedule={
         # Twitter scraping: 4 times per day at 6 AM, 12 PM, 6 PM, and midnight (Mexico City time)
         "scrape-twitter-6am": {
@@ -83,6 +82,45 @@ celery_app.conf.update(
         "health-check-every-5min": {
             "task": "app.tasks.health_check.health_check",
             "schedule": 300.0,  # Every 5 minutes
+        },
+        "monthly-credit-topup": {
+            "task": "app.tasks.credit_topup.monthly_credit_topup",
+            "schedule": crontab(day_of_month=1, hour=0, minute=0),  # 1st of month at midnight
+            "options": {
+                "expires": 86400,  # Expires after 24 hours
+            }
+        },
+        "check-market-probability-changes": {
+            "task": "app.tasks.market_notifications.check_market_probability_changes",
+            "schedule": 3600.0,  # Every hour
+        },
+        "notify-new-markets": {
+            "task": "app.tasks.market_notifications.notify_new_markets",
+            "schedule": crontab(hour=9, minute=0),  # Daily at 9 AM
+        },
+        "seed-new-markets": {
+            "task": "app.tasks.market_intelligence.seed_new_markets",
+            "schedule": 300.0,  # Every 5 minutes
+        },
+        "reassess-inactive-markets": {
+            "task": "app.tasks.market_intelligence.reassess_inactive_markets",
+            "schedule": 3600.0,  # Every hour
+        },
+        # Trending topic detection: Every 2 hours
+        "detect-trending-topics": {
+            "task": "app.tasks.scraper.detect_and_prioritize_topics",
+            "schedule": crontab(minute=0, hour="*/2"),  # Every 2 hours
+            "options": {
+                "expires": 3600,  # 1 hour
+            }
+        },
+        # Scrape prioritized topics: Every 30 minutes
+        "scrape-prioritized-topics": {
+            "task": "app.tasks.scraper.scrape_prioritized_topics",
+            "schedule": crontab(minute="*/30"),  # Every 30 minutes
+            "options": {
+                "expires": 1800,  # 30 minutes
+            }
         },
     },
     # Beat schedule persistence

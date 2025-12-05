@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, DateTime, Text, Enum, Integer, ForeignKey, Table, JSON, Boolean, Float
+from sqlalchemy import Column, String, DateTime, Text, Enum, Integer, ForeignKey, Table, JSON, Boolean, Float, ARRAY
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from datetime import datetime
@@ -17,6 +17,15 @@ claim_topics = Table(
     Base.metadata,
     Column('claim_id', String, ForeignKey('claims.id')),
     Column('topic_id', Integer, ForeignKey('topics.id'))
+)
+
+# Association table for many-to-many relationship between trending topics and sources
+trending_topic_sources = Table(
+    'trending_topic_sources',
+    Base.metadata,
+    Column('topic_id', Integer, ForeignKey('trending_topics.id'), primary_key=True),
+    Column('source_id', String, ForeignKey('sources.id'), primary_key=True),
+    Column('detected_at', DateTime, default=datetime.utcnow)
 )
 
 class VerificationStatus(enum.Enum):
@@ -65,8 +74,12 @@ class Source(Base):
     context_data = Column(JSON, nullable=True)  # {thread_id, parent_id, is_reply, is_retweet, etc.}
     credibility_score = Column(Float, nullable=True, default=0.5)  # Source reliability score
     
-    # Relationship
+    # Trending topic association
+    trending_topic_id = Column(Integer, ForeignKey('trending_topics.id'), nullable=True)
+    
+    # Relationships
     claims = relationship("Claim", back_populates="source")
+    trending_topics = relationship("TrendingTopic", secondary=trending_topic_sources, back_populates="sources")
 
 class Claim(Base):
     """Fact-checked claims with verification results"""
@@ -139,6 +152,10 @@ class User(Base):
     preferred_categories = Column(JSON, nullable=True)  # Array of category strings
     onboarding_completed = Column(Boolean, default=False, nullable=True)
     
+    # Referral system
+    referred_by_user_id = Column(Integer, ForeignKey('users.id'), nullable=True)
+    referral_code = Column(String, unique=True, nullable=True, index=True)
+    
     # Timestamps
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
@@ -149,6 +166,8 @@ class User(Base):
     usage_records = relationship("UsageTracking", back_populates="user")
     balance = relationship("UserBalance", back_populates="user", uselist=False)
     market_trades = relationship("MarketTrade", back_populates="user")
+    market_stats = relationship("UserMarketStats", back_populates="user", uselist=False)
+    market_notifications = relationship("MarketNotification", back_populates="user")
 
 class Subscription(Base):
     """User subscription information linked to Stripe"""
@@ -163,8 +182,24 @@ class Subscription(Base):
     stripe_price_id = Column(String)  # Stripe price ID for the tier
     
     # Subscription details
-    tier = Column(Enum(SubscriptionTier), default=SubscriptionTier.FREE, nullable=False)
-    status = Column(Enum(SubscriptionStatus), default=SubscriptionStatus.ACTIVE, nullable=False)
+    tier = Column(
+        Enum(
+            SubscriptionTier,
+            name="subscriptiontier",
+            values_callable=enum_values
+        ),
+        default=SubscriptionTier.FREE,
+        nullable=False
+    )
+    status = Column(
+        Enum(
+            SubscriptionStatus,
+            name="subscriptionstatus",
+            values_callable=enum_values
+        ),
+        default=SubscriptionStatus.ACTIVE,
+        nullable=False
+    )
     
     # Billing
     billing_cycle = Column(String)  # "month" or "year"
@@ -221,6 +256,9 @@ class Market(Base):
     # Category for filtering (politics, economy, security, rights, environment, mexico-us-relations, institutions)
     category = Column(String, nullable=True, index=True)
     
+    # Creator tracking
+    created_by_user_id = Column(Integer, ForeignKey('users.id'), nullable=True)
+    
     # Market status
     status = Column(
         Enum(
@@ -249,6 +287,8 @@ class Market(Base):
     # Relationships
     claim = relationship("Claim", back_populates="markets")
     trades = relationship("MarketTrade", back_populates="market")
+    creator = relationship("User", foreign_keys=[created_by_user_id])
+    notifications = relationship("MarketNotification", back_populates="market")
 
 class UserBalance(Base):
     """User credit balances for prediction markets"""
@@ -280,3 +320,140 @@ class MarketTrade(Base):
     # Relationships
     market = relationship("Market", back_populates="trades")
     user = relationship("User", back_populates="market_trades")
+
+
+class MarketProposal(Base):
+    """User-submitted market proposals (requires admin approval)"""
+    __tablename__ = 'market_proposals'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    
+    # Proposal details
+    question = Column(String, nullable=False)
+    description = Column(Text)
+    category = Column(String)
+    resolution_criteria = Column(Text)
+    
+    # Status tracking
+    status = Column(String, default="pending", nullable=False)  # pending, approved, rejected
+    created_at = Column(DateTime, default=datetime.utcnow)
+    reviewed_at = Column(DateTime)
+    reviewed_by = Column(Integer, ForeignKey('users.id'), nullable=True)
+    
+    # Relationships
+    user = relationship("User", foreign_keys=[user_id])
+    reviewer = relationship("User", foreign_keys=[reviewed_by])
+
+
+class UserMarketStats(Base):
+    """User performance statistics for prediction markets"""
+    __tablename__ = 'user_market_stats'
+    
+    user_id = Column(Integer, ForeignKey('users.id'), primary_key=True)
+    
+    # Performance metrics
+    total_trades = Column(Integer, default=0, nullable=False)
+    total_volume = Column(Float, default=0.0, nullable=False)
+    winning_trades = Column(Integer, default=0, nullable=False)
+    losing_trades = Column(Integer, default=0, nullable=False)
+    accuracy_rate = Column(Float, default=0.0, nullable=False)
+    total_credits_earned = Column(Float, default=0.0, nullable=False)
+    
+    # Timestamps
+    last_updated = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    user = relationship("User", back_populates="market_stats")
+
+
+class MarketNotification(Base):
+    """Notifications for market events (probability changes, resolutions, etc.)"""
+    __tablename__ = 'market_notifications'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    market_id = Column(Integer, ForeignKey('markets.id'), nullable=False, index=True)
+    
+    # Notification details
+    notification_type = Column(String, nullable=False)  # probability_change, resolution, new_market
+    message = Column(Text)
+    read = Column(Boolean, default=False, nullable=False)
+    
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    user = relationship("User", back_populates="market_notifications")
+    market = relationship("Market", back_populates="notifications")
+
+
+class ReferralBonus(Base):
+    """Referral bonus tracking"""
+    __tablename__ = 'referral_bonuses'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    referrer_id = Column(Integer, ForeignKey('users.id'), nullable=False, index=True)
+    referred_id = Column(Integer, ForeignKey('users.id'), unique=True, nullable=False)
+    
+    # Bonus details
+    bonus_credits = Column(Float, default=100.0, nullable=False)
+    paid = Column(Boolean, default=False, nullable=False)
+    
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    referrer = relationship("User", foreign_keys=[referrer_id])
+    referred = relationship("User", foreign_keys=[referred_id])
+
+
+class TrendingTopic(Base):
+    """Detected trending topics with intelligence scores"""
+    __tablename__ = 'trending_topics'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    topic_name = Column(String(255), nullable=False)
+    topic_keywords = Column(ARRAY(String), nullable=False)
+    detected_at = Column(DateTime, nullable=False)
+    trend_score = Column(Float, nullable=False)  # 0.0-1.0
+    engagement_velocity = Column(Float, nullable=True)  # Posts per hour
+    cross_platform_correlation = Column(Float, nullable=True)  # 0.0-1.0
+    context_relevance_score = Column(Float, nullable=True)  # 0.0-1.0
+    misinformation_risk_score = Column(Float, nullable=True)  # 0.0-1.0
+    final_priority_score = Column(Float, nullable=False)  # Weighted combination
+    status = Column(String(20), default='active')  # active, processed, archived
+    topic_metadata = Column(JSON, nullable=True)  # Renamed from 'metadata' (reserved)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    sources = relationship("Source", secondary=trending_topic_sources, back_populates="trending_topics")
+    priority_entries = relationship("TopicPriorityQueue", back_populates="topic")
+
+
+class ContextIntelligence(Base):
+    """Cached context intelligence for topics"""
+    __tablename__ = 'context_intelligence'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    topic_key = Column(String(255), unique=True, nullable=False, index=True)
+    political_context = Column(JSON, nullable=True)
+    economic_context = Column(JSON, nullable=True)
+    social_context = Column(JSON, nullable=True)
+    relevance_score = Column(Float, nullable=False)  # 0.0-1.0
+    noise_filter_score = Column(Float, nullable=True)  # Lower = more noise
+    last_updated = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
+class TopicPriorityQueue(Base):
+    """Priority queue for processing topics"""
+    __tablename__ = 'topic_priority_queue'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    topic_id = Column(Integer, ForeignKey('trending_topics.id'), nullable=False)
+    priority_score = Column(Float, nullable=False)
+    queued_at = Column(DateTime, default=datetime.utcnow)
+    processed_at = Column(DateTime, nullable=True)
+    processing_status = Column(String(20), default='pending')  # pending, processing, completed
+    
+    # Relationships
+    topic = relationship("TrendingTopic", back_populates="priority_entries")

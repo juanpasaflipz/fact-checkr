@@ -46,7 +46,13 @@ export const createCheckoutSession = async (
     const token = localStorage.getItem('auth_token') || 
                   document.cookie.split('; ').find(row => row.startsWith('auth_token='))?.split('=')[1];
     
-    const response = await fetch(`${apiUrl}/subscriptions/create-checkout-session`, {
+    // Construct URL properly - handle empty apiUrl case
+    const endpoint = '/api/subscriptions/create-checkout-session';
+    const url = apiUrl ? `${apiUrl}${endpoint}` : endpoint;
+    
+    console.log('Creating checkout session:', { url, tier, billingCycle, hasToken: !!token });
+    
+    const response = await fetch(url, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -65,15 +71,32 @@ export const createCheckoutSession = async (
         window.location.href = '/signin?redirect=/subscription';
         throw new Error('Authentication required');
       }
-      const error = await response.json();
+      const error = await response.json().catch(() => ({ detail: `HTTP ${response.status}: ${response.statusText}` }));
       throw new Error(error.detail || 'Failed to create checkout session');
     }
     
     const data = await response.json();
     return data.checkout_url;
   } catch (error) {
+    // Enhanced error logging
+    if (error instanceof TypeError && error.message === 'Failed to fetch') {
+      const apiUrl = getApiBaseUrl();
+      console.error('Network error - Failed to fetch checkout session:', {
+        apiUrl,
+        endpoint: '/api/subscriptions/create-checkout-session',
+        fullUrl: apiUrl ? `${apiUrl}/api/subscriptions/create-checkout-session` : '/api/subscriptions/create-checkout-session',
+        error: error.message,
+        possibleCauses: [
+          'Backend server is not running or not accessible',
+          'CORS configuration issue',
+          'Network connectivity problem',
+          'SSL/certificate issue'
+        ]
+      });
+      throw new Error('No se pudo conectar con el servidor. Por favor, verifica tu conexión a internet e intenta de nuevo.');
+    }
     console.error('Error creating checkout session:', error);
-    return null;
+    throw error; // Re-throw to let caller handle it
   }
 };
 
@@ -88,12 +111,18 @@ export const redirectToCheckout = async (
   billingCycle: 'month' | 'year',
   trialDays: number = 0
 ): Promise<void> => {
-  const checkoutUrl = await createCheckoutSession(tier, billingCycle, trialDays);
-  
-  if (checkoutUrl) {
-    window.location.href = checkoutUrl;
-  } else {
-    throw new Error('Failed to create checkout session');
+  try {
+    const checkoutUrl = await createCheckoutSession(tier, billingCycle, trialDays);
+    
+    if (checkoutUrl) {
+      window.location.href = checkoutUrl;
+    } else {
+      throw new Error('No se pudo crear la sesión de pago. Por favor, intenta de nuevo.');
+    }
+  } catch (error) {
+    // Re-throw with user-friendly message
+    const message = error instanceof Error ? error.message : 'Error desconocido al crear la sesión de pago';
+    throw new Error(message);
   }
 };
 

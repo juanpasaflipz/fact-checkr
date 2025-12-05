@@ -177,6 +177,7 @@ export function googleLogin(): void {
 
 /**
  * Handle OAuth callback (called from signin page after redirect)
+ * Extracts token from URL parameters and stores it
  */
 export function handleOAuthCallback(): string | null {
   if (typeof window === 'undefined') {
@@ -188,15 +189,29 @@ export function handleOAuthCallback(): string | null {
   const error = params.get('error');
   const success = params.get('success');
 
+  // Log for debugging
+  console.log('OAuth callback:', { token: token ? 'present' : 'missing', error, success });
+
   if (error) {
+    console.error('OAuth error in callback:', error);
     throw new Error(`OAuth error: ${error}`);
   }
 
+  // Try to get token from URL
   if (success === 'true' && token) {
+    console.log('Token received, storing...');
     setAuthToken(token);
-    // Clean up URL
-    window.history.replaceState({}, document.title, window.location.pathname);
+    // Clean up URL to remove sensitive token
+    const cleanUrl = window.location.pathname;
+    window.history.replaceState({}, document.title, cleanUrl);
+    console.log('Token stored successfully');
     return token;
+  }
+
+  // If success=true but no token, something went wrong
+  if (success === 'true' && !token) {
+    console.error('Success flag set but no token received');
+    throw new Error('OAuth authentication succeeded but token was not received');
   }
 
   return null;

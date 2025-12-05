@@ -6,7 +6,7 @@
     "watchPatterns": ["backend/**"]
   },
   "deploy": {
-    "startCommand": "sh /app/start.sh",
+    "startCommand": "sh /app/scripts/start.sh",
     "healthcheckPath": "/health",
     "healthcheckTimeout": 300,
     "restartPolicyType": "ON_FAILURE",

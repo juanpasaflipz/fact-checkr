@@ -161,12 +161,33 @@ See [Environment Setup](./docs/setup/environment.md) for complete list.
 
 ## Deployment
 
-### Quick Deploy (Docker)
+### Automated Deployment (Recommended)
+
+Use the comprehensive deployment script for full automation:
+
+```bash
+# Full deployment (migrations + backend + frontend)
+./scripts/deploy.sh
+
+# Verify deployment status only
+./scripts/deploy.sh --verify-only
+
+# Skip specific steps if needed
+./scripts/deploy.sh --skip-migrations
+./scripts/deploy.sh --skip-backend
+./scripts/deploy.sh --skip-frontend
+```
+
+**See:** [Deployment Script Guide](./docs/deployment/DEPLOYMENT_SCRIPT_GUIDE.md) for detailed usage.
+
+### Manual Deployment
+
+#### Quick Deploy (Docker)
 ```bash
 ./deploy.sh docker
 ```
 
-### Platform Deployment
+#### Platform Deployment
 - **Frontend**: Deploy to Vercel (recommended)
 - **Backend**: Deploy to Railway or Render
 - **Workers**: Separate service on Railway/Render

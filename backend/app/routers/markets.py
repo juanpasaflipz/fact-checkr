@@ -817,6 +817,124 @@ async def reject_proposal(
     return {"message": "Proposal rejected", "proposal_id": proposal_id}
 
 
+@router.post("/admin/seed-markets")
+async def seed_existing_markets(
+    max_markets: int = Query(50, ge=1, le=100),
+    admin: User = Depends(get_admin_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Manually trigger seeding for existing markets that haven't been seeded.
+    Admin only - useful for testing or seeding markets created before agent was deployed.
+    """
+    import asyncio
+    from app.services.market_seeding import seed_market_with_agent_assessment
+    
+    # Find markets with no trades
+    markets = db.query(Market).filter(
+        Market.status == MarketStatus.OPEN,
+        ~Market.trades.any()  # No trades yet
+    ).order_by(desc(Market.created_at)).limit(max_markets).all()
+    
+    if not markets:
+        return {
+            "message": "No unseeded markets found",
+            "seeded": 0,
+            "skipped": 0
+        }
+    
+    seeded_count = 0
+    skipped_count = 0
+    errors = []
+    
+    for market in markets:
+        try:
+            result = asyncio.run(
+                seed_market_with_agent_assessment(market, db)
+            )
+            
+            if result["seeded"]:
+                seeded_count += 1
+            else:
+                skipped_count += 1
+                errors.append({
+                    "market_id": market.id,
+                    "reason": result.get("reason", "unknown")
+                })
+        except Exception as e:
+            skipped_count += 1
+            errors.append({
+                "market_id": market.id,
+                "error": str(e)
+            })
+    
+    return {
+        "message": f"Processed {len(markets)} markets",
+        "seeded": seeded_count,
+        "skipped": skipped_count,
+        "errors": errors[:10]  # Limit errors in response
+    }
+
+
+@router.post("/admin/seed-markets")
+async def seed_existing_markets(
+    max_markets: int = Query(50, ge=1, le=100),
+    admin: User = Depends(get_admin_user),
+    db: Session = Depends(get_db)
+):
+    """
+    Manually trigger seeding for existing markets that haven't been seeded.
+    Admin only - useful for testing or seeding markets created before agent was deployed.
+    """
+    import asyncio
+    from app.services.market_seeding import seed_market_with_agent_assessment
+    
+    # Find markets with no trades
+    markets = db.query(Market).filter(
+        Market.status == MarketStatus.OPEN,
+        ~Market.trades.any()  # No trades yet
+    ).order_by(desc(Market.created_at)).limit(max_markets).all()
+    
+    if not markets:
+        return {
+            "message": "No unseeded markets found",
+            "seeded": 0,
+            "skipped": 0
+        }
+    
+    seeded_count = 0
+    skipped_count = 0
+    errors = []
+    
+    for market in markets:
+        try:
+            result = asyncio.run(
+                seed_market_with_agent_assessment(market, db)
+            )
+            
+            if result["seeded"]:
+                seeded_count += 1
+            else:
+                skipped_count += 1
+                errors.append({
+                    "market_id": market.id,
+                    "reason": result.get("reason", "unknown")
+                })
+        except Exception as e:
+            skipped_count += 1
+            errors.append({
+                "market_id": market.id,
+                "error": str(e)
+            })
+    
+    return {
+        "message": f"Processed {len(markets)} markets",
+        "seeded": seeded_count,
+        "skipped": skipped_count,
+        "errors": errors[:10]  # Limit errors in response
+    }
+
+
 @router.get("/leaderboard", response_model=List[LeaderboardEntry])
 async def get_leaderboard(
     category: Optional[str] = Query(None),
@@ -988,4 +1106,3 @@ async def get_market_insights(
         },
         recommendation=insights.get("recommendation", "esperar")
     )
-

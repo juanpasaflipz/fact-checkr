@@ -29,18 +29,17 @@ def get_or_create_system_user_id(db: Session) -> Optional[int]:
     
     # Try to create system user (only if it doesn't exist)
     try:
-        from passlib.context import CryptContext
-        pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
-        
-        # Generate a secure random password (won't be used, but required by schema)
+        from app.utils import get_password_hash
         import secrets
-        random_password = secrets.token_urlsafe(32)
-        hashed = pwd_context.hash(random_password)
+        
+        # Use same approach as OAuth user creation - short token under 72 bytes
+        placeholder_password = secrets.token_urlsafe(16)  # ~22 chars, well under 72 bytes
+        hashed_password = get_password_hash(placeholder_password)
         
         system_user = User(
             email="system@factcheckr.mx",
             username="system_agent",
-            hashed_password=hashed,  # Required field, but won't be used
+            hashed_password=hashed_password,
             is_active=True,
             is_verified=True,
             is_admin=False
@@ -53,6 +52,21 @@ def get_or_create_system_user_id(db: Session) -> Optional[int]:
     except Exception as e:
         logger.warning(f"Could not create system user: {e}")
         db.rollback()
+        # Try to get existing user even if creation failed
+        system_user = db.query(User).filter(User.email == "system@factcheckr.mx").first()
+        if system_user:
+            logger.info("Found existing system user")
+            return system_user.id
+        # If all else fails, try to find any admin user as fallback
+        admin_user = db.query(User).filter(User.is_admin == True).first()
+        if admin_user:
+            logger.warning("Using admin user as fallback for agent trades")
+            return admin_user.id
+        # Last resort: use first user in database
+        first_user = db.query(User).first()
+        if first_user:
+            logger.warning(f"Using first user (ID: {first_user.id}) as fallback for agent trades")
+            return first_user.id
         return None
 
 
@@ -182,6 +196,9 @@ async def seed_market_with_agent_assessment(
         
         # Get system user for agent trades
         system_user_id = get_or_create_system_user_id(db)
+        
+        if not system_user_id:
+            raise ValueError("Could not create or find system user for agent trades")
         
         # Create trade record (marked as agent trade)
         trade = MarketTrade(

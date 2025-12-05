@@ -9,7 +9,10 @@ from typing import Optional, List
 import os
 import secrets
 import httpx
+import logging
 from urllib.parse import urlencode
+
+logger = logging.getLogger(__name__)
 
 from app.database.connection import get_db
 from app.database.models import User
@@ -154,7 +157,8 @@ async def register(
         db.commit()
     
     # Create access token
-    access_token = create_access_token(data={"sub": user.id})
+    # Subject (sub) must be a string for JWT compliance
+    access_token = create_access_token(data={"sub": str(user.id)})
     
     return TokenResponse(
         access_token=access_token,
@@ -204,7 +208,8 @@ async def login(
     db.commit()
     
     # Create access token
-    access_token = create_access_token(data={"sub": user.id})
+    # Subject (sub) must be a string for JWT compliance
+    access_token = create_access_token(data={"sub": str(user.id)})
     
     return TokenResponse(
         access_token=access_token,
@@ -311,24 +316,38 @@ async def google_callback(
     db: Session = Depends(get_db)
 ):
     """Handle Google OAuth callback"""
+    logger.info(f"Google OAuth callback received: code={'present' if code else 'missing'}, state={'present' if state else 'missing'}, error={error}")
+    
     if error:
+        logger.warning(f"Google OAuth error: {error}")
         return RedirectResponse(url=f"{FRONTEND_URL}/signin?error=oauth_cancelled")
     
     if not code or not state:
+        logger.error(f"Missing code or state: code={bool(code)}, state={bool(state)}")
         return RedirectResponse(url=f"{FRONTEND_URL}/signin?error=invalid_callback")
     
     # Verify state (CSRF protection)
     if state not in oauth_states:
+        logger.error(f"Invalid state token: {state[:10]}... (not in oauth_states)")
         return RedirectResponse(url=f"{FRONTEND_URL}/signin?error=invalid_state")
+    
+    # Check if state is expired (older than 10 minutes)
+    state_created = oauth_states.get(state)
+    if state_created and (datetime.utcnow() - state_created).total_seconds() > 600:
+        logger.error(f"Expired state token: {state[:10]}...")
+        del oauth_states[state]
+        return RedirectResponse(url=f"{FRONTEND_URL}/signin?error=expired_state")
     
     # Remove used state (one-time use)
     del oauth_states[state]
     
     if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
+        logger.error("Google OAuth not configured: missing CLIENT_ID or CLIENT_SECRET")
         return RedirectResponse(url=f"{FRONTEND_URL}/signin?error=oauth_not_configured")
     
     try:
         # Exchange code for tokens
+        logger.info("Exchanging authorization code for tokens...")
         token_url = "https://oauth2.googleapis.com/token"
         token_data = {
             "code": code,
@@ -345,9 +364,13 @@ async def google_callback(
         
         access_token = tokens.get("access_token")
         if not access_token:
+            logger.error("Failed to get access_token from Google")
             return RedirectResponse(url=f"{FRONTEND_URL}/signin?error=token_exchange_failed")
         
+        logger.info("Successfully exchanged code for access token")
+        
         # Get user info from Google
+        logger.info("Fetching user info from Google...")
         userinfo_url = "https://www.googleapis.com/oauth2/v2/userinfo"
         headers = {"Authorization": f"Bearer {access_token}"}
         
@@ -363,66 +386,125 @@ async def google_callback(
         family_name = google_user.get("family_name", "")
         picture = google_user.get("picture")
         
+        logger.info(f"Google user info retrieved: email={email}, id={google_id}")
+        
         if not email or not google_id:
+            logger.error(f"Invalid user info from Google: email={email}, id={google_id}")
             return RedirectResponse(url=f"{FRONTEND_URL}/signin?error=invalid_user_info")
         
         # Check if user exists by email
         user = get_user_by_email(db, email)
         
         if user:
+            logger.info(f"Existing user found: {user.email} (id: {user.id})")
             # User exists - update last login
-            user.last_login = datetime.utcnow()
-            # If user doesn't have a password (OAuth-only), that's fine
-            # If they have both, they can use either method
-            db.commit()
+            try:
+                user.last_login = datetime.utcnow()
+                db.commit()
+            except Exception as e:
+                logger.error(f"Error updating last login: {str(e)}")
+                db.rollback()
+                raise
         else:
-            # Create new user from Google OAuth
-            # Generate username from email or name
-            base_username = email.split("@")[0]
-            username = base_username
-            counter = 1
-            while get_user_by_username(db, username):
-                username = f"{base_username}{counter}"
-                counter += 1
-            
-            # Generate referral code
-            referral_code = secrets.token_urlsafe(8)
-            while db.query(User).filter(User.referral_code == referral_code).first():
+            logger.info(f"Creating new user for email: {email}")
+            try:
+                # Create new user from Google OAuth
+                # Generate username from email or name
+                base_username = email.split("@")[0]
+                username = base_username
+                counter = 1
+                while get_user_by_username(db, username):
+                    username = f"{base_username}{counter}"
+                    counter += 1
+                
+                # Generate referral code
                 referral_code = secrets.token_urlsafe(8)
-            
-            # Create user with placeholder password (OAuth users won't use it)
-            # In production, you might want to make hashed_password nullable
-            placeholder_password = secrets.token_urlsafe(32)
-            hashed_password = get_password_hash(placeholder_password)
-            
-            user = User(
-                email=email,
-                username=username,
-                hashed_password=hashed_password,
-                full_name=name or f"{given_name} {family_name}".strip(),
-                is_active=True,
-                is_verified=True,  # Google emails are verified
-                last_login=datetime.utcnow(),
-                referral_code=referral_code
-            )
-            
-            db.add(user)
-            db.commit()
-            db.refresh(user)
-            
-            # Create default subscription and balance
-            create_default_subscription(db, user.id)
-            create_default_user_balance(db, user.id)
+                while db.query(User).filter(User.referral_code == referral_code).first():
+                    referral_code = secrets.token_urlsafe(8)
+                
+                # Create user with placeholder password (OAuth users won't use it)
+                # Bcrypt has a 72-byte limit on input password, so we use a shorter token
+                # 16 bytes = ~22 chars when base64url encoded, well under 72-byte limit
+                placeholder_password = secrets.token_urlsafe(16)
+                hashed_password = get_password_hash(placeholder_password)
+                
+                user = User(
+                    email=email,
+                    username=username,
+                    hashed_password=hashed_password,
+                    full_name=name or f"{given_name} {family_name}".strip(),
+                    is_active=True,
+                    is_verified=True,  # Google emails are verified
+                    last_login=datetime.utcnow(),
+                    referral_code=referral_code
+                )
+                
+                db.add(user)
+                db.commit()
+                db.refresh(user)
+                
+                logger.info(f"New user created: {user.email} (id: {user.id})")
+                
+                # Create default subscription and balance
+                try:
+                    create_default_subscription(db, user.id)
+                    logger.info(f"Default subscription created for user {user.id}")
+                except Exception as e:
+                    logger.error(f"Error creating default subscription: {str(e)}")
+                    db.rollback()
+                    # Don't fail the whole flow if subscription creation fails
+
+                try:
+                    create_default_user_balance(db, user.id)
+                    logger.info(f"Default user balance created for user {user.id}")
+                except Exception as e:
+                    logger.error(f"Error creating default user balance: {str(e)}")
+                    db.rollback()
+                    # Don't fail the whole flow if balance creation fails
+                    
+            except Exception as e:
+                logger.error(f"Error creating user: {str(e)}")
+                db.rollback()
+                raise
         
         # Create JWT token
-        access_token_jwt = create_access_token(data={"sub": user.id})
+        # Subject (sub) must be a string for JWT compliance
+        access_token_jwt = create_access_token(data={"sub": str(user.id)})
+        logger.info(f"JWT token created for user {user.id}")
         
-        # Redirect to frontend with token
-        return RedirectResponse(
-            url=f"{FRONTEND_URL}/signin?token={access_token_jwt}&success=true"
+        # Redirect to frontend with token in URL (frontend should extract and store securely)
+        # Using URL fragment would be more secure but requires JavaScript on frontend
+        redirect_url = f"{FRONTEND_URL}/signin?token={access_token_jwt}&success=true"
+        logger.info(f"Redirecting to frontend: {FRONTEND_URL}/signin")
+        
+        response = RedirectResponse(url=redirect_url)
+        
+        # Also set token in httpOnly cookie as backup (more secure)
+        # Frontend can check cookie first, then fall back to URL param
+        response.set_cookie(
+            key="access_token",
+            value=access_token_jwt,
+            httponly=True,
+            secure=os.getenv("ENVIRONMENT") == "production",  # Only secure in production (HTTPS)
+            samesite="lax",
+            max_age=86400 * 7  # 7 days
         )
         
+        return response
+        
+    except httpx.HTTPStatusError as e:
+        logger.error(f"HTTP error during OAuth: {e.response.status_code} - {e.response.text}")
+        db.rollback()
+        return RedirectResponse(url=f"{FRONTEND_URL}/signin?error=oauth_http_error")
     except httpx.HTTPError as e:
+        logger.error(f"HTTP error during OAuth: {str(e)}")
+        db.rollback()
         return RedirectResponse(url=f"{FRONTEND_URL}/signin?error=oauth_error")
     except Exception as e:
-        return RedirectResponse(url=f"{FRONTEND_URL}/signin?error=server_error")
+        logger.error(f"Unexpected error during OAuth: {str(e)}", exc_info=True)
+        import traceback
+        logger.error(f"Full traceback: {traceback.format_exc()}")
+        db.rollback()
+        # Include error details in redirect for debugging (remove in production)
+        error_detail = str(e).replace(' ', '_')[:50]  # Sanitize for URL
+        return RedirectResponse(url=f"{FRONTEND_URL}/signin?error=server_error&detail={error_detail}")

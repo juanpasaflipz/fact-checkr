@@ -1,23 +1,33 @@
 'use client';
 
-import { useState, useEffect, Suspense } from 'react';
+import { useState, useEffect, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { login, googleLogin, handleOAuthCallback, isAuthenticated } from '@/lib/auth';
+import { useAuth } from '@/contexts/AuthContext';
 
 function SignInForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
+  const { refreshUser, isAuthenticated: isAuthenticatedContext, loading: authLoading } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
+  const hasRedirected = useRef(false);
 
   useEffect(() => {
-    // Check if user is already authenticated
-    if (isAuthenticated()) {
-      router.push('/subscription');
+    // Prevent multiple redirects
+    if (hasRedirected.current) return;
+
+    // Wait for auth context to finish loading
+    if (authLoading) return;
+
+    // Check if user is already authenticated via context
+    if (isAuthenticatedContext) {
+      hasRedirected.current = true;
+      router.replace('/subscription');
       return;
     }
 
@@ -25,10 +35,16 @@ function SignInForm() {
     try {
       const token = handleOAuthCallback();
       if (token) {
+        hasRedirected.current = true;
         setSuccess(true);
-        setTimeout(() => {
-          router.push('/subscription');
-        }, 1500);
+        // Refresh user in auth context and redirect
+        refreshUser().then(() => {
+          router.replace('/subscription');
+        }).catch(() => {
+          // Even if refreshUser fails, redirect anyway - subscription page will handle it
+          router.replace('/subscription');
+        });
+        return;
       }
     } catch (err) {
       setError(err instanceof Error ? err.message : 'OAuth authentication failed');
@@ -36,6 +52,7 @@ function SignInForm() {
 
     // Check for error in URL params
     const urlError = searchParams.get('error');
+    const errorDetail = searchParams.get('detail');
     if (urlError) {
       const errorMessages: Record<string, string> = {
         oauth_cancelled: 'Autenticación con Google cancelada',
@@ -45,11 +62,19 @@ function SignInForm() {
         token_exchange_failed: 'Error al obtener token de autenticación',
         invalid_user_info: 'Error al obtener información del usuario',
         oauth_error: 'Error en la autenticación con Google',
-        server_error: 'Error del servidor. Por favor intenta de nuevo',
+        oauth_http_error: 'Error de comunicación con Google',
+        redirect_uri_mismatch: 'Error de configuración: El redirect URI no coincide. Por favor contacta al administrador.',
+        invalid_client: 'Error de configuración: Credenciales de Google inválidas.',
+        invalid_grant: 'Código de autorización inválido o expirado. Por favor intenta de nuevo.',
+        database_error: 'Error al guardar en la base de datos. Por favor intenta de nuevo.',
+        user_already_exists: 'Este usuario ya existe. Por favor inicia sesión con tu contraseña.',
+        server_error: errorDetail
+          ? `Error del servidor: ${errorDetail.replace(/_/g, ' ')}. Por favor revisa los logs del servidor o contacta al soporte.`
+          : 'Error del servidor. Por favor revisa los logs del servidor o contacta al soporte.',
       };
       setError(errorMessages[urlError] || 'Error de autenticación');
     }
-  }, [router, searchParams]);
+  }, [router, searchParams, authLoading, isAuthenticatedContext, refreshUser]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -151,6 +176,7 @@ function SignInForm() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 required
+                autoComplete="email"
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                 placeholder="tu@email.com"
                 disabled={loading}
@@ -167,6 +193,7 @@ function SignInForm() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                autoComplete="current-password"
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                 placeholder="••••••••"
                 disabled={loading}

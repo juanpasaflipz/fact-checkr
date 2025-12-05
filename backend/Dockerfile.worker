@@ -19,7 +19,7 @@ COPY backend/alembic ./alembic
 COPY backend/alembic.ini .
 
 # Copy worker startup script
-COPY backend/start-worker.sh /app/start-worker.sh
+COPY backend/scripts/start-worker.sh /app/start-worker.sh
 RUN chmod +x /app/start-worker.sh
 
 # Create logs directory

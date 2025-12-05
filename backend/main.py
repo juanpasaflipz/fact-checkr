@@ -4,14 +4,28 @@ import os
 import traceback
 from typing import List, Optional
 from datetime import timedelta, datetime
+from dotenv import load_dotenv
+
+# Load environment variables FIRST before any imports that might use them
+load_dotenv()
 
 from fastapi import FastAPI, Request, Depends, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from dotenv import load_dotenv
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, or_, and_, func, case
 from sqlalchemy.exc import OperationalError
+
+# Configure logging FIRST before any imports
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    stream=sys.stdout,
+    force=True  # Override any existing configuration
+)
+logger = logging.getLogger(__name__)
+
+logger.info("✅ Environment variables loaded")
 
 # Import app modules
 from app.database.connection import get_db
@@ -48,59 +62,77 @@ logger = logging.getLogger(__name__)
 
 # Import routers (with error handling)
 try:
-    from app.routers import auth, subscriptions, usage, whatsapp, telegraph, intelligence, markets, review, quota
+    from app.routers import auth, subscriptions, usage, whatsapp, telegraph, intelligence, markets, review, quota, trending, analytics
     ROUTERS_AVAILABLE = True
     INTELLIGENCE_ROUTER_AVAILABLE = True
     MARKETS_ROUTER_AVAILABLE = True
     REVIEW_ROUTER_AVAILABLE = True
     QUOTA_ROUTER_AVAILABLE = True
+    TRENDING_ROUTER_AVAILABLE = True
+    ANALYTICS_ROUTER_AVAILABLE = True
 except ImportError as e:
     print(f"Warning: Some routers not available: {e}")
     try:
-        from app.routers import auth, subscriptions, usage, whatsapp, telegraph, markets, review, quota
+        from app.routers import auth, subscriptions, usage, whatsapp, telegraph, markets, review, quota, trending, analytics
         ROUTERS_AVAILABLE = True
         INTELLIGENCE_ROUTER_AVAILABLE = False
         MARKETS_ROUTER_AVAILABLE = True
         REVIEW_ROUTER_AVAILABLE = True
         QUOTA_ROUTER_AVAILABLE = True
+        TRENDING_ROUTER_AVAILABLE = True
+        ANALYTICS_ROUTER_AVAILABLE = True
     except ImportError:
         try:
-            from app.routers import auth, subscriptions, usage, whatsapp, telegraph, review, quota
+            from app.routers import auth, subscriptions, usage, whatsapp, telegraph, review, quota, trending, analytics
             ROUTERS_AVAILABLE = True
             INTELLIGENCE_ROUTER_AVAILABLE = False
             MARKETS_ROUTER_AVAILABLE = False
             REVIEW_ROUTER_AVAILABLE = True
             QUOTA_ROUTER_AVAILABLE = True
+            TRENDING_ROUTER_AVAILABLE = True
+            ANALYTICS_ROUTER_AVAILABLE = True
         except ImportError:
             try:
-                from app.routers import auth, subscriptions, usage, whatsapp, telegraph, quota
+                from app.routers import auth, subscriptions, usage, whatsapp, telegraph, quota, trending, analytics
                 ROUTERS_AVAILABLE = True
                 INTELLIGENCE_ROUTER_AVAILABLE = False
                 MARKETS_ROUTER_AVAILABLE = False
                 REVIEW_ROUTER_AVAILABLE = False
                 QUOTA_ROUTER_AVAILABLE = True
+                TRENDING_ROUTER_AVAILABLE = True
+                ANALYTICS_ROUTER_AVAILABLE = True
             except ImportError:
                 try:
-                    from app.routers import auth, subscriptions, usage, whatsapp, telegraph
+                    from app.routers import auth, subscriptions, usage, whatsapp, telegraph, trending, analytics
                     ROUTERS_AVAILABLE = True
                     INTELLIGENCE_ROUTER_AVAILABLE = False
                     MARKETS_ROUTER_AVAILABLE = False
                     REVIEW_ROUTER_AVAILABLE = False
                     QUOTA_ROUTER_AVAILABLE = False
+                    TRENDING_ROUTER_AVAILABLE = True
+                    ANALYTICS_ROUTER_AVAILABLE = True
                 except ImportError:
-                    ROUTERS_AVAILABLE = False
-                    INTELLIGENCE_ROUTER_AVAILABLE = False
-                    MARKETS_ROUTER_AVAILABLE = False
-                    REVIEW_ROUTER_AVAILABLE = False
-                    QUOTA_ROUTER_AVAILABLE = False
+                    try:
+                        from app.routers import auth, subscriptions, usage, whatsapp, telegraph
+                        ROUTERS_AVAILABLE = True
+                        INTELLIGENCE_ROUTER_AVAILABLE = False
+                        MARKETS_ROUTER_AVAILABLE = False
+                        REVIEW_ROUTER_AVAILABLE = False
+                        QUOTA_ROUTER_AVAILABLE = False
+                        TRENDING_ROUTER_AVAILABLE = False
+                        ANALYTICS_ROUTER_AVAILABLE = False
+                    except ImportError:
+                        ROUTERS_AVAILABLE = False
+                        INTELLIGENCE_ROUTER_AVAILABLE = False
+                        MARKETS_ROUTER_AVAILABLE = False
+                        REVIEW_ROUTER_AVAILABLE = False
+                        QUOTA_ROUTER_AVAILABLE = False
+                        TRENDING_ROUTER_AVAILABLE = False
+                        ANALYTICS_ROUTER_AVAILABLE = False
 
 logger.info("=" * 50)
 logger.info("Initializing FactCheckr API...")
 logger.info("=" * 50)
-
-# Load environment variables
-load_dotenv()
-logger.info("✅ Environment variables loaded")
 
 # Initialize FastAPI app
 try:
@@ -201,6 +233,14 @@ if ROUTERS_AVAILABLE:
         if INTELLIGENCE_ROUTER_AVAILABLE:
             app.include_router(intelligence.router)
             logger.info("✅ Intelligence API router registered")
+        
+        if TRENDING_ROUTER_AVAILABLE:
+            app.include_router(trending.router)
+            logger.info("✅ Trending Topics API router registered")
+        
+        if ANALYTICS_ROUTER_AVAILABLE:
+            app.include_router(analytics.router, prefix="/api", tags=["analytics"])
+            logger.info("✅ Analytics API router registered")
     except Exception as e:
         logger.warning(f"⚠️ Failed to register routers: {e}")
         logger.warning(traceback.format_exc())
@@ -215,12 +255,26 @@ def map_db_claim_to_response(db_claim: DBClaim, db: Optional[Session] = None) ->
         status_str = db_claim.status.value
     else:
         status_str = str(db_claim.status)
+    
+    # Convert string to VerificationStatus enum
+    try:
+        status_enum = VerificationStatus(status_str)
+    except ValueError:
+        status_enum = VerificationStatus.UNVERIFIED
         
     # Create VerificationResult
+    evidence_sources = getattr(db_claim, 'evidence_sources', None)
+    sources_list = []
+    if evidence_sources is not None:
+        if isinstance(evidence_sources, list):
+            sources_list = evidence_sources
+        else:
+            sources_list = list(evidence_sources) if hasattr(evidence_sources, '__iter__') else []
+    
     verification = VerificationResult(
-        status=status_str,
-        explanation=db_claim.explanation or "No explanation provided",
-        sources=db_claim.evidence_sources or []
+        status=status_enum,
+        explanation=str(db_claim.explanation) if db_claim.explanation is not None else "No explanation provided",
+        sources=sources_list
     )
     
     # Create SocialPost from Source
@@ -257,23 +311,40 @@ def map_db_claim_to_response(db_claim: DBClaim, db: Optional[Session] = None) ->
             no_prob = no_probability(market)
             volume = calculate_volume(market, db)
             
+            # Access actual values from ORM instance
+            market_id = getattr(market, 'id', None)
+            market_slug = getattr(market, 'slug', None)
+            market_question = getattr(market, 'question', None)
+            market_closes_at = getattr(market, 'closes_at', None)
+            market_claim_id = getattr(market, 'claim_id', None)
+            market_category = getattr(market, 'category', None)
+            market_status = getattr(market, 'status', None)
+            
+            # Determine status string
+            status_str = "open"
+            if market_status is not None:
+                if hasattr(market_status, 'value'):
+                    status_str = market_status.value
+                else:
+                    status_str = str(market_status)
+            
             market_summary = MarketSummary(
-                id=market.id,
-                slug=market.slug,
-                question=market.question,
+                id=int(market_id) if market_id is not None else 0,
+                slug=str(market_slug) if market_slug is not None else "",
+                question=str(market_question) if market_question is not None else "",
                 yes_probability=yes_prob,
                 no_probability=no_prob,
                 volume=volume,
-                closes_at=market.closes_at,
-                status=market.status.value,
-                claim_id=market.claim_id,
-                category=market.category
+                closes_at=market_closes_at if market_closes_at is not None else None,
+                status=status_str,
+                claim_id=str(market_claim_id) if market_claim_id is not None else None,
+                category=str(market_category) if market_category is not None else None
             )
         
     return ClaimResponse(
         id=str(db_claim.id),
-        original_text=db_claim.original_text,
-        claim_text=db_claim.claim_text,
+        original_text=str(db_claim.original_text),
+        claim_text=str(db_claim.claim_text),
         verification=verification,
         source_post=source_post,
         market=market_summary
@@ -410,7 +481,19 @@ async def get_stats(request: Request, db: Session = Depends(get_db)):
 async def get_topics(db: Session = Depends(get_db)):
     """Get all topics"""
     topics = db.query(DBTopic).all()
-    return [TopicResponse(id=t.id, name=t.name, slug=t.slug, description=t.description) for t in topics]
+    result = []
+    for t in topics:
+        topic_id = getattr(t, 'id', None)
+        topic_name = getattr(t, 'name', None)
+        topic_slug = getattr(t, 'slug', None)
+        topic_description = getattr(t, 'description', None)
+        result.append(TopicResponse(
+            id=int(topic_id) if topic_id is not None else 0,
+            name=str(topic_name) if topic_name is not None else "",
+            slug=str(topic_slug) if topic_slug is not None else "",
+            description=str(topic_description) if topic_description is not None else None
+        ))
+    return result
 
 @app.get("/topics/{topic_slug}/stats")
 async def get_topic_stats(topic_slug: str, db: Session = Depends(get_db)):
@@ -427,10 +510,21 @@ async def get_topic_stats(topic_slug: str, db: Session = Depends(get_db)):
     
     # Calculate stats
     total_claims = len(claims)
-    verified_count = sum(1 for c in claims if c.status == DBVerificationStatus.VERIFIED)
-    debunked_count = sum(1 for c in claims if c.status == DBVerificationStatus.DEBUNKED)
-    misleading_count = sum(1 for c in claims if c.status == DBVerificationStatus.MISLEADING)
-    unverified_count = sum(1 for c in claims if c.status == DBVerificationStatus.UNVERIFIED)
+    verified_count = 0
+    debunked_count = 0
+    misleading_count = 0
+    unverified_count = 0
+    
+    for c in claims:
+        claim_status = getattr(c, 'status', None)
+        if claim_status == DBVerificationStatus.VERIFIED:
+            verified_count += 1
+        elif claim_status == DBVerificationStatus.DEBUNKED:
+            debunked_count += 1
+        elif claim_status == DBVerificationStatus.MISLEADING:
+            misleading_count += 1
+        elif claim_status == DBVerificationStatus.UNVERIFIED:
+            unverified_count += 1
     
     return {
         "topic_id": topic.id,
@@ -710,8 +804,8 @@ async def get_sources(
             "content": s.content,
             "author": s.author,
             "url": s.url,
-            "timestamp": s.timestamp.isoformat() if s.timestamp else None,
-            "scraped_at": s.scraped_at.isoformat() if s.scraped_at else None,
+            "timestamp": s.timestamp.isoformat() if s.timestamp is not None else None,
+            "scraped_at": s.scraped_at.isoformat() if s.scraped_at is not None else None,
             "processed": s.processed,
             "claim_count": claim_count
         })

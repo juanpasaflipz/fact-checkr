@@ -1,20 +1,24 @@
 """Utility functions for authentication, subscriptions, and usage tracking"""
-from passlib.context import CryptContext
+import bcrypt
 from datetime import datetime, timedelta
 from typing import Optional
 from sqlalchemy.orm import Session
 from app.database.models import User, Subscription, SubscriptionTier, SubscriptionStatus, UsageTracking, UserBalance
 
-# Password hashing context
-pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
-    """Verify a password against a hash"""
-    return pwd_context.verify(plain_password, hashed_password)
+    """Verify a password against a hash."""
+    # bcrypt has a 72-byte limit - truncate if needed
+    password_bytes = plain_password.encode('utf-8')[:72]
+    hashed_bytes = hashed_password.encode('utf-8')
+    return bcrypt.checkpw(password_bytes, hashed_bytes)
 
 def get_password_hash(password: str) -> str:
-    """Hash a password"""
-    return pwd_context.hash(password)
+    """Hash a password using bcrypt."""
+    # bcrypt has a 72-byte limit - truncate if needed
+    password_bytes = password.encode('utf-8')[:72]
+    salt = bcrypt.gensalt()
+    return bcrypt.hashpw(password_bytes, salt).decode('utf-8')
 
 def get_user_by_email(db: Session, email: str) -> Optional[User]:
     """Get user by email"""
@@ -41,6 +45,11 @@ def get_user_tier(db: Session, user_id: int) -> SubscriptionTier:
 
 def create_default_subscription(db: Session, user_id: int) -> Subscription:
     """Create a default FREE subscription for a new user"""
+    # Check if subscription already exists
+    existing_subscription = db.query(Subscription).filter(Subscription.user_id == user_id).first()
+    if existing_subscription:
+        return existing_subscription
+
     subscription = Subscription(
         user_id=user_id,
         tier=SubscriptionTier.FREE,
@@ -78,6 +87,13 @@ TIER_LIMITS = {
         "historical_days": 7,
         "alerts": 0,
         "collections": 0,
+        "market_trades_per_day": 10,
+        "market_creation": False,
+        "market_proposals_per_month": 2,
+        "market_analytics": False,
+        "market_exports": False,
+        "market_notifications": False,
+        "monthly_credit_topup": 0,
     },
     SubscriptionTier.PRO: {
         "verifications_per_month": None,  # Unlimited
@@ -87,6 +103,13 @@ TIER_LIMITS = {
         "historical_days": None,  # All-time
         "alerts": 5,
         "collections": 10,
+        "market_trades_per_day": None,  # Unlimited
+        "market_creation": True,
+        "market_proposals_per_month": 10,
+        "market_analytics": True,
+        "market_exports": True,
+        "market_notifications": True,
+        "monthly_credit_topup": 500,
     },
     SubscriptionTier.TEAM: {
         "verifications_per_month": None,  # Unlimited
@@ -96,6 +119,13 @@ TIER_LIMITS = {
         "historical_days": None,  # All-time
         "alerts": 20,
         "collections": None,  # Unlimited
+        "market_trades_per_day": None,  # Unlimited
+        "market_creation": True,
+        "market_proposals_per_month": 50,
+        "market_analytics": True,
+        "market_exports": True,
+        "market_notifications": True,
+        "monthly_credit_topup": 2000,
     },
     SubscriptionTier.ENTERPRISE: {
         "verifications_per_month": None,  # Unlimited
@@ -105,6 +135,13 @@ TIER_LIMITS = {
         "historical_days": None,  # All-time
         "alerts": None,  # Unlimited
         "collections": None,  # Unlimited
+        "market_trades_per_day": None,  # Unlimited
+        "market_creation": True,
+        "market_proposals_per_month": None,  # Unlimited
+        "market_analytics": True,
+        "market_exports": True,
+        "market_notifications": True,
+        "monthly_credit_topup": None,  # Custom
     },
 }
 
@@ -169,6 +206,8 @@ def get_current_usage(db: Session, user_id: int, usage_type: str) -> int:
         "api_calls_per_day": "api_call",
         "search_queries_per_day": "search",
         "exports_per_month": "export",
+        "market_trades_per_day": "market_trade",
+        "market_proposals_per_month": "market_proposal",
     }
     
     db_usage_type = type_mapping.get(usage_type, usage_type)

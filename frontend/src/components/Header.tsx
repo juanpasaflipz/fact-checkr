@@ -23,20 +23,27 @@ export default function Header({ searchQuery, setSearchQuery, onSearch }: Header
   useEffect(() => {
     const fetchBalance = async () => {
       const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
-      if (!token) return;
+      // Check if token exists and is not empty
+      if (!token || token.trim() === '') return;
 
       try {
         const baseUrl = getApiBaseUrl();
         const response = await fetch(`${baseUrl}/api/markets/balance`, {
           headers: {
             'Accept': 'application/json',
-            'Authorization': `Bearer ${token}`
+            'Authorization': `Bearer ${token.trim()}`
           }
         });
 
         if (response.ok) {
           const data: UserBalance = await response.json();
           setBalance(data);
+        } else if (response.status === 401 || response.status === 422) {
+          // Token is invalid, clear it and don't retry
+          if (typeof window !== 'undefined') {
+            localStorage.removeItem('auth_token');
+          }
+          setBalance(null);
         }
       } catch (error) {
         console.error('Error fetching balance:', error);

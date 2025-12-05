@@ -179,6 +179,7 @@ export default function SignUpPage() {
                 value={formData.email}
                 onChange={handleChange}
                 required
+                autoComplete="email"
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                 placeholder="tu@email.com"
                 disabled={loading}
@@ -196,6 +197,7 @@ export default function SignUpPage() {
                 value={formData.username}
                 onChange={handleChange}
                 required
+                autoComplete="username"
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                 placeholder="usuario123"
                 disabled={loading}
@@ -212,6 +214,7 @@ export default function SignUpPage() {
                 type="text"
                 value={formData.full_name}
                 onChange={handleChange}
+                autoComplete="name"
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                 placeholder="Juan Pérez"
                 disabled={loading}
@@ -229,6 +232,7 @@ export default function SignUpPage() {
                 value={formData.password}
                 onChange={handleChange}
                 required
+                autoComplete="new-password"
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                 placeholder="••••••••"
                 disabled={loading}
@@ -264,6 +268,7 @@ export default function SignUpPage() {
                 value={formData.confirmPassword}
                 onChange={handleChange}
                 required
+                autoComplete="new-password"
                 className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-blue-500 outline-none transition-all"
                 placeholder="••••••••"
                 disabled={loading}
