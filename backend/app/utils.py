@@ -1,9 +1,65 @@
 """Utility functions for authentication, subscriptions, and usage tracking"""
 import bcrypt
+import os
+import re
 from datetime import datetime, timedelta
 from typing import Optional
 from sqlalchemy.orm import Session
 from app.database.models import User, Subscription, SubscriptionTier, SubscriptionStatus, UsageTracking, UserBalance
+
+
+def get_redis_url() -> str:
+    """
+    Get Redis URL, preferring private endpoints to avoid egress fees on Railway.
+    
+    Priority:
+    1. Check if REDIS_PUBLIC_URL is set (warning: incurs egress fees) and switch to private
+    2. Detect if REDIS_URL uses public Railway endpoint and switch to private
+    3. Use REDIS_URL as-is if it's already private or not Railway
+    4. Fallback to localhost for local development
+    
+    Returns:
+        Redis connection URL string
+    """
+    # Check for REDIS_PUBLIC_URL first (this is what Railway warns about)
+    redis_public_url = os.getenv("REDIS_PUBLIC_URL")
+    if redis_public_url:
+        # REDIS_PUBLIC_URL uses public endpoint - switch to private
+        railway_private_domain = os.getenv("RAILWAY_PRIVATE_DOMAIN")
+        if railway_private_domain:
+            # Extract port and database from public URL
+            port_match = re.search(r':(\d+)', redis_public_url)
+            db_match = re.search(r'/(\d+)$', redis_public_url)
+            
+            port = port_match.group(1) if port_match else "6379"
+            db = db_match.group(1) if db_match else "0"
+            
+            # Use Railway's private internal domain (no egress fees)
+            return f"redis://redis.railway.internal:{port}/{db}"
+    
+    redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+    
+    # Check if we're on Railway and using a public endpoint
+    railway_private_domain = os.getenv("RAILWAY_PRIVATE_DOMAIN")
+    railway_tcp_proxy = os.getenv("RAILWAY_TCP_PROXY_DOMAIN")
+    
+    # If on Railway and REDIS_URL contains public endpoint, switch to private
+    if railway_private_domain and railway_tcp_proxy:
+        # Check if current REDIS_URL uses the public TCP proxy domain
+        if railway_tcp_proxy in redis_url or "railway.app" in redis_url:
+            # Switch to private endpoint: redis.railway.internal
+            # Extract port and database from existing URL if present
+            port_match = re.search(r':(\d+)', redis_url)
+            db_match = re.search(r'/(\d+)$', redis_url)
+            
+            port = port_match.group(1) if port_match else "6379"
+            db = db_match.group(1) if db_match else "0"
+            
+            # Use Railway's private internal domain
+            return f"redis://redis.railway.internal:{port}/{db}"
+    
+    # Use REDIS_URL as-is (already private, local, or custom config)
+    return redis_url
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:

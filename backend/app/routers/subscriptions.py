@@ -132,8 +132,8 @@ async def create_checkout_session(
             }],
             mode="subscription",
             locale="es",  # Spanish locale for checkout page
-            success_url=f"{os.getenv('FRONTEND_URL', 'http://localhost:3000')}/subscription/success?session_id={{CHECKOUT_SESSION_ID}}",
-            cancel_url=f"{os.getenv('FRONTEND_URL', 'http://localhost:3000')}/subscription/cancel",
+            success_url=f"{os.getenv('FRONTEND_URL', 'http://localhost:3000').replace('wwww', 'www').rstrip('/')}/subscription/success?session_id={{CHECKOUT_SESSION_ID}}",
+            cancel_url=f"{os.getenv('FRONTEND_URL', 'http://localhost:3000').replace('wwww', 'www').rstrip('/')}/subscription/cancel",
             metadata={
                 "user_id": str(user.id),
                 "tier": tier.value,

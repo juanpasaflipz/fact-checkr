@@ -24,19 +24,79 @@ from app.utils import (
     get_password_hash,
     create_default_subscription,
     create_default_user_balance,
+    get_redis_url,
 )
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 security = HTTPBearer()
 
-# OAuth state storage (in production, use Redis or database)
+# OAuth state storage - use Redis in production, fallback to in-memory for local dev
+try:
+    import redis
+    REDIS_AVAILABLE = True
+except ImportError:
+    REDIS_AVAILABLE = False
+    redis = None
+    logger.warning("⚠️  redis package not installed, OAuth state will use in-memory storage")
+
+# Redis URL - prefers private endpoints (RAILWAY_PRIVATE_DOMAIN) to avoid egress fees
+REDIS_URL = get_redis_url()
+USE_REDIS = False
+redis_client = None
+
+if REDIS_AVAILABLE:
+    try:
+        redis_client = redis.from_url(REDIS_URL, decode_responses=True, socket_connect_timeout=2)
+        redis_client.ping()  # Test connection
+        USE_REDIS = True
+        logger.info("✅ Using Redis for OAuth state storage")
+    except Exception as e:
+        logger.warning(f"⚠️  Redis not available for OAuth state storage: {e}")
+        logger.warning("⚠️  Falling back to in-memory storage (not recommended for production)")
+        USE_REDIS = False
+        redis_client = None
+else:
+    logger.warning("⚠️  Redis package not available, using in-memory OAuth state storage")
+
+# Fallback in-memory storage (only used if Redis unavailable)
 oauth_states = {}
 
 # Google OAuth configuration
+from app.config.settings import FRONTEND_URL
+
 GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
 GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
 GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "http://localhost:8000/api/auth/google/callback")
-FRONTEND_URL = os.getenv("FRONTEND_URL", "http://localhost:3000")
+
+# Validate OAuth configuration on startup
+def validate_oauth_config():
+    """Validate Google OAuth configuration and log warnings"""
+    if GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET:
+        logger.info("✅ Google OAuth configured")
+        logger.info(f"   Client ID: {GOOGLE_CLIENT_ID[:20]}...")
+        logger.info(f"   Redirect URI: {GOOGLE_REDIRECT_URI}")
+        logger.info(f"   Frontend URL: {FRONTEND_URL}")
+        
+        # Validate redirect URI format
+        if not GOOGLE_REDIRECT_URI.startswith(("http://", "https://")):
+            logger.warning(f"⚠️  GOOGLE_REDIRECT_URI should start with http:// or https://")
+        if not GOOGLE_REDIRECT_URI.endswith("/api/auth/google/callback"):
+            logger.warning(f"⚠️  GOOGLE_REDIRECT_URI should end with /api/auth/google/callback")
+        if " " in GOOGLE_REDIRECT_URI:
+            logger.warning(f"⚠️  GOOGLE_REDIRECT_URI contains spaces - this will cause redirect_uri_mismatch errors")
+        
+        # Validate FRONTEND_URL format
+        if not FRONTEND_URL.startswith(("http://", "https://")):
+            logger.error(f"❌ FRONTEND_URL must start with http:// or https://")
+        if "wwww" in FRONTEND_URL or "wwww" in FRONTEND_URL.lower():
+            logger.error(f"❌ FRONTEND_URL appears to have a typo (wwww instead of www): {FRONTEND_URL}")
+        if ".com" in FRONTEND_URL and "factcheck.mx" not in FRONTEND_URL:
+            logger.warning(f"⚠️  FRONTEND_URL appears incorrect: {FRONTEND_URL} (expected factcheck.mx domain)")
+    else:
+        logger.warning("⚠️  Google OAuth not configured - set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET")
+
+# Run validation on module import
+validate_oauth_config()
 
 class RegisterRequest(BaseModel):
     email: EmailStr
@@ -72,7 +132,7 @@ async def register(
 ):
     """Register a new user"""
     import secrets
-    from app.database.models import ReferralBonus
+    from app.database.models import ReferralBonus, UserBalance
     
     # Check if email already exists
     existing_user = get_user_by_email(db, register_data.email)
@@ -292,7 +352,19 @@ async def google_login():
     
     # Generate state for CSRF protection
     state = secrets.token_urlsafe(32)
-    oauth_states[state] = datetime.utcnow()
+    state_timestamp = datetime.utcnow()
+    
+    # Store state in Redis (with 10 minute expiration) or in-memory fallback
+    if USE_REDIS and redis_client:
+        try:
+            redis_client.setex(f"oauth_state:{state}", 600, state_timestamp.isoformat())  # 10 minutes
+            logger.info(f"OAuth state stored in Redis: {state[:10]}...")
+        except Exception as e:
+            logger.error(f"Failed to store OAuth state in Redis: {e}, falling back to in-memory")
+            oauth_states[state] = state_timestamp
+    else:
+        oauth_states[state] = state_timestamp
+        logger.info(f"OAuth state stored in memory: {state[:10]}...")
     
     # Google OAuth URL
     params = {
@@ -310,36 +382,74 @@ async def google_login():
 
 @router.get("/google/callback")
 async def google_callback(
+    request: Request,
     code: Optional[str] = None,
     state: Optional[str] = None,
     error: Optional[str] = None,
     db: Session = Depends(get_db)
 ):
     """Handle Google OAuth callback"""
-    logger.info(f"Google OAuth callback received: code={'present' if code else 'missing'}, state={'present' if state else 'missing'}, error={error}")
+    # Enhanced logging for debugging
+    logger.info("=" * 60)
+    logger.info("Google OAuth callback hit")
+    logger.info(f"Request URL: {request.url}")
+    logger.info(f"Query params: code={'present' if code else 'missing'}, state={'present' if state else 'missing'}, error={error}")
+    logger.info(f"Configured redirect_uri: {GOOGLE_REDIRECT_URI}")
+    logger.info(f"Frontend URL: {FRONTEND_URL}")
+    logger.info(f"Client ID configured: {bool(GOOGLE_CLIENT_ID)}")
+    logger.info(f"Client Secret configured: {bool(GOOGLE_CLIENT_SECRET)}")
+    logger.info("=" * 60)
     
     if error:
-        logger.warning(f"Google OAuth error: {error}")
+        logger.warning(f"Google OAuth error from callback: {error}")
+        logger.warning(f"Full query params: {dict(request.query_params)}")
         return RedirectResponse(url=f"{FRONTEND_URL}/signin?error=oauth_cancelled")
     
     if not code or not state:
-        logger.error(f"Missing code or state: code={bool(code)}, state={bool(state)}")
+        logger.error(f"Missing required parameters: code={bool(code)}, state={bool(state)}")
+        logger.error(f"Full query params: {dict(request.query_params)}")
         return RedirectResponse(url=f"{FRONTEND_URL}/signin?error=invalid_callback")
     
-    # Verify state (CSRF protection)
-    if state not in oauth_states:
-        logger.error(f"Invalid state token: {state[:10]}... (not in oauth_states)")
+    # Verify state (CSRF protection) - check Redis first, then in-memory fallback
+    state_created = None
+    state_found = False
+    
+    if USE_REDIS and redis_client:
+        try:
+            state_timestamp_str = redis_client.get(f"oauth_state:{state}")
+            if state_timestamp_str:
+                state_created = datetime.fromisoformat(state_timestamp_str)
+                state_found = True
+                # Delete state immediately (one-time use)
+                redis_client.delete(f"oauth_state:{state}")
+                logger.info(f"OAuth state found in Redis: {state[:10]}...")
+        except Exception as e:
+            logger.warning(f"Error reading OAuth state from Redis: {e}, checking in-memory fallback")
+    
+    # Fallback to in-memory storage
+    if not state_found:
+        if state in oauth_states:
+            state_created = oauth_states[state]
+            state_found = True
+            # Remove used state (one-time use)
+            del oauth_states[state]
+            logger.info(f"OAuth state found in memory: {state[:10]}...")
+    
+    if not state_found:
+        logger.error(f"Invalid state token: {state[:10]}... (not found in Redis or memory)")
+        logger.error(f"Available states in memory: {len(oauth_states)}")
+        if USE_REDIS and redis_client:
+            try:
+                redis_keys = redis_client.keys("oauth_state:*")
+                logger.error(f"Available states in Redis: {len(redis_keys)}")
+            except Exception:
+                pass
         return RedirectResponse(url=f"{FRONTEND_URL}/signin?error=invalid_state")
     
     # Check if state is expired (older than 10 minutes)
-    state_created = oauth_states.get(state)
     if state_created and (datetime.utcnow() - state_created).total_seconds() > 600:
-        logger.error(f"Expired state token: {state[:10]}...")
-        del oauth_states[state]
+        logger.error(f"Expired state token: {state[:10]}... (created at {state_created})")
         return RedirectResponse(url=f"{FRONTEND_URL}/signin?error=expired_state")
-    
-    # Remove used state (one-time use)
-    del oauth_states[state]
     
     if not GOOGLE_CLIENT_ID or not GOOGLE_CLIENT_SECRET:
         logger.error("Google OAuth not configured: missing CLIENT_ID or CLIENT_SECRET")
@@ -348,6 +458,7 @@ async def google_callback(
     try:
         # Exchange code for tokens
         logger.info("Exchanging authorization code for tokens...")
+        logger.info(f"Using redirect_uri: {GOOGLE_REDIRECT_URI}")
         token_url = "https://oauth2.googleapis.com/token"
         token_data = {
             "code": code,
@@ -359,12 +470,35 @@ async def google_callback(
         
         async with httpx.AsyncClient() as client:
             token_response = await client.post(token_url, data=token_data)
+            
+            # Enhanced error logging for token exchange
+            if not token_response.is_success:
+                error_text = token_response.text
+                error_status = token_response.status_code
+                logger.error(f"Token exchange failed: HTTP {error_status}")
+                logger.error(f"Response body: {error_text}")
+                try:
+                    error_json = token_response.json()
+                    logger.error(f"Error details: {error_json}")
+                    # Check for common Google OAuth errors
+                    if "error" in error_json:
+                        error_type = error_json.get("error")
+                        error_description = error_json.get("error_description", "")
+                        logger.error(f"Google OAuth error: {error_type} - {error_description}")
+                        if error_type == "redirect_uri_mismatch":
+                            logger.error(f"Redirect URI mismatch! Configured: {GOOGLE_REDIRECT_URI}")
+                            logger.error("Make sure this exact URI is in Google Cloud Console")
+                except Exception:
+                    pass
+                return RedirectResponse(url=f"{FRONTEND_URL}/signin?error=token_exchange_failed")
+            
             token_response.raise_for_status()
             tokens = token_response.json()
         
         access_token = tokens.get("access_token")
         if not access_token:
-            logger.error("Failed to get access_token from Google")
+            logger.error("Failed to get access_token from Google response")
+            logger.error(f"Token response keys: {list(tokens.keys())}")
             return RedirectResponse(url=f"{FRONTEND_URL}/signin?error=token_exchange_failed")
         
         logger.info("Successfully exchanged code for access token")
@@ -493,17 +627,36 @@ async def google_callback(
         return response
         
     except httpx.HTTPStatusError as e:
-        logger.error(f"HTTP error during OAuth: {e.response.status_code} - {e.response.text}")
+        logger.error("=" * 60)
+        logger.error("HTTP Status Error during OAuth")
+        logger.error(f"Status code: {e.response.status_code}")
+        logger.error(f"Response text: {e.response.text}")
+        logger.error(f"Request URL: {e.request.url if hasattr(e, 'request') else 'N/A'}")
+        try:
+            error_json = e.response.json()
+            logger.error(f"Error JSON: {error_json}")
+            if "error" in error_json:
+                logger.error(f"OAuth error type: {error_json.get('error')}")
+                logger.error(f"Error description: {error_json.get('error_description', 'N/A')}")
+        except Exception:
+            pass
+        logger.error("=" * 60)
         db.rollback()
         return RedirectResponse(url=f"{FRONTEND_URL}/signin?error=oauth_http_error")
     except httpx.HTTPError as e:
-        logger.error(f"HTTP error during OAuth: {str(e)}")
+        logger.error("=" * 60)
+        logger.error(f"HTTP Error during OAuth: {str(e)}")
+        logger.error(f"Error type: {type(e).__name__}")
+        logger.error("=" * 60)
         db.rollback()
         return RedirectResponse(url=f"{FRONTEND_URL}/signin?error=oauth_error")
     except Exception as e:
-        logger.error(f"Unexpected error during OAuth: {str(e)}", exc_info=True)
+        logger.error("=" * 60)
+        logger.error(f"Unexpected error during OAuth: {str(e)}")
+        logger.error(f"Error type: {type(e).__name__}")
         import traceback
-        logger.error(f"Full traceback: {traceback.format_exc()}")
+        logger.error(f"Full traceback:\n{traceback.format_exc()}")
+        logger.error("=" * 60)
         db.rollback()
         # Include error details in redirect for debugging (remove in production)
         error_detail = str(e).replace(' ', '_')[:50]  # Sanitize for URL

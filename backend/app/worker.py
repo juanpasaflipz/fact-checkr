@@ -2,11 +2,13 @@ import os
 from celery import Celery
 from celery.schedules import crontab
 from dotenv import load_dotenv
+from app.utils import get_redis_url
 
 load_dotenv()
 
 # Redis URL for broker and backend
-REDIS_URL = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+# Prefers private endpoints (RAILWAY_PRIVATE_DOMAIN) to avoid egress fees
+REDIS_URL = get_redis_url()
 
 celery_app = Celery(
     "factcheckr_worker",

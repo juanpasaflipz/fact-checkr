@@ -18,22 +18,32 @@ from app.database.connection import get_db
 from app.auth import get_optional_user
 from app.services.embeddings import EmbeddingService
 from app.services.rag_pipeline import RAGPipeline
+from app.utils import get_user_tier
+from app.database.models import SubscriptionTier
 
 logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/v1/intelligence", tags=["Intelligence"])
 
 
-# Dependency for premium features (placeholder - integrate with subscription)
-async def require_premium(user = Depends(get_optional_user)):
-    """Check if user has premium access
+# Dependency for premium features
+async def require_premium(
+    user = Depends(get_optional_user),
+    db: Session = Depends(get_db)
+):
+    """Check if user has premium access (PRO, TEAM, or ENTERPRISE tier)"""
+    if not user:
+        raise HTTPException(status_code=401, detail="Authentication required")
     
-    TODO: Integrate with subscription system
-    For now, allows all authenticated users
-    """
-    # In production, check user subscription tier
-    # if not user or user.subscription.tier not in ["pro", "team", "enterprise"]:
-    #     raise HTTPException(status_code=403, detail="Premium subscription required")
+    tier = get_user_tier(db, user.id)
+    premium_tiers = [SubscriptionTier.PRO, SubscriptionTier.TEAM, SubscriptionTier.ENTERPRISE]
+    
+    if tier not in premium_tiers:
+        raise HTTPException(
+            status_code=403, 
+            detail=f"Premium subscription required. Current tier: {tier.value}. Upgrade to PRO, TEAM, or ENTERPRISE to access intelligence features."
+        )
+    
     return user
 
 

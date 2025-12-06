@@ -8,9 +8,12 @@ Use this checklist to quickly verify your Google OAuth setup.
 - [ ] OAuth 2.0 Client ID created (Web application)
 - [ ] Redirect URI added: `http://localhost:8000/api/auth/google/callback`
 - [ ] Redirect URI added: `https://your-backend-domain.com/api/auth/google/callback`
+- [ ] **REMOVED any bare domains** (e.g., `https://factcheck.mx` - these are invalid)
 - [ ] Client ID copied (looks like: `123456789-abc.apps.googleusercontent.com`)
 - [ ] Client Secret copied (looks like: `GOCSPX-abc123...`)
 - [ ] Test users added (if in testing mode) OR app published
+
+**Important**: Only full callback paths are valid. Bare domains like `https://factcheck.mx` will cause errors.
 
 ## ✅ Backend Environment Variables (Local)
 
@@ -112,5 +115,16 @@ curl http://localhost:8000/health
 
 ---
 
-**Full Guide**: See `GOOGLE_AUTH_FIX_GUIDE.md` for detailed instructions.
+## 📚 Documentation
+
+- **Production Issues**: See `GOOGLE_OAUTH_PRODUCTION_FIX.md` for detailed troubleshooting
+- **Full Setup Guide**: See `GOOGLE_AUTH_FIX_GUIDE.md` for complete instructions
+- **Quick Reference**: This checklist
+
+## ⚠️ Important Notes
+
+1. **Backend handles OAuth** - The callback URL must be your backend domain, not the frontend
+2. **Google showing backend URL is normal** - This is expected behavior
+3. **Remove bare domains** - Only full callback paths work in Google Cloud Console
+4. **Exact match required** - `GOOGLE_REDIRECT_URI` must match Google Cloud Console character-by-character
 
