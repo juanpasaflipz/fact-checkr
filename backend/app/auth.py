@@ -47,35 +47,39 @@ async def get_current_user(
     )
     
     if credentials is None:
-        logger.warning("Missing authentication credentials")
+        logger.warning("❌ Auth failed: Missing authentication credentials")
         raise credentials_exception
     
     if not credentials.credentials or not credentials.credentials.strip():
-        logger.warning("Empty authentication credentials")
+        logger.warning("❌ Auth failed: Empty authentication credentials")
         raise credentials_exception
     
     try:
         token = credentials.credentials.strip()
+        # Log token prefix for debugging
+        logger.info(f"🔑 Verifying token: {token[:10]}...")
+        
         payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
         user_id_str = payload.get("sub")
+        
         if user_id_str is None:
-            logger.warning("Token missing 'sub' claim")
+            logger.warning("❌ Auth failed: Token missing 'sub' claim")
             raise credentials_exception
         
         try:
             user_id = int(user_id_str)
         except (ValueError, TypeError):
-            logger.warning(f"Token 'sub' claim is not a valid integer: {user_id_str}")
+            logger.warning(f"❌ Auth failed: Token 'sub' claim is not a valid integer: {user_id_str}")
             raise credentials_exception
         
         # Get user from database
         user = get_user_by_id(db, user_id)
         if user is None:
-            logger.warning(f"User not found for id: {user_id}")
+            logger.warning(f"❌ Auth failed: User not found for id: {user_id}")
             raise credentials_exception
             
         if not user.is_active:
-            logger.warning(f"User {user_id} is inactive")
+            logger.warning(f"❌ Auth failed: User {user_id} is inactive")
             raise credentials_exception
         
         # Update last login
@@ -84,11 +88,20 @@ async def get_current_user(
         
         return user
     except JWTError as e:
-        logger.warning(f"JWT validation error: {str(e)}")
+        logger.warning(f"❌ Auth failed: JWT validation error: {str(e)}")
+        # Check if it might be a key mismatch
+        if "Signature verification failed" in str(e):
+            logger.error("⚠️  Signature verification failed. This often means JWT_SECRET_KEY mismatch between generator and verifier.")
         raise credentials_exception
+    except HTTPException:
+        # Re-raise HTTP exceptions
+        raise
     except Exception as e:
-        logger.error(f"Unexpected auth error: {str(e)}")
-        raise credentials_exception
+        logger.error(f"❌ Unexpected auth error: {str(e)}")
+        import traceback
+        logger.error(traceback.format_exc())
+        # Do NOT raise credentials_exception here. Let it bubble up as 500.
+        raise
 
 # Optional dependency for protected routes
 async def get_optional_user(
