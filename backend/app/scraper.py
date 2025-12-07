@@ -42,10 +42,17 @@ class MockScraper(Scraper):
 
 
 import tweepy
-import facebook
 import requests
 from datetime import datetime, timedelta
 import json
+
+# Optional Facebook SDK import
+try:
+    import facebook
+    FACEBOOK_AVAILABLE = True
+except ImportError:
+    FACEBOOK_AVAILABLE = False
+    facebook = None
 
 class TwitterScraper(Scraper):
     def __init__(self):
@@ -325,6 +332,11 @@ class FacebookScraper(Scraper):
     """Facebook Graph API scraper for public posts and pages"""
 
     def __init__(self):
+        if not FACEBOOK_AVAILABLE:
+            print("Warning: facebook-sdk not installed. Facebook scraping disabled.")
+            self.api = None
+            return
+
         self.app_id = os.getenv("FACEBOOK_APP_ID")
         self.app_secret = os.getenv("FACEBOOK_APP_SECRET")
         self.access_token = os.getenv("FACEBOOK_ACCESS_TOKEN")

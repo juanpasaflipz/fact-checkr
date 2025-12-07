@@ -174,11 +174,8 @@ class FactChecker:
             }
             posts_dicts.append(post_dict)
 
-        # Remove duplicates across platforms
-        from sqlalchemy.orm import Session
-        from app.database.connection import get_db
-        db = next(get_db())
-        deduplicated_posts = self.duplicate_detector.find_duplicates(posts_dicts, db)
+        # Remove duplicates across platforms (db not currently used but kept for future enhancements)
+        deduplicated_posts = self.duplicate_detector.find_duplicates(posts_dicts, db=None)
 
         print(f"Found {len(all_posts)} posts, {len(deduplicated_posts)} unique after deduplication")
 
@@ -268,11 +265,8 @@ class FactChecker:
             }
             posts_dicts.append(post_dict)
 
-        # Remove duplicates across platforms
-        from sqlalchemy.orm import Session
-        from app.database.connection import get_db
-        db = next(get_db())
-        deduplicated_posts = self.duplicate_detector.find_duplicates(posts_dicts, db)
+        # Remove duplicates across platforms (db not currently used but kept for future enhancements)
+        deduplicated_posts = self.duplicate_detector.find_duplicates(posts_dicts, db=None)
 
         print(f"Found {len(all_posts)} posts, {len(deduplicated_posts)} unique after deduplication")
 

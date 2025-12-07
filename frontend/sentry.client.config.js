@@ -1,7 +1,11 @@
 import * as Sentry from "@sentry/nextjs";
 
-Sentry.init({
-  dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
+const dsn = process.env.NEXT_PUBLIC_SENTRY_DSN;
+
+// Only initialize Sentry if DSN is configured
+if (dsn) {
+  Sentry.init({
+    dsn: dsn,
 
   // Adjust this value in production, or use tracesSampler for greater control
   tracesSampleRate: 0.1,
@@ -22,6 +26,7 @@ Sentry.init({
       maskAllText: true,
       blockAllMedia: true,
     }),
-    Sentry.browserTracingIntegration(),
-  ],
-});
+      Sentry.browserTracingIntegration(),
+    ],
+  });
+}

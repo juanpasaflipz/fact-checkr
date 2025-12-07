@@ -9,6 +9,17 @@ from dotenv import load_dotenv
 # Load environment variables FIRST before any imports that might use them
 load_dotenv()
 
+# Configure logging FIRST before any imports
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
+    stream=sys.stdout,
+    force=True  # Override any existing configuration
+)
+logger = logging.getLogger(__name__)
+
+logger.info("✅ Environment variables loaded")
+
 # Initialize Sentry (must be done before other imports)
 try:
     import sentry_sdk
@@ -45,15 +56,6 @@ from sqlalchemy.orm import Session
 from sqlalchemy import desc, or_, and_, func, case
 from sqlalchemy.exc import OperationalError
 
-# Configure logging FIRST before any imports
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    stream=sys.stdout,
-    force=True  # Override any existing configuration
-)
-logger = logging.getLogger(__name__)
-
 logger.info("✅ Environment variables loaded")
 
 # Import app modules
@@ -79,15 +81,6 @@ from app.models import (
 )
 from app.rate_limit import limiter, setup_rate_limiting
 from app.auth import get_optional_user, create_access_token
-
-# Configure logging FIRST before any imports
-logging.basicConfig(
-    level=logging.INFO,
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    stream=sys.stdout,
-    force=True  # Override any existing configuration
-)
-logger = logging.getLogger(__name__)
 
 # Define available routers and their optional dependencies
 CORE_ROUTERS = ['auth', 'subscriptions', 'usage', 'whatsapp', 'telegraph']
@@ -177,7 +170,6 @@ async def health_check():
 @app.get("/health/detailed")
 async def detailed_health_check(db: Session = Depends(get_db)):
     """Detailed health check with system metrics"""
-    import psutil
     import time
     from sqlalchemy import text
 
@@ -187,30 +179,45 @@ async def detailed_health_check(db: Session = Depends(get_db)):
         db.execute(text("SELECT 1"))
         db_time = time.time() - db_start
 
-        # System metrics
-        memory = psutil.virtual_memory()
-        cpu_percent = psutil.cpu_percent(interval=0.1)
+        # System metrics (optional - requires psutil)
+        try:
+            import psutil
+            memory = psutil.virtual_memory()
+            cpu_percent = psutil.cpu_percent(interval=0.1)
+            psutil_available = True
+        except ImportError:
+            psutil_available = False
+            memory = None
+            cpu_percent = None
 
         # Database stats
         claim_count = db.query(func.count(DBClaim.id)).scalar() or 0
         source_count = db.query(func.count(DBSource.id)).scalar() or 0
 
-        return {
-            "status": "healthy",
-            "timestamp": datetime.utcnow().isoformat(),
-            "version": "1.0.0",
-            "system": {
+        system_info = {}
+        if psutil_available and memory and cpu_percent is not None:
+            system_info = {
                 "memory_usage_percent": memory.percent,
                 "cpu_usage_percent": cpu_percent,
                 "memory_used_mb": memory.used // (1024 * 1024),
                 "memory_total_mb": memory.total // (1024 * 1024),
-            },
+                "uptime_seconds": time.time() - psutil.boot_time(),
+            }
+        else:
+            system_info = {
+                "note": "psutil not available - system metrics disabled"
+            }
+
+        return {
+            "status": "healthy",
+            "timestamp": datetime.utcnow().isoformat(),
+            "version": "1.0.0",
+            "system": system_info,
             "database": {
                 "connection_time_ms": round(db_time * 1000, 2),
                 "claims_count": claim_count,
                 "sources_count": source_count,
             },
-            "uptime_seconds": time.time() - psutil.boot_time(),
         }
     except Exception as e:
         logger.error(f"Detailed health check failed: {e}")

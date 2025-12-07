@@ -31,7 +31,7 @@ class DuplicateDetector:
         # Time window for considering claims as potentially duplicate (minutes)
         self.time_window_minutes = 60
 
-    def find_duplicates(self, posts: List[Dict], db: Session) -> List[Dict]:
+    def find_duplicates(self, posts: List[Dict], db: Optional[Session] = None) -> List[Dict]:
         """
         Find and mark duplicate posts across platforms.
 
@@ -209,7 +209,20 @@ class DuplicateDetector:
                 return 0.0
 
             # Cosine similarity
-            import numpy as np
+            try:
+                import numpy as np
+            except ImportError:
+                # Fallback to manual calculation if numpy not available
+                # Simple dot product and norm calculation
+                dot_product = sum(a * b for a, b in zip(embedding1, embedding2))
+                norm1 = sum(a * a for a in embedding1) ** 0.5
+                norm2 = sum(b * b for b in embedding2) ** 0.5
+                
+                if norm1 == 0 or norm2 == 0:
+                    return 0.0
+                
+                return dot_product / (norm1 * norm2)
+            
             vec1 = np.array(embedding1)
             vec2 = np.array(embedding2)
 
