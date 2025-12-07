@@ -4,7 +4,10 @@ from .models import (
     User, Subscription, UsageTracking,
     SubscriptionTier, SubscriptionStatus
 )
-from .connection import engine, SessionLocal, get_db
+from .connection import get_engine, SessionLocal, get_db
+
+# Backwards compatibility alias
+engine = get_engine
 
 __all__ = [
     "Base",

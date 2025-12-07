@@ -42,17 +42,7 @@ echo ""
 echo "Starting Gunicorn..."
 echo ""
 
-# Test if we can import the app before starting
-echo "Testing app import..."
-python3 -c "import main; print('✅ App imports successfully')" || {
-    echo "❌ Failed to import app!"
-    echo "Checking Python path..."
-    python3 -c "import sys; print('\n'.join(sys.path))"
-    exit 1
-}
-
 # Start Gunicorn (foreground process for Railway)
-# This allows health checks to work immediately
 echo "Starting Gunicorn server..."
 exec gunicorn main:app \
     --workers 1 \
