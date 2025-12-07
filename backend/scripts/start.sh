@@ -29,10 +29,11 @@ if [ ! -f "main.py" ]; then
     exit 1
 fi
 
-# Run migrations if alembic is available (non-blocking)
+# Run migrations in background (non-blocking) so app can start quickly
 if command -v alembic >/dev/null 2>&1; then
-    echo "Running database migrations..."
-    alembic upgrade head || echo "⚠️ Migration warning (continuing)..."
+    echo "Running database migrations in background..."
+    (alembic upgrade head || echo "⚠️ Migration warning (continuing)...") &
+    MIGRATION_PID=$!
 else
     echo "Alembic not found, skipping migrations"
 fi
@@ -41,8 +42,8 @@ echo ""
 echo "Starting Gunicorn..."
 echo ""
 
-# Start Gunicorn
-# Railway will route traffic to this port automatically
+# Start Gunicorn (foreground process for Railway)
+# This allows health checks to work immediately
 exec gunicorn main:app \
     --workers 1 \
     --worker-class uvicorn.workers.UvicornWorker \
