@@ -20,7 +20,8 @@ BLACKLIST_SOURCES = [
     # "youtube.com",  # Now supported via YouTube scraper with transcription
     "tiktok.com",   # Hard to parse video content
 ]
-from app.scraper import MockScraper, TwitterScraper, GoogleNewsScraper
+from app.scraper import MockScraper, TwitterScraper, GoogleNewsScraper, FacebookScraper, InstagramScraper
+from app.services.duplicate_detection import DuplicateDetector
 import anthropic
 import openai
 import json
@@ -83,6 +84,9 @@ class FactChecker:
         self.mock_scraper = MockScraper()
         self.twitter_scraper = TwitterScraper()
         self.google_news_scraper = GoogleNewsScraper()
+        self.facebook_scraper = FacebookScraper()
+        self.instagram_scraper = InstagramScraper()
+        self.duplicate_detector = DuplicateDetector()
         
         # Initialize Anthropic (primary)
         anthropic_key = os.getenv("ANTHROPIC_API_KEY")
@@ -133,23 +137,68 @@ class FactChecker:
             # Use default keywords from configuration
             from app.config.scraping_keywords import DEFAULT_KEYWORDS
             keywords = DEFAULT_KEYWORDS
-        
+
         # Fetch from all sources concurrently
         results = await asyncio.gather(
             self.twitter_scraper.fetch_posts(keywords),
             self.google_news_scraper.fetch_posts(keywords),
+            self.facebook_scraper.fetch_posts(keywords),
+            self.instagram_scraper.fetch_posts(keywords),
             return_exceptions=True
         )
-        
+
         twitter_posts = results[0] if isinstance(results[0], list) else []
         google_posts = results[1] if isinstance(results[1], list) else []
-        
-        all_posts = twitter_posts + google_posts
-        
+        facebook_posts = results[2] if isinstance(results[2], list) else []
+        instagram_posts = results[3] if isinstance(results[3], list) else []
+
+        all_posts = twitter_posts + google_posts + facebook_posts + instagram_posts
+
         if not all_posts:
             print("No live posts found (or keys missing). Using Mock data.")
             all_posts = await self.mock_scraper.fetch_posts(keywords)
-            
+
+        # Convert SocialPost objects to dicts for duplicate detection
+        posts_dicts = []
+        for post in all_posts:
+            post_dict = {
+                'id': post.id,
+                'platform': post.platform,
+                'content': post.content,
+                'author': post.author,
+                'timestamp': post.timestamp,
+                'url': post.url,
+                'engagement_metrics': post.engagement_metrics,
+                'media_urls': post.media_urls,
+                'context_data': post.context_data
+            }
+            posts_dicts.append(post_dict)
+
+        # Remove duplicates across platforms
+        from sqlalchemy.orm import Session
+        from app.database.connection import get_db
+        db = next(get_db())
+        deduplicated_posts = self.duplicate_detector.find_duplicates(posts_dicts, db)
+
+        print(f"Found {len(all_posts)} posts, {len(deduplicated_posts)} unique after deduplication")
+
+        # Convert back to SocialPost objects
+        all_posts = []
+        for post_dict in deduplicated_posts:
+            from app.models import SocialPost
+            post = SocialPost(
+                id=post_dict['id'],
+                platform=post_dict['platform'],
+                content=post_dict['content'],
+                author=post_dict['author'],
+                timestamp=post_dict['timestamp'],
+                url=post_dict['url'],
+                engagement_metrics=post_dict.get('engagement_metrics'),
+                media_urls=post_dict.get('media_urls'),
+                context_data=post_dict.get('context_data')
+            )
+            all_posts.append(post)
+
         claims = []
         
         # Limit to first 1 post for instant response
@@ -182,23 +231,68 @@ class FactChecker:
             # Use default keywords from configuration
             from app.config.scraping_keywords import DEFAULT_KEYWORDS
             keywords = DEFAULT_KEYWORDS
-        
+
         # Fetch from all sources concurrently
         results = await asyncio.gather(
             self.twitter_scraper.fetch_posts(keywords),
             self.google_news_scraper.fetch_posts(keywords),
+            self.facebook_scraper.fetch_posts(keywords),
+            self.instagram_scraper.fetch_posts(keywords),
             return_exceptions=True
         )
-        
+
         twitter_posts = results[0] if isinstance(results[0], list) else []
         google_posts = results[1] if isinstance(results[1], list) else []
-        
-        all_posts = twitter_posts + google_posts
-        
+        facebook_posts = results[2] if isinstance(results[2], list) else []
+        instagram_posts = results[3] if isinstance(results[3], list) else []
+
+        all_posts = twitter_posts + google_posts + facebook_posts + instagram_posts
+
         if not all_posts:
             print("No live posts found (or keys missing). Using Mock data.")
             all_posts = await self.mock_scraper.fetch_posts(keywords)
-        
+
+        # Convert SocialPost objects to dicts for duplicate detection
+        posts_dicts = []
+        for post in all_posts:
+            post_dict = {
+                'id': post.id,
+                'platform': post.platform,
+                'content': post.content,
+                'author': post.author,
+                'timestamp': post.timestamp,
+                'url': post.url,
+                'engagement_metrics': post.engagement_metrics,
+                'media_urls': post.media_urls,
+                'context_data': post.context_data
+            }
+            posts_dicts.append(post_dict)
+
+        # Remove duplicates across platforms
+        from sqlalchemy.orm import Session
+        from app.database.connection import get_db
+        db = next(get_db())
+        deduplicated_posts = self.duplicate_detector.find_duplicates(posts_dicts, db)
+
+        print(f"Found {len(all_posts)} posts, {len(deduplicated_posts)} unique after deduplication")
+
+        # Convert back to SocialPost objects
+        all_posts = []
+        for post_dict in deduplicated_posts:
+            from app.models import SocialPost
+            post = SocialPost(
+                id=post_dict['id'],
+                platform=post_dict['platform'],
+                content=post_dict['content'],
+                author=post_dict['author'],
+                timestamp=post_dict['timestamp'],
+                url=post_dict['url'],
+                engagement_metrics=post_dict.get('engagement_metrics'),
+                media_urls=post_dict.get('media_urls'),
+                context_data=post_dict.get('context_data')
+            )
+            all_posts.append(post)
+
         # Yield claims as they're processed
         for post in all_posts[:3]:
             claim_text = await self._extract_claim(post.content)

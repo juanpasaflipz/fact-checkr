@@ -165,10 +165,21 @@ async def get_platform_distribution(
         desc('total_count')
     ).all()
     
+    # Platform name mapping for better display
+    platform_display_names = {
+        'X (Twitter)': 'Twitter/X',
+        'Facebook': 'Facebook',
+        'Instagram': 'Instagram',
+        'Google News': 'Google News',
+        'Twitter': 'Twitter/X',
+        'X': 'Twitter/X'
+    }
+
     # Calculate engagement metrics per platform
     platforms = []
     for p in platform_data:
         platform = p.platform or "Unknown"
+        display_name = platform_display_names.get(platform, platform)
         
         # Get engagement metrics for this platform
         sources_with_engagement = db.query(Source).filter(
@@ -186,15 +197,19 @@ async def get_platform_distribution(
         engagement_count = 0
         
         for source in sources_with_engagement:
-            if source.engagement_metrics:
+            engagement_data = source.engagement_metrics
+            if engagement_data is not None:
                 try:
-                    metrics = source.engagement_metrics if isinstance(source.engagement_metrics, dict) else json.loads(source.engagement_metrics)
-                    total_likes += metrics.get('likes', 0) or 0
-                    total_retweets += metrics.get('retweets', 0) or 0
-                    total_replies += metrics.get('replies', 0) or 0
-                    total_views += metrics.get('views', 0) or 0
+                    if isinstance(engagement_data, dict):
+                        metrics = engagement_data
+                    else:
+                        metrics = json.loads(str(engagement_data))
+                    total_likes += int(metrics.get('likes', 0) or 0)
+                    total_retweets += int(metrics.get('retweets', 0) or 0)
+                    total_replies += int(metrics.get('replies', 0) or 0)
+                    total_views += int(metrics.get('views', 0) or 0)
                     engagement_count += 1
-                except:
+                except (json.JSONDecodeError, ValueError, TypeError):
                     pass
         
         avg_engagement = None
@@ -202,7 +217,7 @@ async def get_platform_distribution(
             avg_engagement = (total_likes + total_retweets + total_replies + total_views) / engagement_count
         
         platforms.append(PlatformDistribution(
-            platform=platform,
+            platform=display_name,
             total_count=int(p.total_count or 0),
             verified_count=int(p.verified_count or 0),
             debunked_count=int(p.debunked_count or 0),
@@ -235,10 +250,10 @@ async def get_engagement_metrics(
     platform_metrics: Dict[str, Dict[str, Any]] = {}
     
     for source in sources:
-        platform = source.platform or "Unknown"
+        platform_str = str(source.platform) if getattr(source, 'platform', None) is not None else "Unknown"
         
-        if platform not in platform_metrics:
-            platform_metrics[platform] = {
+        if platform_str not in platform_metrics:
+            platform_metrics[platform_str] = {
                 "total_likes": 0,
                 "total_retweets": 0,
                 "total_replies": 0,
@@ -246,15 +261,19 @@ async def get_engagement_metrics(
                 "post_count": 0
             }
         
-        if source.engagement_metrics:
+        engagement_data = source.engagement_metrics
+        if engagement_data is not None:
             try:
-                metrics = source.engagement_metrics if isinstance(source.engagement_metrics, dict) else json.loads(source.engagement_metrics)
-                platform_metrics[platform]["total_likes"] += metrics.get('likes', 0) or 0
-                platform_metrics[platform]["total_retweets"] += metrics.get('retweets', 0) or 0
-                platform_metrics[platform]["total_replies"] += metrics.get('replies', 0) or 0
-                platform_metrics[platform]["total_views"] += metrics.get('views', 0) or 0
-                platform_metrics[platform]["post_count"] += 1
-            except:
+                if isinstance(engagement_data, dict):
+                    metrics = engagement_data
+                else:
+                    metrics = json.loads(str(engagement_data))
+                platform_metrics[platform_str]["total_likes"] += int(metrics.get('likes', 0) or 0)
+                platform_metrics[platform_str]["total_retweets"] += int(metrics.get('retweets', 0) or 0)
+                platform_metrics[platform_str]["total_replies"] += int(metrics.get('replies', 0) or 0)
+                platform_metrics[platform_str]["total_views"] += int(metrics.get('views', 0) or 0)
+                platform_metrics[platform_str]["post_count"] += 1
+            except (json.JSONDecodeError, ValueError, TypeError):
                 pass
     
     result = []
@@ -348,27 +367,31 @@ async def compare_topics(
         ).all()
         
         total_claims = len(claims)
-        verified_count = sum(1 for c in claims if c.status == VerificationStatus.VERIFIED)
-        debunked_count = sum(1 for c in claims if c.status == VerificationStatus.DEBUNKED)
+        verified_count = sum(1 for c in claims if getattr(c, 'status', None) == VerificationStatus.VERIFIED)
+        debunked_count = sum(1 for c in claims if getattr(c, 'status', None) == VerificationStatus.DEBUNKED)
         
         # Calculate average confidence
-        confidences = [c.confidence for c in claims if c.confidence is not None]
+        confidences = [float(getattr(c, 'confidence', 0.0)) for c in claims if getattr(c, 'confidence', None) is not None]
         avg_confidence = sum(confidences) / len(confidences) if confidences else 0.0
         
         # Calculate engagement score (from sources)
-        source_ids = [c.source_id for c in claims if c.source_id]
+        source_ids = [str(c.source_id) for c in claims if getattr(c, 'source_id', None) is not None]
         sources = db.query(Source).filter(Source.id.in_(source_ids)).all() if source_ids else []
         
         total_engagement = 0
         engagement_count = 0
         for source in sources:
-            if source.engagement_metrics:
+            engagement_data = source.engagement_metrics
+            if engagement_data is not None:
                 try:
-                    metrics = source.engagement_metrics if isinstance(source.engagement_metrics, dict) else json.loads(source.engagement_metrics)
-                    engagement = (metrics.get('likes', 0) or 0) + (metrics.get('retweets', 0) or 0) + (metrics.get('replies', 0) or 0)
+                    if isinstance(engagement_data, dict):
+                        metrics = engagement_data
+                    else:
+                        metrics = json.loads(str(engagement_data))
+                    engagement = int(metrics.get('likes', 0) or 0) + int(metrics.get('retweets', 0) or 0) + int(metrics.get('replies', 0) or 0)
                     total_engagement += engagement
                     engagement_count += 1
-                except:
+                except (json.JSONDecodeError, ValueError, TypeError):
                     pass
         
         engagement_score = total_engagement / engagement_count if engagement_count > 0 else 0.0
@@ -378,12 +401,12 @@ async def compare_topics(
             TrendingTopic.topic_name.ilike(f"%{topic.name}%")
         ).order_by(desc(TrendingTopic.detected_at)).first()
         
-        trend_score = trending_topic.final_priority_score if trending_topic else None
+        trend_score = float(getattr(trending_topic, 'final_priority_score', 0.0)) if trending_topic and getattr(trending_topic, 'final_priority_score', None) is not None else None
         
         result.append(TopicComparison(
-            topic_id=topic.id,
-            topic_name=topic.name,
-            topic_slug=topic.slug,
+            topic_id=int(getattr(topic, 'id', 0)),
+            topic_name=str(topic.name),
+            topic_slug=str(topic.slug),
             total_claims=total_claims,
             verification_rate=(verified_count / total_claims * 100) if total_claims > 0 else 0.0,
             debunk_rate=(debunked_count / total_claims * 100) if total_claims > 0 else 0.0,
@@ -458,15 +481,19 @@ async def get_audience_stats(
         engagement_count = 0
         
         for source in sources_with_engagement:
-            if source.engagement_metrics:
+            engagement_data = source.engagement_metrics
+            if engagement_data is not None:
                 try:
-                    metrics = source.engagement_metrics if isinstance(source.engagement_metrics, dict) else json.loads(source.engagement_metrics)
-                    total_likes += metrics.get('likes', 0) or 0
-                    total_retweets += metrics.get('retweets', 0) or 0
-                    total_replies += metrics.get('replies', 0) or 0
-                    total_views += metrics.get('views', 0) or 0
+                    if isinstance(engagement_data, dict):
+                        metrics = engagement_data
+                    else:
+                        metrics = json.loads(str(engagement_data))
+                    total_likes += int(metrics.get('likes', 0) or 0)
+                    total_retweets += int(metrics.get('retweets', 0) or 0)
+                    total_replies += int(metrics.get('replies', 0) or 0)
+                    total_views += int(metrics.get('views', 0) or 0)
                     engagement_count += 1
-                except:
+                except (json.JSONDecodeError, ValueError, TypeError):
                     pass
         
         avg_engagement = None
@@ -474,7 +501,7 @@ async def get_audience_stats(
             avg_engagement = (total_likes + total_retweets + total_replies + total_views) / engagement_count
         
         platforms.append(PlatformDistribution(
-            platform=platform,
+            platform=str(platform),
             total_count=int(p.total_count or 0),
             verified_count=int(p.verified_count or 0),
             debunked_count=int(p.debunked_count or 0),
@@ -495,10 +522,10 @@ async def get_audience_stats(
     platform_metrics: Dict[str, Dict[str, Any]] = {}
     
     for source in sources_engagement:
-        platform = source.platform or "Unknown"
+        platform_str = str(source.platform) if getattr(source, 'platform', None) is not None else "Unknown"
         
-        if platform not in platform_metrics:
-            platform_metrics[platform] = {
+        if platform_str not in platform_metrics:
+            platform_metrics[platform_str] = {
                 "total_likes": 0,
                 "total_retweets": 0,
                 "total_replies": 0,
@@ -506,15 +533,19 @@ async def get_audience_stats(
                 "post_count": 0
             }
         
-        if source.engagement_metrics:
+        engagement_data = source.engagement_metrics
+        if engagement_data is not None:
             try:
-                metrics = source.engagement_metrics if isinstance(source.engagement_metrics, dict) else json.loads(source.engagement_metrics)
-                platform_metrics[platform]["total_likes"] += metrics.get('likes', 0) or 0
-                platform_metrics[platform]["total_retweets"] += metrics.get('retweets', 0) or 0
-                platform_metrics[platform]["total_replies"] += metrics.get('replies', 0) or 0
-                platform_metrics[platform]["total_views"] += metrics.get('views', 0) or 0
-                platform_metrics[platform]["post_count"] += 1
-            except:
+                if isinstance(engagement_data, dict):
+                    metrics = engagement_data
+                else:
+                    metrics = json.loads(str(engagement_data))
+                platform_metrics[platform_str]["total_likes"] += int(metrics.get('likes', 0) or 0)
+                platform_metrics[platform_str]["total_retweets"] += int(metrics.get('retweets', 0) or 0)
+                platform_metrics[platform_str]["total_replies"] += int(metrics.get('replies', 0) or 0)
+                platform_metrics[platform_str]["total_views"] += int(metrics.get('views', 0) or 0)
+                platform_metrics[platform_str]["post_count"] += 1
+            except (json.JSONDecodeError, ValueError, TypeError):
                 pass
     
     engagement_metrics = []
@@ -570,11 +601,15 @@ async def get_audience_stats(
         
         total_engagement = 0
         for source in author_sources:
-            if source.engagement_metrics:
+            engagement_data = source.engagement_metrics
+            if engagement_data is not None:
                 try:
-                    metrics = source.engagement_metrics if isinstance(source.engagement_metrics, dict) else json.loads(source.engagement_metrics)
-                    total_engagement += (metrics.get('likes', 0) or 0) + (metrics.get('retweets', 0) or 0) + (metrics.get('replies', 0) or 0)
-                except:
+                    if isinstance(engagement_data, dict):
+                        metrics = engagement_data
+                    else:
+                        metrics = json.loads(str(engagement_data))
+                    total_engagement += int(metrics.get('likes', 0) or 0) + int(metrics.get('retweets', 0) or 0) + int(metrics.get('replies', 0) or 0)
+                except (json.JSONDecodeError, ValueError, TypeError):
                     pass
         
         top_authors.append({

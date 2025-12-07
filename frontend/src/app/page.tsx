@@ -36,7 +36,15 @@ export default function Home() {
   const [activeTab, setActiveTab] = useState('todos');
   const [showOnboarding, setShowOnboarding] = useState(false);
   const [userOnboardingStatus, setUserOnboardingStatus] = useState<boolean | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
   const LIMIT = 20;
+
+  const handleRetry = () => {
+    setError(null);
+    setRetryCount(0);
+    fetchClaims(searchQuery, false, 0, activeTab);
+  };
 
   const fetchClaims = async (query?: string, isLoadMore = false, retryCount = 0, statusFilter?: string) => {
     setLoading(true);
@@ -144,8 +152,10 @@ export default function Home() {
           return;
         }
 
-        // Re-throw other errors
-        throw fetchError;
+        // Handle other fetch errors
+        setError(`Error de conexión: ${errorMessage}`);
+        setLoading(false);
+        return;
       }
 
       // Clear timeout if request completed successfully
@@ -304,6 +314,8 @@ export default function Home() {
         // Only show alert if we have a meaningful error message
         if (errorMessage && errorMessage !== 'Unknown error') {
           console.error('Final error after retries:', errorMsg);
+          // Set error state for UI display instead of alert
+          setError(errorMsg);
           // Don't show alert for network errors in development - just log
           if (!baseUrl.includes('localhost') || process.env.NODE_ENV === 'production') {
             alert(errorMsg);
@@ -769,6 +781,37 @@ export default function Home() {
                   </div>
                 </div>
               </div>
+
+              {/* Error Display */}
+              {error && (
+                <div className="mb-6 bg-red-50 border border-red-200 rounded-xl p-4">
+                  <div className="flex items-start">
+                    <div className="flex-shrink-0">
+                      <svg className="h-5 w-5 text-red-400" viewBox="0 0 20 20" fill="currentColor">
+                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z" clipRule="evenodd" />
+                      </svg>
+                    </div>
+                    <div className="ml-3 flex-1">
+                      <h3 className="text-sm font-medium text-red-800">
+                        Error al cargar datos
+                      </h3>
+                      <div className="mt-2 text-sm text-red-700">
+                        <p>{error}</p>
+                      </div>
+                      <div className="mt-4">
+                        <div className="-mx-2 -my-1.5 flex">
+                          <button
+                            onClick={handleRetry}
+                            className="bg-red-50 px-3 py-2 rounded-md text-sm font-medium text-red-800 hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-offset-red-50 focus:ring-red-600"
+                          >
+                            Intentar de nuevo
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Feed */}
               {loading && claims.length === 0 ? (

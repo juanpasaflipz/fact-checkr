@@ -1,6 +1,7 @@
 from sqlalchemy import Column, String, DateTime, Text, Enum, Integer, ForeignKey, Table, JSON, Boolean, Float, ARRAY
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
+from pgvector.sqlalchemy import Vector
 from datetime import datetime
 import enum
 
@@ -102,6 +103,7 @@ class Claim(Base):
     needs_review = Column(Boolean, default=False)  # Flag for human review
     review_priority = Column(String, nullable=True)  # "high|medium|low"
     agent_findings = Column(JSON, nullable=True)  # Multi-agent analysis results
+    embedding = Column(Vector(1536))  # OpenAI text-embedding-3-small dimensions
     
     # Metadata
     created_at = Column(DateTime, default=datetime.utcnow)

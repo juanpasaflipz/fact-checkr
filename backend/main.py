@@ -9,6 +9,35 @@ from dotenv import load_dotenv
 # Load environment variables FIRST before any imports that might use them
 load_dotenv()
 
+# Initialize Sentry (must be done before other imports)
+try:
+    import sentry_sdk
+    from sentry_sdk.integrations.fastapi import FastApiIntegration
+    from sentry_sdk.integrations.sqlalchemy import SqlalchemyIntegration
+    from sentry_sdk.integrations.redis import RedisIntegration
+
+    sentry_dsn = os.getenv("SENTRY_DSN")
+    if sentry_dsn:
+        sentry_sdk.init(
+            dsn=sentry_dsn,
+            integrations=[
+                FastApiIntegration(),
+                SqlalchemyIntegration(),
+                RedisIntegration(),
+            ],
+            # Performance monitoring
+            traces_sample_rate=0.1,  # Sample 10% of transactions
+            # Release health tracking
+            enable_tracing=True,
+            # Environment
+            environment=os.getenv("ENVIRONMENT", "development"),
+        )
+        logger.info("✅ Sentry monitoring initialized")
+    else:
+        logger.info("⚠️ SENTRY_DSN not configured - monitoring disabled")
+except ImportError:
+    logger.warning("⚠️ Sentry SDK not available - monitoring disabled")
+
 from fastapi import FastAPI, Request, Depends, HTTPException, Query
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -60,75 +89,42 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# Import routers (with error handling)
-try:
-    from app.routers import auth, subscriptions, usage, whatsapp, telegraph, intelligence, markets, review, quota, trending, analytics
-    ROUTERS_AVAILABLE = True
-    INTELLIGENCE_ROUTER_AVAILABLE = True
-    MARKETS_ROUTER_AVAILABLE = True
-    REVIEW_ROUTER_AVAILABLE = True
-    QUOTA_ROUTER_AVAILABLE = True
-    TRENDING_ROUTER_AVAILABLE = True
-    ANALYTICS_ROUTER_AVAILABLE = True
-except ImportError as e:
-    print(f"Warning: Some routers not available: {e}")
+# Define available routers and their optional dependencies
+CORE_ROUTERS = ['auth', 'subscriptions', 'usage', 'whatsapp', 'telegraph']
+OPTIONAL_ROUTERS = {
+    'intelligence': {'available': False, 'dependencies': []},
+    'markets': {'available': False, 'dependencies': []},
+    'review': {'available': False, 'dependencies': []},
+    'quota': {'available': False, 'dependencies': []},
+    'trending': {'available': False, 'dependencies': []},
+    'analytics': {'available': False, 'dependencies': []},
+    'keywords': {'available': False, 'dependencies': []},
+}
+
+# Load core routers (always required)
+core_router_modules = {}
+for router_name in CORE_ROUTERS:
     try:
-        from app.routers import auth, subscriptions, usage, whatsapp, telegraph, markets, review, quota, trending, analytics
-        ROUTERS_AVAILABLE = True
-        INTELLIGENCE_ROUTER_AVAILABLE = False
-        MARKETS_ROUTER_AVAILABLE = True
-        REVIEW_ROUTER_AVAILABLE = True
-        QUOTA_ROUTER_AVAILABLE = True
-        TRENDING_ROUTER_AVAILABLE = True
-        ANALYTICS_ROUTER_AVAILABLE = True
-    except ImportError:
-        try:
-            from app.routers import auth, subscriptions, usage, whatsapp, telegraph, review, quota, trending, analytics
-            ROUTERS_AVAILABLE = True
-            INTELLIGENCE_ROUTER_AVAILABLE = False
-            MARKETS_ROUTER_AVAILABLE = False
-            REVIEW_ROUTER_AVAILABLE = True
-            QUOTA_ROUTER_AVAILABLE = True
-            TRENDING_ROUTER_AVAILABLE = True
-            ANALYTICS_ROUTER_AVAILABLE = True
-        except ImportError:
-            try:
-                from app.routers import auth, subscriptions, usage, whatsapp, telegraph, quota, trending, analytics
-                ROUTERS_AVAILABLE = True
-                INTELLIGENCE_ROUTER_AVAILABLE = False
-                MARKETS_ROUTER_AVAILABLE = False
-                REVIEW_ROUTER_AVAILABLE = False
-                QUOTA_ROUTER_AVAILABLE = True
-                TRENDING_ROUTER_AVAILABLE = True
-                ANALYTICS_ROUTER_AVAILABLE = True
-            except ImportError:
-                try:
-                    from app.routers import auth, subscriptions, usage, whatsapp, telegraph, trending, analytics
-                    ROUTERS_AVAILABLE = True
-                    INTELLIGENCE_ROUTER_AVAILABLE = False
-                    MARKETS_ROUTER_AVAILABLE = False
-                    REVIEW_ROUTER_AVAILABLE = False
-                    QUOTA_ROUTER_AVAILABLE = False
-                    TRENDING_ROUTER_AVAILABLE = True
-                    ANALYTICS_ROUTER_AVAILABLE = True
-                except ImportError:
-                    try:
-                        from app.routers import auth, subscriptions, usage, whatsapp, telegraph
-                        ROUTERS_AVAILABLE = True
-                        INTELLIGENCE_ROUTER_AVAILABLE = False
-                        MARKETS_ROUTER_AVAILABLE = False
-                        REVIEW_ROUTER_AVAILABLE = False
-                        QUOTA_ROUTER_AVAILABLE = False
-                        TRENDING_ROUTER_AVAILABLE = False
-                        ANALYTICS_ROUTER_AVAILABLE = False
-                    except ImportError:
-                        ROUTERS_AVAILABLE = False
-                        INTELLIGENCE_ROUTER_AVAILABLE = False
-                        MARKETS_ROUTER_AVAILABLE = False
-                        REVIEW_ROUTER_AVAILABLE = False
-                        QUOTA_ROUTER_AVAILABLE = False
-                        TRENDING_ROUTER_AVAILABLE = False
-                        ANALYTICS_ROUTER_AVAILABLE = False
+        module = __import__(f'app.routers.{router_name}', fromlist=[router_name])
+        core_router_modules[router_name] = module
+        logger.info(f"✅ Core router '{router_name}' loaded successfully")
+    except ImportError as e:
+        logger.error(f"❌ Failed to load core router '{router_name}': {e}")
+        raise  # Core routers are required
+
+# Load optional routers (gracefully handle missing ones)
+optional_router_modules = {}
+for router_name, config in OPTIONAL_ROUTERS.items():
+    try:
+        module = __import__(f'app.routers.{router_name}', fromlist=[router_name])
+        optional_router_modules[router_name] = module
+        OPTIONAL_ROUTERS[router_name]['available'] = True
+        logger.info(f"✅ Optional router '{router_name}' loaded successfully")
+    except ImportError as e:
+        logger.warning(f"⚠️ Optional router '{router_name}' not available: {e}")
+        continue
+
+ROUTERS_AVAILABLE = True
 
 logger.info("=" * 50)
 logger.info("Initializing FactCheckr API...")
@@ -173,8 +169,58 @@ async def health_check():
     """Health check endpoint - always returns 200 for Railway health checks"""
     return {
         "status": "healthy",
-        "message": "API is operational"
+        "message": "API is operational",
+        "timestamp": datetime.utcnow().isoformat(),
+        "version": "1.0.0"
     }
+
+@app.get("/health/detailed")
+async def detailed_health_check(db: Session = Depends(get_db)):
+    """Detailed health check with system metrics"""
+    import psutil
+    import time
+    from sqlalchemy import text
+
+    try:
+        # Database connectivity check
+        db_start = time.time()
+        db.execute(text("SELECT 1"))
+        db_time = time.time() - db_start
+
+        # System metrics
+        memory = psutil.virtual_memory()
+        cpu_percent = psutil.cpu_percent(interval=0.1)
+
+        # Database stats
+        claim_count = db.query(func.count(DBClaim.id)).scalar() or 0
+        source_count = db.query(func.count(DBSource.id)).scalar() or 0
+
+        return {
+            "status": "healthy",
+            "timestamp": datetime.utcnow().isoformat(),
+            "version": "1.0.0",
+            "system": {
+                "memory_usage_percent": memory.percent,
+                "cpu_usage_percent": cpu_percent,
+                "memory_used_mb": memory.used // (1024 * 1024),
+                "memory_total_mb": memory.total // (1024 * 1024),
+            },
+            "database": {
+                "connection_time_ms": round(db_time * 1000, 2),
+                "claims_count": claim_count,
+                "sources_count": source_count,
+            },
+            "uptime_seconds": time.time() - psutil.boot_time(),
+        }
+    except Exception as e:
+        logger.error(f"Detailed health check failed: {e}")
+        # Return degraded status but don't fail the check
+        return {
+            "status": "degraded",
+            "timestamp": datetime.utcnow().isoformat(),
+            "error": str(e),
+            "message": "Some health checks failed but service is operational"
+        }
 
 logger.info("✅ Health check endpoint registered")
 
@@ -200,50 +246,33 @@ try:
 except Exception as e:
     logger.error(f"Rate limiting setup failed: {e}")
 
-# --- Routers ---
+# --- Router Registration ---
 if ROUTERS_AVAILABLE:
-    try:
-        app.include_router(auth.router, prefix="/api", tags=["auth"])
-        app.include_router(subscriptions.router, prefix="/api", tags=["subscriptions"])
-        app.include_router(usage.router, prefix="/api", tags=["usage"])
-        app.include_router(whatsapp.router, prefix="/api", tags=["whatsapp"])
-        app.include_router(telegraph.router, prefix="/api", tags=["telegraph"])
-        logger.info("✅ Base routers registered successfully")
-        
-        if QUOTA_ROUTER_AVAILABLE:
-            app.include_router(quota.router, prefix="/api", tags=["quota"])
-            logger.info("✅ Quota management router registered")
-        
-        # Keywords router (always available - no external dependencies)
+    # Register core routers
+    for router_name, module in core_router_modules.items():
         try:
-            from app.routers import keywords
-            app.include_router(keywords.router, prefix="/api", tags=["keywords"])
-            logger.info("✅ Keywords management router registered")
-        except ImportError as e:
-            logger.warning(f"Keywords router not available: {e}")
-        
-        if REVIEW_ROUTER_AVAILABLE:
-            app.include_router(review.router, prefix="/api", tags=["review"])
-            logger.info("✅ Review queue router registered")
-        
-        if MARKETS_ROUTER_AVAILABLE:
-            app.include_router(markets.router, prefix="/api", tags=["markets"])
-            logger.info("✅ Markets API router registered")
-        
-        if INTELLIGENCE_ROUTER_AVAILABLE:
-            app.include_router(intelligence.router)
-            logger.info("✅ Intelligence API router registered")
-        
-        if TRENDING_ROUTER_AVAILABLE:
-            app.include_router(trending.router)
-            logger.info("✅ Trending Topics API router registered")
-        
-        if ANALYTICS_ROUTER_AVAILABLE:
-            app.include_router(analytics.router, prefix="/api", tags=["analytics"])
-            logger.info("✅ Analytics API router registered")
-    except Exception as e:
-        logger.warning(f"⚠️ Failed to register routers: {e}")
-        logger.warning(traceback.format_exc())
+            if router_name == 'intelligence':
+                app.include_router(module.router)  # Intelligence router has its own prefix
+            else:
+                app.include_router(module.router, prefix="/api", tags=[router_name])
+            logger.info(f"✅ Core router '{router_name}' registered")
+        except Exception as e:
+            logger.error(f"❌ Failed to register core router '{router_name}': {e}")
+            raise
+
+    # Register optional routers
+    for router_name, module in optional_router_modules.items():
+        try:
+            if router_name == 'intelligence':
+                app.include_router(module.router)  # Intelligence router has its own prefix
+            elif router_name == 'keywords':
+                app.include_router(module.router, prefix="/api", tags=["keywords"])
+            else:
+                app.include_router(module.router, prefix="/api", tags=[router_name])
+            logger.info(f"✅ Optional router '{router_name}' registered")
+        except Exception as e:
+            logger.warning(f"⚠️ Failed to register optional router '{router_name}': {e}")
+            continue
 
 # --- Helper Functions ---
 def map_db_claim_to_response(db_claim: DBClaim, db: Optional[Session] = None) -> ClaimResponse:

@@ -57,21 +57,21 @@ async def find_similar_claims(
 ):
     """
     Find semantically similar claims using AI embeddings.
-    
+
     Useful for:
     - Detecting repeat misinformation
     - Finding related fact-checks
     - Research on claim patterns
     """
     embedding_service = EmbeddingService()
-    
-    similar = await embedding_service.find_similar_claims(
+
+    similar = embedding_service.find_similar_claims(
         query_text=query,
         limit=limit,
         threshold=threshold,
         status_filter=status
     )
-    
+
     return {
         "query": query,
         "threshold": threshold,
@@ -534,5 +534,80 @@ async def export_research_data(
         "filters": {"status": status, "topic": topic},
         "count": len(data),
         "data": data
+    }
+
+
+@router.post("/embeddings/backfill")
+async def backfill_embeddings(
+    limit: int = Query(100, ge=1, le=1000, description="Number of claims to process"),
+    db: Session = Depends(get_db),
+    user = Depends(require_premium)
+):
+    """
+    Generate embeddings for claims that don't have them yet.
+
+    Premium feature for data maintenance.
+    """
+    from app.database.models import Claim
+
+    # Find claims without embeddings
+    claims_without_embeddings = db.query(Claim).filter(Claim.embedding.is_(None)).limit(limit).all()
+
+    if not claims_without_embeddings:
+        return {"message": "All claims already have embeddings", "processed": 0}
+
+    embedding_service = EmbeddingService()
+    processed = 0
+    failed = 0
+
+    for claim in claims_without_embeddings:
+        # Combine claim text and original text for better embedding
+        text_to_embed = f"{claim.claim_text} {claim.original_text or ''}".strip()
+
+        if embedding_service.store_claim_embedding(db, claim.id, text_to_embed):
+            processed += 1
+        else:
+            failed += 1
+
+    return {
+        "message": f"Processed {processed} claims, {failed} failed",
+        "processed": processed,
+        "failed": failed,
+        "total_found": len(claims_without_embeddings)
+    }
+
+
+@router.get("/semantic-search")
+async def semantic_search(
+    query: str = Query(..., min_length=3, description="Search query for semantic matching"),
+    limit: int = Query(20, ge=1, le=100),
+    threshold: float = Query(0.6, ge=0.3, le=0.95),
+    include_source_info: bool = Query(True, description="Include detailed source information"),
+    db: Session = Depends(get_db)
+):
+    """
+    Advanced semantic search using AI embeddings.
+
+    Returns claims that are semantically similar to the query,
+    even if they don't contain the exact keywords.
+    """
+    embedding_service = EmbeddingService()
+
+    results = embedding_service.find_similar_claims(
+        query_text=query,
+        limit=limit,
+        threshold=threshold
+    )
+
+    # Optionally enrich with additional source information
+    if include_source_info and results:
+        claim_ids = [r['id'] for r in results]
+        # Could add additional enrichment here if needed
+
+    return {
+        "query": query,
+        "threshold": threshold,
+        "total_results": len(results),
+        "results": results
     }
 

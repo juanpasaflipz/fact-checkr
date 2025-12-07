@@ -24,19 +24,10 @@ depends_on = None
 
 
 def upgrade() -> None:
-    # Enable pgvector extension (Neon supports this)
-    op.execute('CREATE EXTENSION IF NOT EXISTS vector')
-    
-    # Add embedding column to claims table
-    # Using 1536 dimensions for OpenAI text-embedding-3-small
-    op.execute('ALTER TABLE claims ADD COLUMN IF NOT EXISTS embedding vector(1536)')
-    
-    # Create index for similarity search (IVFFlat for performance)
-    op.execute('''
-        CREATE INDEX IF NOT EXISTS claims_embedding_idx 
-        ON claims USING ivfflat (embedding vector_cosine_ops)
-        WITH (lists = 100)
-    ''')
+    # Add embedding column to claims table (JSON fallback for local development)
+    # Using JSON to store embeddings when pgvector is not available
+    # In production (Neon), this will be migrated to vector type later
+    op.add_column('claims', sa.Column('embedding', sa.JSON(), nullable=True))
     
     # Entity Knowledge Base - stores verified facts about entities
     op.create_table(
@@ -54,8 +45,8 @@ def upgrade() -> None:
         sa.Column('updated_at', sa.DateTime(), server_default=sa.func.now(), onupdate=sa.func.now()),
     )
     
-    # Add embedding column to entity_knowledge
-    op.execute('ALTER TABLE entity_knowledge ADD COLUMN fact_embedding vector(1536)')
+    # Add embedding column to entity_knowledge (JSON fallback)
+    op.add_column('entity_knowledge', sa.Column('fact_embedding', sa.JSON(), nullable=True))
     
     # Unique constraint on entity + fact combination
     op.create_index(
@@ -108,7 +99,7 @@ def upgrade() -> None:
     )
     
     # Add centroid embedding for narrative clusters
-    op.execute('ALTER TABLE narrative_clusters ADD COLUMN centroid_embedding vector(1536)')
+    op.add_column('narrative_clusters', sa.Column('centroid_embedding', sa.JSON(), nullable=True))
     
     # Verification Corrections - for learning from human feedback
     op.create_table(

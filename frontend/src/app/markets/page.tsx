@@ -4,7 +4,7 @@ import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 import Header from '@/components/Header';
-import { getApiBaseUrl } from '@/lib/api-config';
+import { api } from '@/lib/api-client';
 
 interface Market {
   id: number;
@@ -42,43 +42,18 @@ export default function MarketsPage() {
 
   const fetchMarkets = async (isLoadMore = false) => {
     setLoading(true);
-    let url = '';
     try {
-      const baseUrl = getApiBaseUrl();
       const currentSkip = isLoadMore ? skip : 0;
-      const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
       
-      // Construct URL properly - handle empty baseUrl case
-      if (baseUrl) {
-        url = `${baseUrl}/api/markets?skip=${currentSkip}&limit=${LIMIT}`;
-      } else {
-        // For local development with Next.js proxy
-        url = `/api/markets?skip=${currentSkip}&limit=${LIMIT}`;
-      }
+      let endpoint = `/api/markets?skip=${currentSkip}&limit=${LIMIT}`;
       
       if (selectedCategory === 'for_you') {
-        url += '&for_you=true';
+        endpoint += '&for_you=true';
       } else if (selectedCategory !== 'all') {
-        url += `&category=${selectedCategory}`;
+        endpoint += `&category=${selectedCategory}`;
       }
 
-      const headers: HeadersInit = { 'Accept': 'application/json' };
-      if (token) {
-        headers['Authorization'] = `Bearer ${token}`;
-      }
-
-      const response = await fetch(url, { 
-        headers,
-        // Add credentials for CORS if needed
-        credentials: 'omit'
-      });
-
-      if (!response.ok) {
-        const errorText = await response.text().catch(() => response.statusText);
-        throw new Error(`HTTP ${response.status}: ${errorText || response.statusText}`);
-      }
-
-      const data: Market[] = await response.json();
+      const data = await api.get<Market[]>(endpoint);
 
       if (isLoadMore) {
         setMarkets(prev => [...prev, ...data]);
@@ -89,14 +64,11 @@ export default function MarketsPage() {
       }
 
       setHasMore(data.length === LIMIT);
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error fetching markets:', error);
       // Show user-friendly error message
-      if (error instanceof TypeError && error.message.includes('fetch')) {
+      if (error.message?.includes('Network Error')) {
         console.error('Network error - Backend may not be running or CORS issue');
-        console.error('URL attempted:', url);
-        console.error('Base URL:', getApiBaseUrl());
-        console.error('Full error:', error);
       }
       // Don't clear markets on error, keep showing what we have
     } finally {

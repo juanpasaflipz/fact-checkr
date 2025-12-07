@@ -110,5 +110,48 @@ export function FeedSkeleton({ count = 5 }: { count?: number }) {
   );
 }
 
+export function LoadingSpinner({
+  size = "md",
+  className = "",
+  color = "text-blue-600"
+}: {
+  size?: "sm" | "md" | "lg";
+  className?: string;
+  color?: string;
+}) {
+  const sizeClasses = {
+    sm: "w-4 h-4",
+    md: "w-6 h-6",
+    lg: "w-8 h-8"
+  };
+
+  return (
+    <div
+      className={`inline-block animate-spin rounded-full border-2 border-solid border-current border-r-transparent motion-reduce:animate-[spin_1.5s_linear_infinite] ${sizeClasses[size]} ${color} ${className}`}
+      role="status"
+      aria-label="Cargando"
+    >
+      <span className="sr-only">Cargando...</span>
+    </div>
+  );
+}
+
+export function PageLoading({
+  message = "Cargando contenido...",
+  className = ""
+}: {
+  message?: string;
+  className?: string;
+}) {
+  return (
+    <div className={`min-h-[200px] flex items-center justify-center p-6 ${className}`}>
+      <div className="text-center">
+        <LoadingSpinner size="lg" className="mb-4" />
+        <p className="text-gray-600 text-sm">{message}</p>
+      </div>
+    </div>
+  );
+}
+
 export default Skeleton;
 

@@ -42,6 +42,10 @@ class MockScraper(Scraper):
 
 
 import tweepy
+import facebook
+import requests
+from datetime import datetime, timedelta
+import json
 
 class TwitterScraper(Scraper):
     def __init__(self):
@@ -313,5 +317,171 @@ class GoogleNewsScraper(Scraper):
                 ))
         except Exception as e:
             print(f"Error fetching from Google News: {e}")
-            
+
+        return posts
+
+
+class FacebookScraper(Scraper):
+    """Facebook Graph API scraper for public posts and pages"""
+
+    def __init__(self):
+        self.app_id = os.getenv("FACEBOOK_APP_ID")
+        self.app_secret = os.getenv("FACEBOOK_APP_SECRET")
+        self.access_token = os.getenv("FACEBOOK_ACCESS_TOKEN")
+        self.page_access_token = os.getenv("FACEBOOK_PAGE_ACCESS_TOKEN")
+        self.api = None
+
+        if self.access_token:
+            try:
+                self.api = facebook.GraphAPI(access_token=self.access_token, version="3.1")
+                print("✓ Facebook Graph API initialized")
+            except Exception as e:
+                print(f"Warning: Failed to initialize Facebook API: {e}")
+                self.api = None
+        else:
+            print("Warning: FACEBOOK_ACCESS_TOKEN not found. Facebook scraping disabled.")
+
+    async def fetch_posts(self, keywords: List[str]) -> List[SocialPost]:
+        """Fetch posts from Facebook pages and public groups"""
+        posts = []
+
+        if not self.api:
+            print("Facebook API not initialized - returning empty results")
+            return posts
+
+        # Mexican political pages and groups to monitor
+        target_pages = [
+            "gobierno.mexico",  # Official government page
+            "lopezobrador.org",  # President López Obrador
+            "PRI.Nacional",     # PRI Party
+            "PAN",
+            "prd.mx",           # PRD Party
+            "MovimientoCiudadanoMX",
+            "partidoverde.mx",
+            "PTmexico",
+            "MorenaOficial",    # Morena Party
+            "partidomovimiento.ciudadano",  # Movimiento Ciudadano
+            "claudia.sheinbaum",  # Claudia Sheinbaum
+            "XochitlGalvez",    # Xóchitl Gálvez
+        ]
+
+        try:
+            for page_id in target_pages[:5]:  # Limit to 5 pages to avoid rate limits
+                try:
+                    # Get recent posts from the page
+                    page_posts = self.api.get_connections(page_id, 'posts', limit=10,
+                                                        fields='id,message,created_time,permalink_url,likes.summary(true),comments.summary(true),shares')
+
+                    for post in page_posts['data']:
+                        content = post.get('message', '')
+                        if not content:
+                            continue
+
+                        # Check if post contains any of our keywords
+                        content_lower = content.lower()
+                        matched_keywords = [kw for kw in keywords if kw.lower() in content_lower]
+
+                        if matched_keywords:
+                            # Get engagement metrics
+                            likes_count = post.get('likes', {}).get('summary', {}).get('total_count', 0)
+                            comments_count = post.get('comments', {}).get('summary', {}).get('total_count', 0)
+                            shares_count = post.get('shares', {}).get('count', 0) if 'shares' in post else 0
+
+                            engagement = {
+                                'likes': likes_count,
+                                'comments': comments_count,
+                                'shares': shares_count,
+                                'total_engagement': likes_count + comments_count + shares_count
+                            }
+
+                            posts.append(SocialPost(
+                                id=post['id'],
+                                platform="Facebook",
+                                content=content,
+                                author=page_id,  # Page name
+                                timestamp=post['created_time'],
+                                url=post.get('permalink_url', f"https://facebook.com/{post['id']}"),
+                                engagement_metrics=engagement,
+                                context_data={
+                                    'matched_keywords': matched_keywords,
+                                    'post_type': 'page_post'
+                                }
+                            ))
+
+                except Exception as e:
+                    print(f"Error fetching from Facebook page {page_id}: {e}")
+                    continue
+
+        except Exception as e:
+            print(f"Error in Facebook scraping: {e}")
+
+        print(f"Facebook scraper found {len(posts)} posts")
+        return posts
+
+
+class InstagramScraper(Scraper):
+    """Instagram Basic Display API scraper"""
+
+    def __init__(self):
+        self.access_token = os.getenv("INSTAGRAM_ACCESS_TOKEN")
+        self.user_id = os.getenv("INSTAGRAM_USER_ID")
+        self.base_url = "https://graph.instagram.com"
+
+    async def fetch_posts(self, keywords: List[str]) -> List[SocialPost]:
+        """Fetch posts from Instagram accounts"""
+        posts = []
+
+        if not self.access_token or not self.user_id:
+            print("Instagram credentials not configured - returning empty results")
+            return posts
+
+        try:
+            # Get recent media from the account
+            url = f"{self.base_url}/{self.user_id}/media"
+            params = {
+                'access_token': self.access_token,
+                'fields': 'id,media_type,media_url,permalink,caption,timestamp,like_count,comments_count',
+                'limit': 20
+            }
+
+            response = requests.get(url, params=params, timeout=10)
+            response.raise_for_status()
+            data = response.json()
+
+            for media in data.get('data', []):
+                caption = media.get('caption', '')
+                if not caption:
+                    continue
+
+                # Check if caption contains any of our keywords
+                caption_lower = caption.lower()
+                matched_keywords = [kw for kw in keywords if kw.lower() in caption_lower]
+
+                if matched_keywords:
+                    engagement = {
+                        'likes': media.get('like_count', 0),
+                        'comments': media.get('comments_count', 0),
+                        'total_engagement': media.get('like_count', 0) + media.get('comments_count', 0)
+                    }
+
+                    posts.append(SocialPost(
+                        id=media['id'],
+                        platform="Instagram",
+                        content=caption,
+                        author=self.user_id,  # Account ID
+                        timestamp=media['timestamp'],
+                        url=media.get('permalink', ''),
+                        engagement_metrics=engagement,
+                        media_urls=[media.get('media_url')] if media.get('media_url') else None,
+                        context_data={
+                            'matched_keywords': matched_keywords,
+                            'media_type': media.get('media_type', 'IMAGE'),
+                            'post_type': 'instagram_post'
+                        }
+                    ))
+
+        except Exception as e:
+            print(f"Error in Instagram scraping: {e}")
+
+        print(f"Instagram scraper found {len(posts)} posts")
         return posts
