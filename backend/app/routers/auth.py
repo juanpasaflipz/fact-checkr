@@ -39,24 +39,49 @@ except ImportError:
     redis = None
     logger.warning("⚠️  redis package not installed, OAuth state will use in-memory storage")
 
-# Redis URL - prefers private endpoints (RAILWAY_PRIVATE_DOMAIN) to avoid egress fees
-REDIS_URL = get_redis_url()
-USE_REDIS = False
-redis_client = None
+# Lazy Redis initialization - don't block startup with connection attempts
+_redis_client = None
+_redis_initialized = False
+_use_redis = None
 
-if REDIS_AVAILABLE:
+
+def _get_redis_client():
+    """Lazily initialize Redis client on first use, not at import time"""
+    global _redis_client, _redis_initialized, _use_redis
+    
+    if _redis_initialized:
+        return _redis_client, _use_redis
+    
+    _redis_initialized = True
+    _use_redis = False
+    
+    if not REDIS_AVAILABLE:
+        logger.warning("⚠️  Redis package not available, using in-memory OAuth state storage")
+        return None, False
+    
     try:
-        redis_client = redis.from_url(REDIS_URL, decode_responses=True, socket_connect_timeout=2)
-        redis_client.ping()  # Test connection
-        USE_REDIS = True
+        redis_url = get_redis_url()
+        _redis_client = redis.from_url(redis_url, decode_responses=True, socket_connect_timeout=2)
+        _redis_client.ping()  # Test connection
+        _use_redis = True
         logger.info("✅ Using Redis for OAuth state storage")
     except Exception as e:
         logger.warning(f"⚠️  Redis not available for OAuth state storage: {e}")
         logger.warning("⚠️  Falling back to in-memory storage (not recommended for production)")
-        USE_REDIS = False
-        redis_client = None
-else:
-    logger.warning("⚠️  Redis package not available, using in-memory OAuth state storage")
+        _redis_client = None
+        _use_redis = False
+    
+    return _redis_client, _use_redis
+
+
+# Backwards compatibility - these are now lazily evaluated
+def _get_use_redis():
+    _, use = _get_redis_client()
+    return use
+
+def _get_client():
+    client, _ = _get_redis_client()
+    return client
 
 # Fallback in-memory storage (only used if Redis unavailable)
 oauth_states = {}
@@ -355,7 +380,8 @@ async def google_login():
     state_timestamp = datetime.utcnow()
     
     # Store state in Redis (with 10 minute expiration) or in-memory fallback
-    if USE_REDIS and redis_client:
+    redis_client, use_redis = _get_redis_client()
+    if use_redis and redis_client:
         try:
             redis_client.setex(f"oauth_state:{state}", 600, state_timestamp.isoformat())  # 10 minutes
             logger.info(f"OAuth state stored in Redis: {state[:10]}...")
@@ -414,7 +440,8 @@ async def google_callback(
     state_created = None
     state_found = False
     
-    if USE_REDIS and redis_client:
+    redis_client, use_redis = _get_redis_client()
+    if use_redis and redis_client:
         try:
             state_timestamp_str = redis_client.get(f"oauth_state:{state}")
             if state_timestamp_str:
@@ -438,7 +465,7 @@ async def google_callback(
     if not state_found:
         logger.error(f"Invalid state token: {state[:10]}... (not found in Redis or memory)")
         logger.error(f"Available states in memory: {len(oauth_states)}")
-        if USE_REDIS and redis_client:
+        if use_redis and redis_client:
             try:
                 redis_keys = redis_client.keys("oauth_state:*")
                 logger.error(f"Available states in Redis: {len(redis_keys)}")
