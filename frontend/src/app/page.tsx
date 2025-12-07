@@ -152,6 +152,13 @@ export default function Home() {
           return;
         }
 
+        let errorMessage = 'Unknown error';
+        if (fetchError instanceof Error) {
+          errorMessage = fetchError.message || fetchError.name || 'Error occurred';
+        } else if (typeof fetchError === 'string') {
+          errorMessage = fetchError;
+        }
+
         // Handle other fetch errors
         setError(`Error de conexión: ${errorMessage}`);
         setLoading(false);
