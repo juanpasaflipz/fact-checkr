@@ -9,6 +9,7 @@ from typing import Sequence, Union
 
 from alembic import op
 import sqlalchemy as sa
+from pgvector.sqlalchemy import Vector
 
 
 # revision identifiers, used by Alembic.
@@ -30,29 +31,53 @@ def upgrade() -> None:
         vector_available = False
 
     if vector_available:
-        # Add embedding column to claims table for semantic search
-        op.add_column('claims',
-            sa.Column('embedding', sa.dialects.postgresql.VECTOR(1536), nullable=True)
-        )
+        # Add embedding column to claims table for semantic search (if not exists)
+        from sqlalchemy import inspect
+        conn = op.get_bind()
+        inspector = inspect(conn)
+        claims_columns = [col['name'] for col in inspector.get_columns('claims')]
+        entities_columns = [col['name'] for col in inspector.get_columns('entities')]
+        
+        if 'embedding' not in claims_columns:
+            op.add_column('claims',
+                sa.Column('embedding', Vector(1536), nullable=True)
+            )
 
-        # Add embedding column to entities table for entity similarity
-        op.add_column('entities',
-            sa.Column('embedding', sa.dialects.postgresql.VECTOR(1536), nullable=True)
-        )
+        # Add embedding column to entities table for entity similarity (if not exists)
+        if 'embedding' not in entities_columns:
+            op.add_column('entities',
+                sa.Column('embedding', Vector(1536), nullable=True)
+            )
 
-        # Create indexes for vector similarity search
-        op.create_index('claims_embedding_idx', 'claims', ['embedding'],
-            postgresql_using='ivfflat', postgresql_ops={'embedding': 'vector_cosine_ops'})
-        op.create_index('entities_embedding_idx', 'entities', ['embedding'],
-            postgresql_using='ivfflat', postgresql_ops={'embedding': 'vector_cosine_ops'})
+        # Create indexes for vector similarity search (if not exists)
+        from sqlalchemy import inspect
+        conn = op.get_bind()
+        inspector = inspect(conn)
+        claims_indexes = [idx['name'] for idx in inspector.get_indexes('claims')]
+        entities_indexes = [idx['name'] for idx in inspector.get_indexes('entities')]
+        
+        if 'claims_embedding_idx' not in claims_indexes:
+            op.create_index('claims_embedding_idx', 'claims', ['embedding'],
+                postgresql_using='ivfflat', postgresql_ops={'embedding': 'vector_cosine_ops'})
+        if 'entities_embedding_idx' not in entities_indexes:
+            op.create_index('entities_embedding_idx', 'entities', ['embedding'],
+                postgresql_using='ivfflat', postgresql_ops={'embedding': 'vector_cosine_ops'})
     else:
         # Fallback: use JSONB to store embeddings as arrays when pgvector is not available
-        op.add_column('claims',
-            sa.Column('embedding', sa.JSON(), nullable=True)
-        )
-        op.add_column('entities',
-            sa.Column('embedding', sa.JSON(), nullable=True)
-        )
+        from sqlalchemy import inspect
+        conn = op.get_bind()
+        inspector = inspect(conn)
+        claims_columns = [col['name'] for col in inspector.get_columns('claims')]
+        entities_columns = [col['name'] for col in inspector.get_columns('entities')]
+        
+        if 'embedding' not in claims_columns:
+            op.add_column('claims',
+                sa.Column('embedding', sa.JSON(), nullable=True)
+            )
+        if 'embedding' not in entities_columns:
+            op.add_column('entities',
+                sa.Column('embedding', sa.JSON(), nullable=True)
+            )
         # Note: No vector indexes can be created without pgvector
 
     # Create table for embedding metadata and versioning

@@ -29,6 +29,14 @@ trending_topic_sources = Table(
     Column('detected_at', DateTime, default=datetime.utcnow)
 )
 
+# Association table for many-to-many relationship between blog articles and claims
+blog_article_claims = Table(
+    'blog_article_claims',
+    Base.metadata,
+    Column('blog_article_id', Integer, ForeignKey('blog_articles.id'), primary_key=True),
+    Column('claim_id', String, ForeignKey('claims.id'), primary_key=True)
+)
+
 class VerificationStatus(enum.Enum):
     VERIFIED = "Verified"
     DEBUNKED = "Debunked"
@@ -113,6 +121,7 @@ class Claim(Base):
     source = relationship("Source", back_populates="claims")
     topics = relationship("Topic", secondary=claim_topics, back_populates="claims")
     markets = relationship("Market", back_populates="claim")
+    blog_articles = relationship("BlogArticle", secondary=blog_article_claims, back_populates="related_claims")
 
 class Topic(Base):
     """Categories for claims (Executive, Legislative, Judicial, Economy, etc.)"""
@@ -459,3 +468,45 @@ class TopicPriorityQueue(Base):
     
     # Relationships
     topic = relationship("TrendingTopic", back_populates="priority_entries")
+
+
+class BlogArticle(Base):
+    """AI-generated blog articles from fact-checking data"""
+    __tablename__ = 'blog_articles'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    title = Column(String, nullable=False)
+    slug = Column(String, unique=True, nullable=False, index=True)
+    excerpt = Column(Text)
+    content = Column(Text, nullable=False)  # Markdown format
+    
+    # Article metadata
+    article_type = Column(String, nullable=False)  # "morning", "afternoon", "evening", "breaking"
+    edition_number = Column(Integer)  # Sequential number per article type
+    
+    # Data context (snapshot of analytics used for generation)
+    data_context = Column(JSON)  # Store claims, topics, stats used
+    
+    # Publishing
+    published = Column(Boolean, default=False)
+    published_at = Column(DateTime, nullable=True)
+    telegraph_url = Column(String, nullable=True)
+    telegraph_path = Column(String, nullable=True)
+    
+    # Social media posting
+    twitter_posted = Column(Boolean, default=False)
+    twitter_url = Column(String, nullable=True)
+    
+    # Video generation (future phase)
+    video_generated = Column(Boolean, default=False)
+    youtube_url = Column(String, nullable=True)
+    tiktok_video_path = Column(String, nullable=True)
+    
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+    
+    # Relationships
+    related_claims = relationship("Claim", secondary=blog_article_claims, back_populates="blog_articles")
+    topic_id = Column(Integer, ForeignKey('topics.id'), nullable=True)
+    topic = relationship("Topic")

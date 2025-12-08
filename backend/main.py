@@ -92,6 +92,7 @@ OPTIONAL_ROUTERS = {
     'trending': {'available': False, 'dependencies': []},
     'analytics': {'available': False, 'dependencies': []},
     'keywords': {'available': False, 'dependencies': []},
+    'blog': {'available': False, 'dependencies': []},
 }
 
 # Load core routers (always required)
@@ -272,6 +273,8 @@ if ROUTERS_AVAILABLE:
         try:
             if router_name == 'intelligence':
                 app.include_router(module.router)  # Intelligence router has its own prefix
+            elif router_name == 'trending':
+                app.include_router(module.router)  # Trending router already has /api/v1/trending prefix
             elif router_name == 'keywords':
                 app.include_router(module.router, prefix="/api", tags=["keywords"])
             else:

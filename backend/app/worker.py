@@ -14,7 +14,7 @@ celery_app = Celery(
     "factcheckr_worker",
     broker=REDIS_URL,
     backend=REDIS_URL,
-    include=["app.tasks.scraper", "app.tasks.fact_check", "app.tasks.health_check", "app.tasks.credit_topup", "app.tasks.market_notifications", "app.tasks.market_intelligence"]
+    include=["app.tasks.scraper", "app.tasks.fact_check", "app.tasks.health_check", "app.tasks.credit_topup", "app.tasks.market_notifications", "app.tasks.market_intelligence", "app.tasks.blog_generation"]
 )
 
 celery_app.conf.update(
@@ -122,6 +122,35 @@ celery_app.conf.update(
             "schedule": crontab(minute="*/30"),  # Every 30 minutes
             "options": {
                 "expires": 1800,  # 30 minutes
+            }
+        },
+        # Blog article generation: 3-4 times daily
+        "generate-morning-blog": {
+            "task": "app.tasks.blog_generation.generate_morning_blog_article",
+            "schedule": crontab(hour=9, minute=0),  # 9:00 AM
+            "options": {
+                "expires": 21600,  # 6 hours
+            }
+        },
+        "generate-afternoon-blog": {
+            "task": "app.tasks.blog_generation.generate_afternoon_blog_article",
+            "schedule": crontab(hour=15, minute=0),  # 3:00 PM
+            "options": {
+                "expires": 21600,  # 6 hours
+            }
+        },
+        "generate-evening-blog": {
+            "task": "app.tasks.blog_generation.generate_evening_blog_article",
+            "schedule": crontab(hour=21, minute=0),  # 9:00 PM
+            "options": {
+                "expires": 21600,  # 6 hours
+            }
+        },
+        "generate-breaking-blog": {
+            "task": "app.tasks.blog_generation.generate_breaking_blog_article",
+            "schedule": crontab(hour=23, minute=30),  # 11:30 PM
+            "options": {
+                "expires": 21600,  # 6 hours
             }
         },
     },

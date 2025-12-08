@@ -1,0 +1,259 @@
+"""
+Blog API Router
+Handles blog article listing, retrieval, and publishing with subscription-based access
+"""
+import os
+import logging
+from fastapi import APIRouter, Depends, HTTPException, Query
+from sqlalchemy.orm import Session
+from sqlalchemy import desc, and_, nullslast
+from typing import Dict, Optional
+from datetime import datetime
+from pydantic import BaseModel
+
+from app.database.connection import get_db
+from app.database.models import BlogArticle, User, SubscriptionTier
+from app.auth import get_current_user, get_optional_user
+from app.utils import get_user_tier
+
+logger = logging.getLogger(__name__)
+
+router = APIRouter(prefix="/blog", tags=["blog"])
+
+# Free tier: 3 articles, PRO: unlimited
+FREE_TIER_ARTICLE_LIMIT = int(os.getenv("BLOG_FREE_TIER_LIMIT", "3"))
+
+
+class BlogArticleResponse(BaseModel):
+    """Blog article summary response"""
+    id: int
+    title: str
+    slug: str
+    excerpt: Optional[str]
+    article_type: str
+    published_at: Optional[datetime]
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+class BlogArticleDetailResponse(BlogArticleResponse):
+    """Full blog article response"""
+    content: str
+    telegraph_url: Optional[str]
+    twitter_url: Optional[str]
+    topic_id: Optional[int]
+    
+    class Config:
+        from_attributes = True
+
+
+@router.get("/articles", response_model=Dict)
+async def list_articles(
+    limit: int = Query(20, ge=1, le=100),
+    article_type: Optional[str] = None,
+    user: Optional[User] = Depends(get_optional_user),
+    db: Session = Depends(get_db)
+):
+    """List published blog articles with subscription-based access
+    
+    Free tier: Returns only 3 most recent articles
+    PRO tier: Returns all articles with pagination
+    """
+    try:
+        query = db.query(BlogArticle).filter(BlogArticle.published == True)
+        
+        if article_type:
+            query = query.filter(BlogArticle.article_type == article_type)
+        
+        # Get user tier (default to FREE for anonymous users)
+        tier = get_user_tier(db, user.id) if user else SubscriptionTier.FREE
+        
+        # Free tier: limit to most recent 3 articles
+        if tier == SubscriptionTier.FREE:
+            # Order by published_at (NULLS LAST) or created_at as fallback
+            query = query.order_by(
+                nullslast(desc(BlogArticle.published_at)),
+                desc(BlogArticle.created_at)
+            ).limit(FREE_TIER_ARTICLE_LIMIT)
+            has_more = False
+        else:
+            query = query.order_by(
+                nullslast(desc(BlogArticle.published_at)),
+                desc(BlogArticle.created_at)
+            ).limit(limit)
+            # Check if there are more articles
+            total_count = db.query(BlogArticle).filter(BlogArticle.published == True).count()
+            has_more = total_count > limit
+        
+        articles = query.all()
+        
+        return {
+            "articles": [BlogArticleResponse.model_validate(a) for a in articles],
+            "tier": tier.value,
+            "has_more": has_more,
+            "free_tier_limit": FREE_TIER_ARTICLE_LIMIT if tier == SubscriptionTier.FREE else None
+        }
+    except Exception as e:
+        logger.error(f"Error fetching blog articles: {e}", exc_info=True)
+        # Return empty result on error instead of crashing
+        return {
+            "articles": [],
+            "tier": SubscriptionTier.FREE.value,
+            "has_more": False,
+            "free_tier_limit": FREE_TIER_ARTICLE_LIMIT
+        }
+
+
+@router.get("/articles/{slug}", response_model=BlogArticleDetailResponse)
+async def get_article(
+    slug: str,
+    user: Optional[User] = Depends(get_optional_user),
+    db: Session = Depends(get_db)
+):
+    """Get full article content with subscription check
+    
+    Free tier: Can only access 3 most recent articles
+    PRO tier: Full access to all articles
+    """
+    article = db.query(BlogArticle).filter(
+        and_(
+            BlogArticle.slug == slug,
+            BlogArticle.published == True
+        )
+    ).first()
+    
+    if not article:
+        raise HTTPException(status_code=404, detail="Article not found")
+    
+    tier = get_user_tier(db, user.id) if user else SubscriptionTier.FREE
+    
+    # Free tier: check if article is in top 3 most recent
+    if tier == SubscriptionTier.FREE:
+        recent_articles = db.query(BlogArticle).filter(
+            BlogArticle.published == True
+        ).order_by(desc(BlogArticle.published_at)).limit(FREE_TIER_ARTICLE_LIMIT).all()
+        
+        if article.id not in [a.id for a in recent_articles]:
+            raise HTTPException(
+                status_code=403,
+                detail=f"Free tier limited to {FREE_TIER_ARTICLE_LIMIT} most recent articles. Upgrade to PRO for full access."
+            )
+    
+    return BlogArticleDetailResponse.model_validate(article)
+
+
+@router.post("/articles/{article_id}/publish")
+async def publish_article(
+    article_id: int,
+    publish_to_telegraph: bool = Query(True),
+    publish_to_twitter: bool = Query(False),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Publish article (requires authentication, admin recommended)
+    
+    Optionally publishes to Telegraph and Twitter
+    """
+    article = db.query(BlogArticle).filter(BlogArticle.id == article_id).first()
+    if not article:
+        raise HTTPException(status_code=404, detail="Article not found")
+    
+    if article.published:
+        raise HTTPException(status_code=400, detail="Article already published")
+    
+    # Publish to Telegraph if requested
+    if publish_to_telegraph:
+        try:
+            from app.routers.telegraph import create_telegraph_page, format_article_for_telegraph
+            telegraph_content = format_article_for_telegraph(article)
+            page = await create_telegraph_page(
+                title=article.title,
+                content=telegraph_content,
+                author_name="FactCheckr MX",
+                author_url="https://factcheck.mx"
+            )
+            article.telegraph_url = page.url
+            article.telegraph_path = page.path
+        except Exception as e:
+            logger.error(f"Error publishing to Telegraph: {e}")
+            # Continue even if Telegraph fails
+    
+    # Post to Twitter if requested
+    if publish_to_twitter:
+        try:
+            from app.services.twitter_poster import TwitterPoster
+            poster = TwitterPoster()
+            if poster.is_available():
+                blog_url = f"https://factcheck.mx/blog/{article.slug}"
+                twitter_url = poster.post_article(
+                    title=article.title,
+                    url=blog_url,
+                    excerpt=article.excerpt
+                )
+                if twitter_url:
+                    article.twitter_url = twitter_url
+                    article.twitter_posted = True
+        except Exception as e:
+            logger.error(f"Error posting to Twitter: {e}")
+            # Continue even if Twitter fails
+    
+    article.published = True
+    article.published_at = datetime.utcnow()
+    db.commit()
+    db.refresh(article)
+    
+    return {
+        "message": "Article published successfully",
+        "article_id": article.id,
+        "telegraph_url": article.telegraph_url,
+        "twitter_url": article.twitter_url
+    }
+
+
+@router.post("/articles/{article_id}/post-twitter")
+async def post_to_twitter(
+    article_id: int,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db)
+):
+    """Manually post article to Twitter/X"""
+    article = db.query(BlogArticle).filter(BlogArticle.id == article_id).first()
+    if not article:
+        raise HTTPException(status_code=404, detail="Article not found")
+    
+    if not article.published:
+        raise HTTPException(status_code=400, detail="Article must be published before posting to Twitter")
+    
+    if article.twitter_posted:
+        raise HTTPException(status_code=400, detail="Article already posted to Twitter")
+    
+    try:
+        from app.services.twitter_poster import TwitterPoster
+        poster = TwitterPoster()
+        
+        if not poster.is_available():
+            raise HTTPException(status_code=503, detail="Twitter posting not available (credentials not configured)")
+        
+        blog_url = f"https://factcheck.mx/blog/{article.slug}"
+        twitter_url = poster.post_article(
+            title=article.title,
+            url=blog_url,
+            excerpt=article.excerpt
+        )
+        
+        if twitter_url:
+            article.twitter_url = twitter_url
+            article.twitter_posted = True
+            db.commit()
+            return {"message": "Posted to Twitter successfully", "twitter_url": twitter_url}
+        else:
+            raise HTTPException(status_code=500, detail="Failed to post to Twitter")
+            
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error posting to Twitter: {e}")
+        raise HTTPException(status_code=500, detail=f"Error posting to Twitter: {str(e)}")
+

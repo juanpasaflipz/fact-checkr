@@ -9,9 +9,10 @@ import os
 import logging
 import httpx
 from app.database import SessionLocal, get_db
-from app.database.models import Claim as DBClaim, Topic as DBTopic
+from app.database.models import Claim as DBClaim, Topic as DBTopic, BlogArticle
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
+import re
 
 logger = logging.getLogger(__name__)
 
@@ -192,6 +193,187 @@ def format_claim_for_telegraph(claim: DBClaim) -> Tuple[str, List[Dict[str, Any]
     })
     
     return title, content
+
+def format_article_for_telegraph(article: BlogArticle) -> List[Dict[str, Any]]:
+    """Format blog article as Telegraph content
+    
+    Converts markdown content to Telegraph format
+    """
+    content = []
+    
+    # Add title
+    content.append({
+        "tag": "h1",
+        "children": [article.title]
+    })
+    
+    # Add excerpt if available
+    if article.excerpt:
+        content.append({
+            "tag": "p",
+            "children": [f"<em>{article.excerpt}</em>"]
+        })
+        content.append({
+            "tag": "hr"
+        })
+    
+    # Parse markdown content and convert to Telegraph format
+    # Simple markdown parser for common elements
+    lines = article.content.split('\n')
+    current_paragraph = []
+    
+    for line in lines:
+        line = line.strip()
+        
+        if not line:
+            # Empty line - flush current paragraph
+            if current_paragraph:
+                content.append({
+                    "tag": "p",
+                    "children": [" ".join(current_paragraph)]
+                })
+                current_paragraph = []
+            continue
+        
+        # Headers
+        if line.startswith('# '):
+            if current_paragraph:
+                content.append({
+                    "tag": "p",
+                    "children": [" ".join(current_paragraph)]
+                })
+                current_paragraph = []
+            content.append({
+                "tag": "h2",
+                "children": [line[2:].strip()]
+            })
+        elif line.startswith('## '):
+            if current_paragraph:
+                content.append({
+                    "tag": "p",
+                    "children": [" ".join(current_paragraph)]
+                })
+                current_paragraph = []
+            content.append({
+                "tag": "h3",
+                "children": [line[3:].strip()]
+            })
+        elif line.startswith('### '):
+            if current_paragraph:
+                content.append({
+                    "tag": "p",
+                    "children": [" ".join(current_paragraph)]
+                })
+                current_paragraph = []
+            content.append({
+                "tag": "h4",
+                "children": [line[4:].strip()]
+            })
+        # Lists
+        elif line.startswith('- ') or line.startswith('* '):
+            if current_paragraph:
+                content.append({
+                    "tag": "p",
+                    "children": [" ".join(current_paragraph)]
+                })
+                current_paragraph = []
+            content.append({
+                "tag": "li",
+                "children": [line[2:].strip()]
+            })
+        # Bold text
+        elif '**' in line:
+            # Simple bold handling
+            parts = re.split(r'\*\*(.*?)\*\*', line)
+            children = []
+            for i, part in enumerate(parts):
+                if i % 2 == 0:
+                    if part:
+                        children.append(part)
+                else:
+                    children.append({
+                        "tag": "strong",
+                        "children": [part]
+                    })
+            if current_paragraph:
+                content.append({
+                    "tag": "p",
+                    "children": [" ".join(current_paragraph)]
+                })
+                current_paragraph = []
+            content.append({
+                "tag": "p",
+                "children": children if children else [line]
+            })
+        # Links
+        elif '[' in line and '](' in line:
+            # Markdown link format: [text](url)
+            link_pattern = r'\[([^\]]+)\]\(([^\)]+)\)'
+            matches = re.findall(link_pattern, line)
+            if matches:
+                if current_paragraph:
+                    content.append({
+                        "tag": "p",
+                        "children": [" ".join(current_paragraph)]
+                    })
+                    current_paragraph = []
+                # Replace links in line
+                processed_line = line
+                for text, url in matches:
+                    processed_line = processed_line.replace(f"[{text}]({url})", text)
+                # Add paragraph with links
+                parts = re.split(link_pattern, line)
+                children = []
+                link_idx = 0
+                for i, part in enumerate(parts):
+                    if i % 3 == 0 and part:
+                        children.append(part)
+                    elif i % 3 == 1:
+                        # Link text
+                        url = parts[i + 1] if i + 1 < len(parts) else "#"
+                        children.append({
+                            "tag": "a",
+                            "attrs": {"href": url},
+                            "children": [part]
+                        })
+                content.append({
+                    "tag": "p",
+                    "children": children if children else [processed_line]
+                })
+            else:
+                current_paragraph.append(line)
+        else:
+            # Regular paragraph text
+            current_paragraph.append(line)
+    
+    # Flush remaining paragraph
+    if current_paragraph:
+        content.append({
+            "tag": "p",
+            "children": [" ".join(current_paragraph)]
+        })
+    
+    # Add footer with link back to factcheck.mx
+    content.append({
+        "tag": "hr"
+    })
+    content.append({
+        "tag": "p",
+        "children": [
+            "Lee el artículo completo en ",
+            {
+                "tag": "a",
+                "attrs": {"href": f"https://factcheck.mx/blog/{article.slug}"},
+                "children": ["FactCheckr MX"]
+            }
+        ]
+    })
+    content.append({
+        "tag": "p",
+        "children": [f"<em>Publicado el {article.published_at.strftime('%d/%m/%Y %H:%M') if article.published_at else 'Fecha no disponible'}</em>"]
+    })
+    
+    return content
 
 @router.post("/publish/{claim_id}")
 async def publish_claim_to_telegraph(
