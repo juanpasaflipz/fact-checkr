@@ -54,7 +54,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, or_, and_, func, case
-from sqlalchemy.exc import OperationalError
+from sqlalchemy.exc import OperationalError, DisconnectionError
 
 logger.info("✅ Environment variables loaded")
 
@@ -420,10 +420,71 @@ def map_db_claim_to_response(db_claim: DBClaim, db: Optional[Session] = None) ->
 @app.exception_handler(OperationalError)
 async def database_error_handler(request: Request, exc: OperationalError):
     """Handle database connection errors gracefully"""
-    logger.error(f"Database error: {exc}")
+    error_msg = str(exc)
+    logger.error(f"Database OperationalError: {error_msg}")
+    
+    # Check for specific SQLAlchemy error codes
+    if "f405" in error_msg or "connection pool" in error_msg.lower():
+        logger.error("Connection pool exhausted or timeout")
+        return JSONResponse(
+            status_code=503,
+            content={
+                "detail": "Database connection pool exhausted. Please try again in a moment.",
+                "error_type": "connection_pool_exhausted",
+                "retry_after": 5
+            },
+        )
+    
     return JSONResponse(
         status_code=503,
-        content={"detail": "Service temporarily unavailable (Database Error)"},
+        content={
+            "detail": "Service temporarily unavailable (Database Error)",
+            "error_type": "database_error"
+        },
+    )
+
+@app.exception_handler(DisconnectionError)
+async def disconnection_error_handler(request: Request, exc: DisconnectionError):
+    """Handle database disconnection errors"""
+    logger.error(f"Database DisconnectionError: {exc}")
+    return JSONResponse(
+        status_code=503,
+        content={
+            "detail": "Database connection lost. Please try again.",
+            "error_type": "database_disconnection",
+            "retry_after": 3
+        },
+    )
+
+
+@app.exception_handler(Exception)
+async def general_exception_handler(request: Request, exc: Exception):
+    """Catch-all exception handler for unhandled errors"""
+    error_msg = str(exc)
+    error_type = type(exc).__name__
+    
+    # Check for SQLAlchemy connection pool errors in any exception
+    if "f405" in error_msg or "connection pool" in error_msg.lower() or "pool" in error_msg.lower():
+        logger.error(f"Database connection pool error caught in general handler: {error_type} - {error_msg}")
+        return JSONResponse(
+            status_code=503,
+            content={
+                "detail": "Database connection pool exhausted. Please try again in a moment.",
+                "error_type": "connection_pool_exhausted",
+                "retry_after": 5
+            },
+        )
+    
+    # Log other unhandled errors
+    logger.error(f"Unhandled exception: {error_type} - {error_msg}")
+    logger.error(traceback.format_exc())
+    
+    return JSONResponse(
+        status_code=500,
+        content={
+            "detail": "An unexpected error occurred",
+            "error_type": error_type
+        },
     )
 
 @app.get("/")

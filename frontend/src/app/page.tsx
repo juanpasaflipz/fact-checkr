@@ -175,15 +175,41 @@ export default function Home() {
       if (!response.ok) {
         const errorText = await response.text().catch(() => response.statusText);
         let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
+        let errorType = 'unknown';
+        let retryAfter = 3;
+        
         try {
           const errorJson = JSON.parse(errorText);
           if (errorJson.detail) {
             errorMessage = errorJson.detail;
           }
+          if (errorJson.error_type) {
+            errorType = errorJson.error_type;
+          }
+          if (errorJson.retry_after) {
+            retryAfter = errorJson.retry_after;
+          }
         } catch {
           // If not JSON, use the text as is
           if (errorText) errorMessage = errorText;
         }
+        
+        // Handle 503 Service Unavailable with retry logic
+        if (response.status === 503 && retryCount < 2) {
+          const retryDelay = retryAfter * 1000 * (retryCount + 1);
+          console.warn(`Service unavailable (503), retrying in ${retryDelay}ms... (attempt ${retryCount + 1}/2)`);
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
+          return fetchClaims(query, isLoadMore, retryCount + 1, statusFilter);
+        }
+        
+        // Handle 504 Gateway Timeout with retry logic
+        if (response.status === 504 && retryCount < 2) {
+          const retryDelay = 2000 * (retryCount + 1);
+          console.warn(`Gateway timeout (504), retrying in ${retryDelay}ms... (attempt ${retryCount + 1}/2)`);
+          await new Promise(resolve => setTimeout(resolve, retryDelay));
+          return fetchClaims(query, isLoadMore, retryCount + 1, statusFilter);
+        }
+        
         throw new Error(errorMessage);
       }
 

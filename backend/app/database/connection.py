@@ -23,22 +23,31 @@ def get_engine():
     global _engine
     if _engine is None:
         logger.info("Creating database engine...")
+        # Connection pool settings - increased for production to handle concurrent requests
+        # pool_size: number of connections to maintain persistently
+        # max_overflow: additional connections that can be created on demand
+        # Total max connections = pool_size + max_overflow
+        pool_size = int(os.getenv("DB_POOL_SIZE", "5"))  # Increased from 3
+        max_overflow = int(os.getenv("DB_MAX_OVERFLOW", "10"))  # Increased from 5
+        
         _engine = create_engine(
             DATABASE_URL,
-            pool_size=3,
-            max_overflow=5,
-            pool_timeout=30,              # Reduced from 60
+            pool_size=pool_size,
+            max_overflow=max_overflow,
+            pool_timeout=30,              # Timeout waiting for connection from pool
             pool_recycle=1800,            # Recycle connections after 30 minutes
             pool_pre_ping=True,           # Verify connection is alive before using
             echo=False,                   # Set to True for SQL debugging
             connect_args={
-                "connect_timeout": 10,    # Reduced from 20
+                "connect_timeout": 10,    # Connection establishment timeout
                 "keepalives": 1,          # Enable TCP keepalives
                 "keepalives_idle": 30,    # Start keepalives after 30s of inactivity
                 "keepalives_interval": 10,  # Send keepalive every 10s
                 "keepalives_count": 5,    # Max keepalive packets before considering connection dead
             }
         )
+        
+        logger.info(f"Database engine created with pool_size={pool_size}, max_overflow={max_overflow} (max connections: {pool_size + max_overflow})")
         
         # Add connection event listener
         @event.listens_for(_engine, "connect")
