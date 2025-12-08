@@ -426,8 +426,8 @@ async def database_error_handler(request: Request, exc: OperationalError):
     # Check for specific SQLAlchemy error codes
     if "f405" in error_msg or "connection pool" in error_msg.lower():
         logger.error("Connection pool exhausted or timeout")
-        return JSONResponse(
-            status_code=503,
+    return JSONResponse(
+        status_code=503,
             content={
                 "detail": "Database connection pool exhausted. Please try again in a moment.",
                 "error_type": "connection_pool_exhausted",
@@ -561,20 +561,20 @@ async def search_claims(
 ):
     """Search claims by text"""
     try:
-        if not query:
-            return []
-            
-        search_term = f"%{query}%"
-        claims = db.query(DBClaim)\
-            .filter(
-                or_(
-                    DBClaim.claim_text.ilike(search_term),
-                    DBClaim.original_text.ilike(search_term)
-                )
-            )\
-            .limit(50)\
-            .all()
-            
+    if not query:
+        return []
+        
+    search_term = f"%{query}%"
+    claims = db.query(DBClaim)\
+        .filter(
+            or_(
+                DBClaim.claim_text.ilike(search_term),
+                DBClaim.original_text.ilike(search_term)
+            )
+        )\
+        .limit(50)\
+        .all()
+        
         result = []
         for c in claims:
             try:
@@ -641,24 +641,24 @@ async def get_stats(request: Request, db: Session = Depends(get_db)):
 async def get_topics(db: Session = Depends(get_db)):
     """Get all topics"""
     try:
-        topics = db.query(DBTopic).all()
-        result = []
-        for t in topics:
+    topics = db.query(DBTopic).all()
+    result = []
+    for t in topics:
             try:
-                topic_id = getattr(t, 'id', None)
-                topic_name = getattr(t, 'name', None)
-                topic_slug = getattr(t, 'slug', None)
-                topic_description = getattr(t, 'description', None)
-                result.append(TopicResponse(
-                    id=int(topic_id) if topic_id is not None else 0,
-                    name=str(topic_name) if topic_name is not None else "",
-                    slug=str(topic_slug) if topic_slug is not None else "",
-                    description=str(topic_description) if topic_description is not None else None
-                ))
+        topic_id = getattr(t, 'id', None)
+        topic_name = getattr(t, 'name', None)
+        topic_slug = getattr(t, 'slug', None)
+        topic_description = getattr(t, 'description', None)
+        result.append(TopicResponse(
+            id=int(topic_id) if topic_id is not None else 0,
+            name=str(topic_name) if topic_name is not None else "",
+            slug=str(topic_slug) if topic_slug is not None else "",
+            description=str(topic_description) if topic_description is not None else None
+        ))
             except Exception as e:
                 logger.error(f"Error mapping topic {getattr(t, 'id', 'unknown')} to response: {e}")
                 continue
-        return result
+    return result
     except Exception as e:
         logger.error(f"Error fetching topics: {e}", exc_info=True)
         raise HTTPException(
@@ -670,44 +670,44 @@ async def get_topics(db: Session = Depends(get_db)):
 async def get_topic_stats(topic_slug: str, db: Session = Depends(get_db)):
     """Get statistics for a specific topic"""
     try:
-        topic = db.query(DBTopic).filter(DBTopic.slug == topic_slug).first()
-        if not topic:
-            raise HTTPException(status_code=404, detail="Topic not found")
-        
-        # Get all claims for this topic
-        claims = db.query(DBClaim)\
-            .join(claim_topics, DBClaim.id == claim_topics.c.claim_id)\
-            .filter(claim_topics.c.topic_id == topic.id)\
-            .all()
-        
-        # Calculate stats
-        total_claims = len(claims)
-        verified_count = 0
-        debunked_count = 0
-        misleading_count = 0
-        unverified_count = 0
-        
-        for c in claims:
-            claim_status = getattr(c, 'status', None)
-            if claim_status == DBVerificationStatus.VERIFIED:
-                verified_count += 1
-            elif claim_status == DBVerificationStatus.DEBUNKED:
-                debunked_count += 1
-            elif claim_status == DBVerificationStatus.MISLEADING:
-                misleading_count += 1
-            elif claim_status == DBVerificationStatus.UNVERIFIED:
-                unverified_count += 1
-        
-        return {
-            "topic_id": topic.id,
-            "topic_name": topic.name,
-            "topic_slug": topic.slug,
-            "total_claims": total_claims,
-            "verified_count": verified_count,
-            "debunked_count": debunked_count,
-            "misleading_count": misleading_count,
-            "unverified_count": unverified_count
-        }
+    topic = db.query(DBTopic).filter(DBTopic.slug == topic_slug).first()
+    if not topic:
+        raise HTTPException(status_code=404, detail="Topic not found")
+    
+    # Get all claims for this topic
+    claims = db.query(DBClaim)\
+        .join(claim_topics, DBClaim.id == claim_topics.c.claim_id)\
+        .filter(claim_topics.c.topic_id == topic.id)\
+        .all()
+    
+    # Calculate stats
+    total_claims = len(claims)
+    verified_count = 0
+    debunked_count = 0
+    misleading_count = 0
+    unverified_count = 0
+    
+    for c in claims:
+        claim_status = getattr(c, 'status', None)
+        if claim_status == DBVerificationStatus.VERIFIED:
+            verified_count += 1
+        elif claim_status == DBVerificationStatus.DEBUNKED:
+            debunked_count += 1
+        elif claim_status == DBVerificationStatus.MISLEADING:
+            misleading_count += 1
+        elif claim_status == DBVerificationStatus.UNVERIFIED:
+            unverified_count += 1
+    
+    return {
+        "topic_id": topic.id,
+        "topic_name": topic.name,
+        "topic_slug": topic.slug,
+        "total_claims": total_claims,
+        "verified_count": verified_count,
+        "debunked_count": debunked_count,
+        "misleading_count": misleading_count,
+        "unverified_count": unverified_count
+    }
     except HTTPException:
         raise  # Re-raise HTTP exceptions (like 404)
     except Exception as e:
@@ -727,26 +727,26 @@ async def get_claims_by_topic(
 ):
     """Get claims filtered by topic with optional status filter"""
     try:
-        topic = db.query(DBTopic).filter(DBTopic.slug == topic_slug).first()
-        if not topic:
-            raise HTTPException(status_code=404, detail="Topic not found")
-        
-        query = db.query(DBClaim)\
-            .join(claim_topics, DBClaim.id == claim_topics.c.claim_id)\
-            .filter(claim_topics.c.topic_id == topic.id)
-        
-        if status:
-            status_map = {
-                "verified": DBVerificationStatus.VERIFIED,
-                "debunked": DBVerificationStatus.DEBUNKED,
-                "misleading": DBVerificationStatus.MISLEADING,
-                "unverified": DBVerificationStatus.UNVERIFIED
-            }
-            status_enum = status_map.get(status.lower())
-            if status_enum:
-                query = query.filter(DBClaim.status == status_enum)
-                
-        claims = query.order_by(desc(DBClaim.created_at)).offset(skip).limit(limit).all()
+    topic = db.query(DBTopic).filter(DBTopic.slug == topic_slug).first()
+    if not topic:
+        raise HTTPException(status_code=404, detail="Topic not found")
+    
+    query = db.query(DBClaim)\
+        .join(claim_topics, DBClaim.id == claim_topics.c.claim_id)\
+        .filter(claim_topics.c.topic_id == topic.id)
+    
+    if status:
+        status_map = {
+            "verified": DBVerificationStatus.VERIFIED,
+            "debunked": DBVerificationStatus.DEBUNKED,
+            "misleading": DBVerificationStatus.MISLEADING,
+            "unverified": DBVerificationStatus.UNVERIFIED
+        }
+        status_enum = status_map.get(status.lower())
+        if status_enum:
+            query = query.filter(DBClaim.status == status_enum)
+            
+    claims = query.order_by(desc(DBClaim.created_at)).offset(skip).limit(limit).all()
         
         result = []
         for c in claims:
@@ -773,41 +773,41 @@ async def get_trends_summary(
 ):
     """Get summary of trending topics and activity"""
     try:
-        today = datetime.utcnow()
-        start_date = today - timedelta(days=days)
-        previous_start = start_date - timedelta(days=days)
+    today = datetime.utcnow()
+    start_date = today - timedelta(days=days)
+    previous_start = start_date - timedelta(days=days)
+    
+    # Current period claims
+    current_claims = db.query(func.count(DBClaim.id)).filter(DBClaim.created_at >= start_date).scalar() or 0
+    
+    # Previous period claims
+    previous_claims = db.query(func.count(DBClaim.id))\
+        .filter(DBClaim.created_at >= previous_start, DBClaim.created_at < start_date)\
+        .scalar() or 0
         
-        # Current period claims
-        current_claims = db.query(func.count(DBClaim.id)).filter(DBClaim.created_at >= start_date).scalar() or 0
+    # Calculate growth
+    growth = 0
+    if previous_claims > 0:
+        growth = ((current_claims - previous_claims) / previous_claims) * 100
         
-        # Previous period claims
-        previous_claims = db.query(func.count(DBClaim.id))\
-            .filter(DBClaim.created_at >= previous_start, DBClaim.created_at < start_date)\
-            .scalar() or 0
-            
-        # Calculate growth
-        growth = 0
-        if previous_claims > 0:
-            growth = ((current_claims - previous_claims) / previous_claims) * 100
-            
-        # Status breakdown
-        status_breakdown = db.query(
-            DBClaim.status,
-            func.count(DBClaim.id).label('count')
-        ).filter(DBClaim.created_at >= start_date)\
-        .group_by(DBClaim.status).all()
-        
-        return {
-            "period_days": days,
-            "total_claims": current_claims,
-            "previous_period_claims": previous_claims,
-            "growth_percentage": round(growth, 1),
-            "trend_up": growth > 0,
-            "status_breakdown": [
-                {"status": str(s.status.value) if hasattr(s.status, 'value') else str(s.status), "count": s.count}
-                for s in status_breakdown
-            ]
-        }
+    # Status breakdown
+    status_breakdown = db.query(
+        DBClaim.status,
+        func.count(DBClaim.id).label('count')
+    ).filter(DBClaim.created_at >= start_date)\
+    .group_by(DBClaim.status).all()
+    
+    return {
+        "period_days": days,
+        "total_claims": current_claims,
+        "previous_period_claims": previous_claims,
+        "growth_percentage": round(growth, 1),
+        "trend_up": growth > 0,
+        "status_breakdown": [
+            {"status": str(s.status.value) if hasattr(s.status, 'value') else str(s.status), "count": s.count}
+            for s in status_breakdown
+        ]
+    }
     except Exception as e:
         logger.error(f"Error fetching trends summary: {e}", exc_info=True)
         raise HTTPException(

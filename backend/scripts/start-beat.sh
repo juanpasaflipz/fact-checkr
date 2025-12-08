@@ -26,12 +26,12 @@ python -c "
 import os
 import sys
 try:
-    import redis
+import redis
     redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
     print(f'Connecting to Redis: {redis_url.split(\"@\")[-1] if \"@\" in redis_url else redis_url}')
     r = redis.from_url(redis_url)
-    r.ping()
-    print('[OK] Redis connection successful')
+r.ping()
+print('[OK] Redis connection successful')
 except Exception as e:
     print(f'[ERROR] Failed to connect to Redis: {e}')
     sys.exit(1)
