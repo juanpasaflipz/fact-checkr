@@ -529,6 +529,9 @@ class BlogArticleGenerator:
         
         edition_number = (last_edition.edition_number + 1) if last_edition and last_edition.edition_number else 1
         
+        # Check if auto-publish is enabled
+        auto_publish = os.getenv("AUTO_PUBLISH_BLOG", "false").lower() == "true"
+        
         article = BlogArticle(
             title=title,
             slug=slug,
@@ -538,8 +541,12 @@ class BlogArticleGenerator:
             edition_number=edition_number,
             data_context=data_context,
             topic_id=topic_id,
-            published=False  # Review before publishing
+            published=auto_publish  # Auto-publish if configured
         )
+        
+        # Set published_at if auto-publishing
+        if auto_publish:
+            article.published_at = datetime.utcnow()
         
         self.db.add(article)
         self.db.commit()

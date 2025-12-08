@@ -24,6 +24,34 @@ router = APIRouter(prefix="/blog", tags=["blog"])
 FREE_TIER_ARTICLE_LIMIT = int(os.getenv("BLOG_FREE_TIER_LIMIT", "3"))
 
 
+@router.get("/stats")
+async def get_blog_stats(db: Session = Depends(get_db)):
+    """Get blog statistics (for debugging)"""
+    try:
+        total = db.query(BlogArticle).count()
+        published = db.query(BlogArticle).filter(BlogArticle.published == True).count()
+        unpublished = total - published
+        
+        # Count by article type
+        by_type = {}
+        for article_type in ["morning", "afternoon", "evening", "breaking"]:
+            count = db.query(BlogArticle).filter(
+                BlogArticle.article_type == article_type,
+                BlogArticle.published == True
+            ).count()
+            by_type[article_type] = count
+        
+        return {
+            "total_articles": total,
+            "published": published,
+            "unpublished": unpublished,
+            "by_type": by_type
+        }
+    except Exception as e:
+        logger.error(f"Error getting blog stats: {e}", exc_info=True)
+        return {"error": str(e)}
+
+
 class BlogArticleResponse(BaseModel):
     """Blog article summary response"""
     id: int
@@ -62,6 +90,14 @@ async def list_articles(
     PRO tier: Returns all articles with pagination
     """
     try:
+        # Log the request for debugging
+        logger.info(f"Blog articles request: user={user.id if user else None}, article_type={article_type}, limit={limit}")
+        
+        # Check total articles count for debugging
+        total_articles = db.query(BlogArticle).count()
+        published_count = db.query(BlogArticle).filter(BlogArticle.published == True).count()
+        logger.info(f"Blog articles stats: total={total_articles}, published={published_count}")
+        
         query = db.query(BlogArticle).filter(BlogArticle.published == True)
         
         if article_type:
@@ -69,6 +105,7 @@ async def list_articles(
         
         # Get user tier (default to FREE for anonymous users)
         tier = get_user_tier(db, user.id) if user else SubscriptionTier.FREE
+        logger.info(f"User tier determined: {tier.value}")
         
         # Free tier: limit to most recent 3 articles
         if tier == SubscriptionTier.FREE:
@@ -88,6 +125,7 @@ async def list_articles(
             has_more = total_count > limit
         
         articles = query.all()
+        logger.info(f"Found {len(articles)} articles to return")
         
         return {
             "articles": [BlogArticleResponse.model_validate(a) for a in articles],
