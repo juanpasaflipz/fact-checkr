@@ -855,9 +855,9 @@ export default function Home() {
                             <p className="text-sm font-semibold text-gray-900 group-hover:text-gray-700">Temas</p>
                             <p className="text-xs text-gray-600 mt-1">Explora por categoría</p>
                           </a>
-                          <a href="/mercados" className="group bg-white border border-gray-200 rounded-lg p-4 hover:border-gray-300 hover:shadow-sm transition-all duration-200 text-center">
+                          <a href="/markets" className="group bg-white border border-gray-200 rounded-lg p-4 hover:border-gray-300 hover:shadow-sm transition-all duration-200 text-center">
                             <div className="text-3xl mb-2">💰</div>
-                            <p className="text-sm font-semibold text-gray-900 group-hover:text-gray-700">Mercados</p>
+                            <p className="text-sm font-semibold text-gray-900 group-hover:text-gray-700">Predicciones</p>
                             <p className="text-xs text-gray-600 mt-1">Predicciones colectivas</p>
                           </a>
                           <a href="/estadisticas" className="group bg-white border border-gray-200 rounded-lg p-4 hover:border-gray-300 hover:shadow-sm transition-all duration-200 text-center">

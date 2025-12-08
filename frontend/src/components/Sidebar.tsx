@@ -7,7 +7,7 @@ const menuItems = [
   { id: 'inicio', label: 'Inicio', icon: 'Home', path: '/' },
   { id: 'historial', label: 'Historial', icon: 'Clock', path: '/historial' },
   { id: 'tendencias', label: 'Tendencias', icon: 'TrendingUp', path: '/tendencias' },
-  { id: 'mercados', label: 'Mercados', icon: 'TrendingDown', path: '/markets' },
+  { id: 'mercados', label: 'Predicciones', icon: 'TrendingDown', path: '/markets' },
   { id: 'temas', label: 'Temas', icon: 'Hash', path: '/temas' },
   { id: 'blog', label: 'Blog', icon: 'BookOpen', path: '/blog' },
   { id: 'fuentes', label: 'Fuentes', icon: 'Folder', path: '/fuentes' },
