@@ -426,8 +426,8 @@ async def database_error_handler(request: Request, exc: OperationalError):
     # Check for specific SQLAlchemy error codes
     if "f405" in error_msg or "connection pool" in error_msg.lower():
         logger.error("Connection pool exhausted or timeout")
-    return JSONResponse(
-        status_code=503,
+        return JSONResponse(
+            status_code=503,
             content={
                 "detail": "Database connection pool exhausted. Please try again in a moment.",
                 "error_type": "connection_pool_exhausted",
