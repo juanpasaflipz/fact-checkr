@@ -365,10 +365,17 @@ def map_db_claim_to_response(db_claim: DBClaim, db: Optional[Session] = None) ->
             ).order_by(desc(DBMarket.created_at)).first()
         
         if market:
-            from app.services.markets import yes_probability, no_probability, calculate_volume
-            yes_prob = yes_probability(market)
-            no_prob = no_probability(market)
-            volume = calculate_volume(market, db)
+            try:
+                from app.services.markets import yes_probability, no_probability, calculate_volume
+                yes_prob = yes_probability(market)
+                no_prob = no_probability(market)
+                volume = calculate_volume(market, db)
+            except Exception as e:
+                logger.warning(f"Error calculating market probabilities for claim {db_claim.id}: {e}")
+                # Fallback to default values if market calculation fails
+                yes_prob = 0.5
+                no_prob = 0.5
+                volume = 0.0
             
             # Access actual values from ORM instance
             market_id = getattr(market, 'id', None)
