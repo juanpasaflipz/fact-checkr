@@ -561,20 +561,20 @@ async def search_claims(
 ):
     """Search claims by text"""
     try:
-    if not query:
-        return []
-        
-    search_term = f"%{query}%"
-    claims = db.query(DBClaim)\
-        .filter(
-            or_(
-                DBClaim.claim_text.ilike(search_term),
-                DBClaim.original_text.ilike(search_term)
-            )
-        )\
-        .limit(50)\
-        .all()
-        
+        if not query:
+            return []
+            
+        search_term = f"%{query}%"
+        claims = db.query(DBClaim)\
+            .filter(
+                or_(
+                    DBClaim.claim_text.ilike(search_term),
+                    DBClaim.original_text.ilike(search_term)
+                )
+            )\
+            .limit(50)\
+            .all()
+            
         result = []
         for c in claims:
             try:
@@ -670,44 +670,44 @@ async def get_topics(db: Session = Depends(get_db)):
 async def get_topic_stats(topic_slug: str, db: Session = Depends(get_db)):
     """Get statistics for a specific topic"""
     try:
-    topic = db.query(DBTopic).filter(DBTopic.slug == topic_slug).first()
-    if not topic:
-        raise HTTPException(status_code=404, detail="Topic not found")
-    
-    # Get all claims for this topic
-    claims = db.query(DBClaim)\
-        .join(claim_topics, DBClaim.id == claim_topics.c.claim_id)\
-        .filter(claim_topics.c.topic_id == topic.id)\
-        .all()
-    
-    # Calculate stats
-    total_claims = len(claims)
-    verified_count = 0
-    debunked_count = 0
-    misleading_count = 0
-    unverified_count = 0
-    
-    for c in claims:
-        claim_status = getattr(c, 'status', None)
-        if claim_status == DBVerificationStatus.VERIFIED:
-            verified_count += 1
-        elif claim_status == DBVerificationStatus.DEBUNKED:
-            debunked_count += 1
-        elif claim_status == DBVerificationStatus.MISLEADING:
-            misleading_count += 1
-        elif claim_status == DBVerificationStatus.UNVERIFIED:
-            unverified_count += 1
-    
-    return {
-        "topic_id": topic.id,
-        "topic_name": topic.name,
-        "topic_slug": topic.slug,
-        "total_claims": total_claims,
-        "verified_count": verified_count,
-        "debunked_count": debunked_count,
-        "misleading_count": misleading_count,
-        "unverified_count": unverified_count
-    }
+        topic = db.query(DBTopic).filter(DBTopic.slug == topic_slug).first()
+        if not topic:
+            raise HTTPException(status_code=404, detail="Topic not found")
+        
+        # Get all claims for this topic
+        claims = db.query(DBClaim)\
+            .join(claim_topics, DBClaim.id == claim_topics.c.claim_id)\
+            .filter(claim_topics.c.topic_id == topic.id)\
+            .all()
+        
+        # Calculate stats
+        total_claims = len(claims)
+        verified_count = 0
+        debunked_count = 0
+        misleading_count = 0
+        unverified_count = 0
+        
+        for c in claims:
+            claim_status = getattr(c, 'status', None)
+            if claim_status == DBVerificationStatus.VERIFIED:
+                verified_count += 1
+            elif claim_status == DBVerificationStatus.DEBUNKED:
+                debunked_count += 1
+            elif claim_status == DBVerificationStatus.MISLEADING:
+                misleading_count += 1
+            elif claim_status == DBVerificationStatus.UNVERIFIED:
+                unverified_count += 1
+        
+        return {
+            "topic_id": topic.id,
+            "topic_name": topic.name,
+            "topic_slug": topic.slug,
+            "total_claims": total_claims,
+            "verified_count": verified_count,
+            "debunked_count": debunked_count,
+            "misleading_count": misleading_count,
+            "unverified_count": unverified_count
+        }
     except HTTPException:
         raise  # Re-raise HTTP exceptions (like 404)
     except Exception as e:
@@ -727,26 +727,26 @@ async def get_claims_by_topic(
 ):
     """Get claims filtered by topic with optional status filter"""
     try:
-    topic = db.query(DBTopic).filter(DBTopic.slug == topic_slug).first()
-    if not topic:
-        raise HTTPException(status_code=404, detail="Topic not found")
-    
-    query = db.query(DBClaim)\
-        .join(claim_topics, DBClaim.id == claim_topics.c.claim_id)\
-        .filter(claim_topics.c.topic_id == topic.id)
-    
-    if status:
-        status_map = {
-            "verified": DBVerificationStatus.VERIFIED,
-            "debunked": DBVerificationStatus.DEBUNKED,
-            "misleading": DBVerificationStatus.MISLEADING,
-            "unverified": DBVerificationStatus.UNVERIFIED
-        }
-        status_enum = status_map.get(status.lower())
-        if status_enum:
-            query = query.filter(DBClaim.status == status_enum)
-            
-    claims = query.order_by(desc(DBClaim.created_at)).offset(skip).limit(limit).all()
+        topic = db.query(DBTopic).filter(DBTopic.slug == topic_slug).first()
+        if not topic:
+            raise HTTPException(status_code=404, detail="Topic not found")
+        
+        query = db.query(DBClaim)\
+            .join(claim_topics, DBClaim.id == claim_topics.c.claim_id)\
+            .filter(claim_topics.c.topic_id == topic.id)
+        
+        if status:
+            status_map = {
+                "verified": DBVerificationStatus.VERIFIED,
+                "debunked": DBVerificationStatus.DEBUNKED,
+                "misleading": DBVerificationStatus.MISLEADING,
+                "unverified": DBVerificationStatus.UNVERIFIED
+            }
+            status_enum = status_map.get(status.lower())
+            if status_enum:
+                query = query.filter(DBClaim.status == status_enum)
+                
+        claims = query.order_by(desc(DBClaim.created_at)).offset(skip).limit(limit).all()
         
         result = []
         for c in claims:
