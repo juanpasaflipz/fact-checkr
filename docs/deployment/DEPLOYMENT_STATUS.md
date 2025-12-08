@@ -1,6 +1,6 @@
 # FactCheckr Deployment Status
 
-**Last Updated**: November 26, 2025
+**Last Updated**: December 8, 2025
 
 ## ✅ Completed
 
@@ -12,11 +12,18 @@
 ### 2. Backend API
 - **Platform**: Railway
 - **Status**: ✅ Deployed and running
-- **URL**: Check Railway dashboard
+- **URL**: https://backend-production-72ea.up.railway.app
 - **Health Check**: `/health` endpoint available
 - **Configuration**: `backend/railway.json`
 
-### 3. Deployment Scripts & Documentation
+### 3. Frontend
+- **Platform**: Vercel
+- **Status**: ✅ Deployed and running
+- **URL**: Check Vercel dashboard (e.g., https://factcheck-mx-frontend.vercel.app)
+- **Configuration**: `frontend/vercel.json`
+- **Connection**: `NEXT_PUBLIC_API_URL` configured to point to backend
+
+### 4. Deployment Scripts & Documentation
 - ✅ Worker startup script: `backend/start-worker.sh`
 - ✅ Beat startup script: `backend/start-beat.sh`
 - ✅ Railway configs: `railway-worker.json`, `railway-beat.json`
@@ -25,7 +32,7 @@
 
 ## 🔄 Ready to Deploy (Manual Steps Required)
 
-### 4. Redis
+### 5. Redis
 **Action Required**: Deploy Redis service in Railway
 ```
 Railway Dashboard → + New → Database → Redis
@@ -33,7 +40,7 @@ Name: factcheckr-redis
 ```
 Then add `REDIS_URL` to backend, worker, and beat services.
 
-### 5. Celery Worker
+### 6. Celery Worker
 **Action Required**: Deploy worker service
 ```
 Railway Dashboard → + New → GitHub Repo → fact-checkr
@@ -42,7 +49,7 @@ Railway Config Path: backend/railway-worker.json
 ```
 Copy environment variables from backend service.
 
-### 6. Celery Beat (Scheduler)
+### 7. Celery Beat (Scheduler)
 **Action Required**: Deploy beat service
 ```
 Railway Dashboard → + New → GitHub Repo → fact-checkr
@@ -50,14 +57,6 @@ Name: factcheckr-beat
 Railway Config Path: backend/railway-beat.json
 ```
 Copy environment variables from backend service.
-
-### 7. Frontend
-**Action Required**: Deploy to Vercel
-```
-Vercel Dashboard → Add New → Project → Import fact-checkr
-Root Directory: frontend
-Add env var: NEXT_PUBLIC_API_URL=<Railway backend URL>
-```
 
 ### 8. CORS Configuration
 **Action Required**: Update backend environment
@@ -151,14 +150,10 @@ NEXT_PUBLIC_API_URL=<Railway backend URL>
    - Use `backend/railway-beat.json`
    - Copy env vars from backend
 
-5. **Deploy Frontend** (5 min)
-   - Vercel → Import project
-   - Set `NEXT_PUBLIC_API_URL`
-
-6. **Update CORS** (1 min)
+5. **Update CORS** (1 min)
    - Add Vercel URL to backend `CORS_ORIGINS`
 
-7. **Verify** (5 min)
+6. **Verify** (5 min)
    - Test backend health endpoint
    - Test frontend loads
    - Check worker/beat logs
@@ -168,7 +163,7 @@ NEXT_PUBLIC_API_URL=<Railway backend URL>
 
 ### Backend
 ```bash
-curl https://your-backend.railway.app/health
+curl https://backend-production-72ea.up.railway.app/health
 ```
 Expected: `{"status": "healthy", ...}`
 
@@ -208,4 +203,3 @@ Visit Vercel URL and verify:
 - CORS is configurable via environment variable
 - Health checks are configured for backend
 - All documentation is comprehensive and up-to-date
-
