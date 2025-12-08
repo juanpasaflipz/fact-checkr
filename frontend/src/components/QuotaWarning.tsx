@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { getApiBaseUrl } from '@/lib/api';
+import { getApiBaseUrl } from '@/lib/api-config';
 
 interface QuotaData {
   tier: string;
