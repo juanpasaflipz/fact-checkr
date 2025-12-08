@@ -19,11 +19,12 @@ interface BlogArticle {
   topic_id: number | null;
 }
 
-export async function generateMetadata({ params }: { params: { slug: string } }): Promise<Metadata> {
+export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
+  const { slug } = await params;
   const apiUrl = getApiBaseUrl();
   
   try {
-    const response = await fetch(`${apiUrl}/api/blog/articles/${params.slug}`, {
+    const response = await fetch(`${apiUrl}/api/blog/articles/${slug}`, {
       next: { revalidate: 300 },
     });
     
@@ -83,8 +84,9 @@ async function getArticle(slug: string): Promise<BlogArticle | { restricted: tru
   }
 }
 
-export default async function BlogArticlePage({ params }: { params: { slug: string } }) {
-  const article = await getArticle(params.slug);
+export default async function BlogArticlePage({ params }: { params: Promise<{ slug: string }> }) {
+  const { slug } = await params;
+  const article = await getArticle(slug);
   
   if (!article) {
     notFound();
