@@ -464,12 +464,30 @@ async def get_claims(
             .limit(limit)\
             .all()
             
-        return [map_db_claim_to_response(c, db) for c in claims]
+        result = []
+        for c in claims:
+            try:
+                result.append(map_db_claim_to_response(c, db))
+            except Exception as e:
+                logger.error(f"Error mapping claim {c.id} to response: {e}")
+                import traceback
+                logger.error(traceback.format_exc())
+                # Skip this claim but continue with others
+                continue
+        
+        return result
     except (OperationalError) as e:
         db.rollback()
-        raise
+        logger.error(f"Database operational error: {e}")
+        raise HTTPException(
+            status_code=503,
+            detail="Database temporarily unavailable"
+        )
     except Exception as e:
         db.rollback()
+        logger.error(f"Unexpected error in get_claims: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
         raise HTTPException(
             status_code=500,
             detail=f"An unexpected error occurred while fetching claims: {str(e)}"
