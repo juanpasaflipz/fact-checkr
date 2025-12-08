@@ -5,26 +5,24 @@ WORKDIR /app
 # Install system dependencies
 RUN apt-get update && apt-get install -y \
     gcc \
+    g++ \
     postgresql-client \
     curl \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching
-COPY backend/requirements.txt .
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-# Copy application code
-COPY backend/app ./app
-COPY backend/alembic ./alembic
-COPY backend/alembic.ini .
-
-# Copy beat startup script
-COPY backend/scripts/start-beat.sh /app/start-beat.sh
-RUN chmod +x /app/start-beat.sh
+# Copy application code (same structure as main Dockerfile)
+COPY . .
 
 # Create logs directory
 RUN mkdir -p logs
 
+# Make beat startup script executable
+RUN chmod +x /app/scripts/start-beat.sh
+
 # Run beat scheduler
-CMD ["sh", "/app/start-beat.sh"]
+CMD ["sh", "/app/scripts/start-beat.sh"]
 

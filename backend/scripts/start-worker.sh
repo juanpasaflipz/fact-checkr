@@ -7,23 +7,74 @@ echo "=========================================="
 echo "Starting FactCheckr Celery Worker..."
 echo "=========================================="
 
+# Set Python path to include current directory
+export PYTHONPATH=/app:$PYTHONPATH
+
+# Verify Python and dependencies
+echo "Checking Python version..."
+python --version
+
+echo "Checking installed packages..."
+python -c "import celery; print(f'Celery version: {celery.__version__}')" || {
+    echo "[ERROR] Celery not installed"
+    exit 1
+}
+
 # Verify Redis connection
 echo "Testing Redis connection..."
 python -c "
 import os
-import redis
-r = redis.from_url(os.getenv('REDIS_URL', 'redis://localhost:6379/0'))
-r.ping()
-print('[OK] Redis connection successful')
+import sys
+try:
+    import redis
+    redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379/0')
+    print(f'Connecting to Redis: {redis_url.split(\"@\")[-1] if \"@\" in redis_url else redis_url}')
+    r = redis.from_url(redis_url)
+    r.ping()
+    print('[OK] Redis connection successful')
+except Exception as e:
+    print(f'[ERROR] Failed to connect to Redis: {e}')
+    sys.exit(1)
 " || {
-    echo "[ERROR] Failed to connect to Redis"
+    echo "[ERROR] Redis connection test failed"
     exit 1
 }
 
+# Test database connection (if DATABASE_URL is set)
+if [ -n "$DATABASE_URL" ]; then
+    echo "Testing database connection..."
+    python -c "
+import os
+import sys
+try:
+    from app.database.connection import get_engine
+    engine = get_engine()
+    with engine.connect() as conn:
+        result = conn.execute('SELECT 1')
+        print('[OK] Database connection successful')
+except Exception as e:
+    print(f'[WARNING] Database connection test failed: {e}')
+    print('Worker will continue but database operations may fail')
+" || {
+    echo "[WARNING] Database connection test failed - worker will continue"
+}
+fi
+
 # Test if worker module can be imported
 echo "Testing worker import..."
-python -c "from app.worker import celery_app; print('[OK] Worker module imported successfully')" || {
-    echo "[ERROR] Failed to import worker module"
+python -c "
+import sys
+import traceback
+try:
+    from app.worker import celery_app
+    print('[OK] Worker module imported successfully')
+    print(f'[OK] Celery app name: {celery_app.main}')
+except Exception as e:
+    print(f'[ERROR] Failed to import worker module: {e}')
+    traceback.print_exc()
+    sys.exit(1)
+" || {
+    echo "[ERROR] Worker module import failed"
     exit 1
 }
 
