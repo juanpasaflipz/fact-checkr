@@ -5,7 +5,37 @@ import type { NextRequest } from 'next/server';
 export function middleware(request: NextRequest) {
   const start = Date.now();
 
-  // Add custom headers for security and performance
+  // --- Auth Logic ---
+  const { pathname } = request.nextUrl;
+  
+  // Public routes that don't require authentication
+  const publicRoutes = [
+    '/',
+    '/signin',
+    '/signup',
+    '/temas',
+    '/fuentes',
+    '/tendencias',
+    '/estadisticas',
+  ];
+  
+  // Check if route is public
+  const isPublicRoute = publicRoutes.some(route => 
+    pathname === route || pathname.startsWith(`${route}/`)
+  );
+  
+  // Check for auth token in cookies or headers
+  const authToken = request.cookies.get('auth_token')?.value || 
+                    request.headers.get('authorization')?.replace('Bearer ', '');
+  
+  // If no token and trying to access protected route, redirect to signin
+  if (!isPublicRoute && !authToken) {
+    const signInUrl = new URL('/signin', request.url);
+    signInUrl.searchParams.set('redirect', pathname);
+    return NextResponse.redirect(signInUrl);
+  }
+  
+  // --- Security & Performance ---
   const response = NextResponse.next();
 
   // Security headers
@@ -34,8 +64,8 @@ export const config = {
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
-     * - public folder
+     * - public files (public folder)
      */
-    '/((?!api|_next/static|_next/image|favicon.ico|public/).*)',
+    '/((?!api|_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 };

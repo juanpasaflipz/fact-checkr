@@ -1,10 +1,9 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
+import { getApiBaseUrl } from './api-config';
 
 // --- Configuration ---
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 
-  (typeof window !== 'undefined' && (window as any).__NEXT_DATA__?.env?.NEXT_PUBLIC_API_URL) || 
-  '';
+const API_URL = getApiBaseUrl();
 
 const isServer = typeof window === 'undefined';
 

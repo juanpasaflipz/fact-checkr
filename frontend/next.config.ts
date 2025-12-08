@@ -55,34 +55,37 @@ const nextConfig: NextConfig = {
 
   // Development Proxy to bypass CORS
   async rewrites() {
+    const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+    console.log(`[Next.js] Rewriting API requests to: ${API_URL}`);
+    
     return [
       {
         source: '/api/:path*',
-        destination: 'http://localhost:8000/api/:path*', // Proxy to Backend
+        destination: `${API_URL}/api/:path*`, // Proxy to Backend
       },
       {
         source: '/claims/:path*',
-        destination: 'http://localhost:8000/claims/:path*', // Proxy to Backend
+        destination: `${API_URL}/claims/:path*`, // Proxy to Backend
       },
       {
         source: '/stats',
-        destination: 'http://localhost:8000/stats', // Proxy to Backend
+        destination: `${API_URL}/stats`, // Proxy to Backend
       },
       {
         source: '/health',
-        destination: 'http://localhost:8000/health', // Proxy to Backend
+        destination: `${API_URL}/health`, // Proxy to Backend
       },
       {
         source: '/topics/:path*',
-        destination: 'http://localhost:8000/topics/:path*', // Proxy to Backend
+        destination: `${API_URL}/topics/:path*`, // Proxy to Backend
       },
       {
         source: '/entities',
-        destination: 'http://localhost:8000/entities', // Proxy to Backend
+        destination: `${API_URL}/entities`, // Proxy to Backend
       },
       {
         source: '/trends/:path*',
-        destination: 'http://localhost:8000/trends/:path*', // Proxy to Backend
+        destination: `${API_URL}/trends/:path*`, // Proxy to Backend
       }
     ];
   },
