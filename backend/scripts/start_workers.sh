@@ -1,7 +1,9 @@
 #!/bin/bash
 # Start Celery worker with beat scheduler for continuous data fetching
 
-cd "$(dirname "$0")"
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+APP_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+cd "$APP_ROOT"
 
 # Activate virtual environment
 source venv/bin/activate
