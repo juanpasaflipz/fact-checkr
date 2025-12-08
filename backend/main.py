@@ -284,6 +284,14 @@ if ROUTERS_AVAILABLE:
             logger.warning(f"⚠️ Failed to register optional router '{router_name}': {e}")
             continue
 
+    # Register share router
+    try:
+        from app.routers import share
+        app.include_router(share.router, prefix="/api", tags=["share"])
+        logger.info("✅ Share router registered")
+    except Exception as e:
+        logger.warning(f"⚠️ Failed to register share router: {e}")
+
 # --- Helper Functions ---
 def map_db_claim_to_response(db_claim: DBClaim, db: Optional[Session] = None) -> ClaimResponse:
     """Map database claim object to Pydantic response model"""
@@ -310,10 +318,22 @@ def map_db_claim_to_response(db_claim: DBClaim, db: Optional[Session] = None) ->
         else:
             sources_list = list(evidence_sources) if hasattr(evidence_sources, '__iter__') else []
     
+    # Get evidence_details if available
+    evidence_details = getattr(db_claim, 'evidence_details', None)
+    evidence_details_list = None
+    if evidence_details:
+        from app.models import EvidenceDetail
+        if isinstance(evidence_details, list):
+            evidence_details_list = [
+                EvidenceDetail(**ed) if isinstance(ed, dict) else ed
+                for ed in evidence_details
+            ]
+    
     verification = VerificationResult(
         status=status_enum,
         explanation=str(db_claim.explanation) if db_claim.explanation is not None else "No explanation provided",
-        sources=sources_list
+        sources=sources_list,
+        evidence_details=evidence_details_list
     )
     
     # Create SocialPost from Source

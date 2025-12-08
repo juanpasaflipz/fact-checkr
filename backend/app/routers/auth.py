@@ -340,7 +340,11 @@ async def update_preferences(
 ):
     """Update user preferences for market categories"""
     # Validate categories
-    valid_categories = ['politics', 'economy', 'security', 'rights', 'environment', 'mexico-us-relations', 'institutions']
+    valid_categories = [
+        'politics', 'economy', 'security', 'rights', 'environment', 
+        'mexico-us-relations', 'institutions',
+        'sports', 'financial-markets', 'weather', 'social-incidents'
+    ]
     for cat in preferences.preferred_categories:
         if cat not in valid_categories:
             raise HTTPException(

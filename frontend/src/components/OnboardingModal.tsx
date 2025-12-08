@@ -16,6 +16,10 @@ const CATEGORIES = [
   { id: 'environment', label: 'Medio Ambiente', icon: '🌱', description: 'Calidad del aire, agua, clima' },
   { id: 'mexico-us-relations', label: 'México-Estados Unidos', icon: '🌎', description: 'T-MEC, migración, relaciones' },
   { id: 'institutions', label: 'Instituciones', icon: '🏛️', description: 'Poder judicial, reformas institucionales' },
+  { id: 'sports', label: 'Deportes', icon: '⚽', description: 'Fútbol, ligas, competencias' },
+  { id: 'financial-markets', label: 'Mercados Financieros', icon: '💹', description: 'Bolsa, acciones, inversiones' },
+  { id: 'weather', label: 'Clima', icon: '🌦️', description: 'Lluvia, huracanes, temperaturas' },
+  { id: 'social-incidents', label: 'Incidentes Sociales', icon: '📢', description: 'Manifestaciones, eventos sociales' },
 ] as const;
 
 export default function OnboardingModal({ onComplete }: OnboardingModalProps) {

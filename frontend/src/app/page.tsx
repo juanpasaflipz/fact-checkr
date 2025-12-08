@@ -7,6 +7,7 @@ import Header from '@/components/Header';
 import StatsCard from '@/components/StatsCard';
 import OnboardingModal from '@/components/OnboardingModal';
 import TrendingTopics from '@/components/TrendingTopics';
+import QuotaWarning from '@/components/QuotaWarning';
 import { getApiBaseUrl, getConnectionErrorHelp } from '@/lib/api-config';
 
 // Define types matching the backend response
@@ -539,6 +540,8 @@ export default function Home() {
         />
         <main className="p-6 lg:p-8">
           <div className="max-w-7xl mx-auto space-y-8">
+            {/* Quota Warning */}
+            <QuotaWarning />
             
             {/* Breaking News Banner */}
             {breakingNews.length > 0 && (

@@ -20,6 +20,10 @@ const CATEGORIES = [
   { value: 'environment', label: 'Medio Ambiente' },
   { value: 'mexico-us-relations', label: 'México-Estados Unidos' },
   { value: 'institutions', label: 'Instituciones' },
+  { value: 'sports', label: 'Deportes' },
+  { value: 'financial-markets', label: 'Mercados Financieros' },
+  { value: 'weather', label: 'Clima' },
+  { value: 'social-incidents', label: 'Incidentes Sociales' },
 ];
 
 export default function MarketProposalForm({ onSubmit, onCancel }: MarketProposalFormProps) {

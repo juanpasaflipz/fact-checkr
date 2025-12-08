@@ -56,7 +56,7 @@ export default function SubscriptionPage() {
       price: { month: 0, year: 0 },
       description: 'Perfecto para usuarios casuales',
       features: [
-        '10 verificaciones manuales/mes',
+        '10 verificaciones diarias',
         '100 solicitudes API/día',
         '50 búsquedas/día',
         'Solo últimos 7 días de datos',

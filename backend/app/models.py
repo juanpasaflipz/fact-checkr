@@ -22,10 +22,20 @@ class SocialPost(BaseModel):
     media_urls: Optional[list] = None  # [image_urls, video_urls]
     context_data: Optional[dict] = None  # {thread_id, parent_id, is_reply, etc.}
 
+class EvidenceDetail(BaseModel):
+    """Rich evidence detail with snippet and metadata"""
+    url: str
+    snippet: str  # First 200 chars of relevant text
+    timestamp: Optional[str] = None  # When evidence was found/published
+    relevance_score: Optional[float] = None  # 0.0-1.0, how relevant to the claim
+    title: Optional[str] = None  # Page/article title
+    domain: Optional[str] = None  # Domain of the source
+
 class VerificationResult(BaseModel):
     status: VerificationStatus
     explanation: str
     sources: List[str]
+    evidence_details: Optional[List[EvidenceDetail]] = None  # Rich evidence with snippets
     confidence: float = 0.5  # Confidence score 0.0-1.0
     evidence_strength: Optional[str] = None  # "strong|moderate|weak|insufficient"
     key_evidence_points: Optional[List[str]] = None  # Key points from evidence
@@ -67,7 +77,7 @@ class MarketSummary(BaseModel):
     closes_at: Optional[datetime] = None
     status: str  # "open", "resolved", "cancelled"
     claim_id: Optional[str] = None
-    category: Optional[str] = None  # politics, economy, security, rights, environment, mexico-us-relations, institutions
+    category: Optional[str] = None  # politics, economy, security, rights, environment, mexico-us-relations, institutions, sports, financial-markets, weather, social-incidents
 
     class Config:
         from_attributes = True
@@ -115,7 +125,7 @@ class CreateMarketRequest(BaseModel):
     description: Optional[str] = None
     claim_id: Optional[str] = None
     closes_at: Optional[datetime] = None
-    category: Optional[str] = None  # politics, economy, security, rights, environment, mexico-us-relations, institutions
+    category: Optional[str] = None  # politics, economy, security, rights, environment, mexico-us-relations, institutions, sports, financial-markets, weather, social-incidents
     resolution_criteria: Optional[str] = None  # Transparent resolution rules
 
 class ResolveMarketRequest(BaseModel):

@@ -103,11 +103,13 @@ class Claim(Base):
     status = Column(Enum(VerificationStatus), nullable=False)
     explanation = Column(Text)
     evidence_sources = Column(JSON)  # List of URLs
+    evidence_details = Column(JSON, nullable=True)  # Rich evidence data: [{url, snippet, timestamp, relevance_score}]
     
     # Enhanced verification fields
     confidence = Column(Float, nullable=True)  # Confidence score 0.0-1.0
     evidence_strength = Column(String, nullable=True)  # "strong|moderate|weak|insufficient"
     key_evidence_points = Column(JSON, nullable=True)  # Key evidence points
+    reading_level = Column(String, nullable=True, default="normal")  # "simple", "normal", "expert"
     needs_review = Column(Boolean, default=False)  # Flag for human review
     review_priority = Column(String, nullable=True)  # "high|medium|low"
     agent_findings = Column(JSON, nullable=True)  # Multi-agent analysis results
@@ -264,7 +266,7 @@ class Market(Base):
     # Link to claim (optional)
     claim_id = Column(String, ForeignKey('claims.id'), nullable=True, index=True)
     
-    # Category for filtering (politics, economy, security, rights, environment, mexico-us-relations, institutions)
+    # Category for filtering (politics, economy, security, rights, environment, mexico-us-relations, institutions, sports, financial-markets, weather, social-incidents)
     category = Column(String, nullable=True, index=True)
     
     # Creator tracking

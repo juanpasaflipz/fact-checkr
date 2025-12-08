@@ -137,7 +137,35 @@ class MarketIntelligenceAgent(BaseAgent):
             context_text = "\n".join(context_parts) if context_parts else "Sin contexto adicional disponible"
             
             # 4. Single focused LLM call (no multi-agent orchestration)
-            prompt = f"""Eres un analista político experto en México. Estima la probabilidad objetiva de que este mercado de predicción resuelva en SÍ.
+            # Determine category-specific expertise
+            category_expertise = {
+                "politics": "analista político experto en México",
+                "economy": "analista económico experto en México",
+                "security": "analista de seguridad experto en México",
+                "rights": "analista de derechos humanos experto en México",
+                "environment": "analista ambiental experto en México",
+                "mexico-us-relations": "analista de relaciones internacionales experto en México-EU",
+                "institutions": "analista institucional experto en México",
+                "sports": "analista deportivo experto en México",
+                "financial-markets": "analista financiero experto en mercados mexicanos",
+                "weather": "meteorólogo experto en clima de México",
+                "social-incidents": "analista social experto en eventos e incidentes en México"
+            }
+            expertise = category_expertise.get(market.category, "analista experto en México")
+            
+            # Category-specific data sources
+            data_sources = {
+                "politics": "INE, INEGI, datos electorales, tendencias políticas",
+                "economy": "Banxico, INEGI, datos económicos, indicadores financieros",
+                "security": "SESNSP, datos de seguridad, estadísticas criminales",
+                "sports": "resultados oficiales de ligas, estadísticas deportivas",
+                "financial-markets": "BMV, Banxico, datos de mercado, indicadores financieros",
+                "weather": "CONAGUA, datos meteorológicos oficiales, patrones climáticos",
+                "social-incidents": "reportes oficiales, noticias verificadas, datos de eventos"
+            }
+            sources = data_sources.get(market.category, "datos oficiales relevantes, tendencias actuales")
+            
+            prompt = f"""Eres un {expertise}. Estima la probabilidad objetiva de que este mercado de predicción resuelva en SÍ.
 
 MERCADO: "{market.question}"
 DESCRIPCIÓN: {market.description or "No disponible"}
@@ -147,10 +175,10 @@ CONTEXTO ADICIONAL:
 {context_text}
 
 INSTRUCCIONES:
-1. Basándote SOLO en conocimiento general sobre política mexicana, datos históricos, y tendencias actuales
+1. Basándote SOLO en conocimiento general sobre {market.category or "el tema"}, datos históricos, y tendencias actuales en México
 2. NO busques evidencia específica - solo estima probabilidad basada en contexto disponible
 3. Sé conservador: probabilidades extremas (0.2 o 0.8+) solo con alta confianza
-4. Considera: contexto político mexicano, datos oficiales típicos (INE, INEGI, Banxico, SESNSP), tendencias recientes
+4. Considera: contexto mexicano, {sources}, tendencias recientes
 5. Si el contexto es insuficiente, usa probabilidad moderada (0.4-0.6) con baja confianza
 
 RESPONDE EN JSON (solo este objeto, sin markdown, sin código):

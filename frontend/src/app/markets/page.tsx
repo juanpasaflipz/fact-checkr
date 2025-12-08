@@ -28,6 +28,10 @@ const CATEGORIES = [
   { id: 'environment', label: 'Medio Ambiente', icon: 'Leaf' },
   { id: 'mexico-us-relations', label: 'México-EU', icon: 'Globe' },
   { id: 'institutions', label: 'Instituciones', icon: 'Building' },
+  { id: 'sports', label: 'Deportes', icon: 'Trophy' },
+  { id: 'financial-markets', label: 'Mercados Financieros', icon: 'DollarSign' },
+  { id: 'weather', label: 'Clima', icon: 'Cloud' },
+  { id: 'social-incidents', label: 'Incidentes Sociales', icon: 'AlertCircle' },
 ] as const;
 
 export default function MarketsPage() {

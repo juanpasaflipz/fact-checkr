@@ -1,7 +1,18 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { addToHistory } from '@/lib/claimHistory';
+import { getApiBaseUrl } from '@/lib/api-config';
 
 type VerificationStatus = "Verified" | "Debunked" | "Misleading" | "Unverified";
+
+interface EvidenceDetail {
+  url: string;
+  snippet?: string;
+  timestamp?: string | null;
+  relevance_score?: number | null;
+  title?: string | null;
+  domain?: string | null;
+}
 
 interface ClaimProps {
   claim: {
@@ -12,6 +23,7 @@ interface ClaimProps {
       status: VerificationStatus;
       explanation: string;
       sources: string[];
+      evidence_details?: EvidenceDetail[];
     } | null;
     source_post: {
       platform: string;
@@ -69,6 +81,64 @@ export default function ClaimCard({ claim }: ClaimProps) {
   const status = claim.verification?.status || "Unverified";
   const config = statusConfig[status];
   const StatusIcon = config.icon;
+  const [sharing, setSharing] = useState(false);
+  const [shareSuccess, setShareSuccess] = useState(false);
+  const [readingLevel, setReadingLevel] = useState<'simple' | 'normal' | 'expert'>(() => {
+    if (typeof window !== 'undefined') {
+      return (localStorage.getItem('reading_level') as 'simple' | 'normal' | 'expert') || 'normal';
+    }
+    return 'normal';
+  });
+
+  // Add claim to history when component mounts (when claim is viewed)
+  useEffect(() => {
+    addToHistory({
+      id: claim.id,
+      claim_text: claim.claim_text,
+      verification: claim.verification,
+    });
+  }, [claim.id, claim.claim_text, claim.verification]);
+
+  const handleShare = async (type: 'tweet' | 'image') => {
+    if (type === 'tweet') {
+      setSharing(true);
+      try {
+        const baseUrl = getApiBaseUrl();
+        const response = await fetch(`${baseUrl}/api/share/claim/${claim.id}`, {
+          headers: { 'Accept': 'application/json' }
+        });
+        
+        if (response.ok) {
+          const data = await response.json();
+          
+          // Copy to clipboard
+          if (navigator.clipboard) {
+            await navigator.clipboard.writeText(data.tweet_text);
+            setShareSuccess(true);
+            setTimeout(() => setShareSuccess(false), 2000);
+          } else {
+            // Fallback for older browsers
+            const textArea = document.createElement('textarea');
+            textArea.value = data.tweet_text;
+            document.body.appendChild(textArea);
+            textArea.select();
+            document.execCommand('copy');
+            document.body.removeChild(textArea);
+            setShareSuccess(true);
+            setTimeout(() => setShareSuccess(false), 2000);
+          }
+        }
+      } catch (error) {
+        console.error('Error sharing:', error);
+      } finally {
+        setSharing(false);
+      }
+    } else if (type === 'image') {
+      // For image sharing, we'll create a simple canvas-based image
+      // This is a simplified version - in production you'd want server-side image generation
+      alert('Compartir como imagen próximamente. Por ahora usa "Copiar para Tweet".');
+    }
+  };
 
   return (
     <article className={`
@@ -130,43 +200,129 @@ export default function ClaimCard({ claim }: ClaimProps) {
       {claim.verification && (
         <>
           <div className="mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200">
-            <p className="text-xs text-gray-600 mb-3 font-semibold uppercase tracking-wide">ANÁLISIS DE FACTCHECKR</p>
+            <div className="flex items-center justify-between mb-3">
+              <p className="text-xs text-gray-600 font-semibold uppercase tracking-wide">ANÁLISIS DE FACTCHECKR</p>
+              <div className="flex items-center gap-2">
+                <label htmlFor={`reading-level-${claim.id}`} className="text-xs text-gray-600">
+                  Nivel:
+                </label>
+                <select
+                  id={`reading-level-${claim.id}`}
+                  value={readingLevel}
+                  onChange={(e) => {
+                    const newLevel = e.target.value as 'simple' | 'normal' | 'expert';
+                    setReadingLevel(newLevel);
+                    if (typeof window !== 'undefined') {
+                      localStorage.setItem('reading_level', newLevel);
+                    }
+                  }}
+                  className="text-xs px-2 py-1 bg-white border border-gray-300 rounded text-gray-700 focus:outline-none focus:ring-1 focus:ring-gray-900"
+                >
+                  <option value="simple">Simple (ELI12)</option>
+                  <option value="normal">Normal (ELI18)</option>
+                  <option value="expert">Experto</option>
+                </select>
+              </div>
+            </div>
             <p className="text-sm text-gray-700 leading-relaxed">{claim.verification.explanation}</p>
+            {readingLevel !== 'normal' && (
+              <p className="text-xs text-gray-500 mt-2 italic">
+                {readingLevel === 'simple' 
+                  ? 'Nota: La explicación se mostrará en nivel simple próximamente.'
+                  : 'Nota: La explicación experta estará disponible próximamente.'}
+              </p>
+            )}
           </div>
 
-          {/* Sources */}
+          {/* Sources - Enhanced with evidence_details if available */}
           {claim.verification.sources.length > 0 && (
-            <div className="flex flex-wrap items-center gap-2.5">
-              <span className="text-xs text-gray-600 font-semibold">Fuentes:</span>
-              {claim.verification.sources.map((source, index) => {
-                try {
-                  const hostname = new URL(source).hostname.replace('www.', '');
-                  return (
-                    <a
-                      key={index}
-                      href={source}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="
-                        inline-flex items-center gap-1.5 px-3 py-1.5 
-                        text-xs text-gray-700 
-                        bg-gray-50 
-                        hover:bg-gray-100
-                        rounded-lg transition-colors duration-200 
-                        border border-gray-200 
-                        font-medium
-                      "
-                    >
-                      <svg className="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                      </svg>
-                      {hostname}
-                    </a>
-                  );
-                } catch (e) {
-                  return null;
-                }
-              })}
+            <div className="mt-4">
+              <p className="text-xs text-gray-600 mb-3 font-semibold uppercase tracking-wide">FUENTES</p>
+              <div className="space-y-3">
+                {claim.verification.evidence_details && claim.verification.evidence_details.length > 0 ? (
+                  // Rich evidence details with snippets
+                  claim.verification.evidence_details.map((evidence, index) => {
+                    const hostname = evidence.domain || (() => {
+                      try {
+                        return new URL(evidence.url).hostname.replace('www.', '');
+                      } catch {
+                        return evidence.url;
+                      }
+                    })();
+                    
+                    return (
+                      <div
+                        key={index}
+                        className="bg-gray-50 rounded-lg p-3 border border-gray-200 hover:border-gray-300 transition-colors"
+                      >
+                        <div className="flex items-start justify-between gap-2 mb-2">
+                          <a
+                            href={evidence.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex items-center gap-2 text-sm font-semibold text-gray-900 hover:text-blue-600 transition-colors flex-1 min-w-0"
+                          >
+                            <svg className="size-4 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                            </svg>
+                            <span className="truncate">{evidence.title || hostname}</span>
+                          </a>
+                          {evidence.relevance_score !== null && evidence.relevance_score !== undefined && (
+                            <span className="text-xs text-gray-500 flex-shrink-0">
+                              {(evidence.relevance_score * 100).toFixed(0)}% relevante
+                            </span>
+                          )}
+                        </div>
+                        {evidence.snippet && (
+                          <p className="text-xs text-gray-600 leading-relaxed line-clamp-2 mb-2">
+                            {evidence.snippet}
+                          </p>
+                        )}
+                        <div className="flex items-center gap-2 text-xs text-gray-500">
+                          <span className="truncate">{hostname}</span>
+                          {evidence.timestamp && (
+                            <>
+                              <span>•</span>
+                              <span>{new Date(evidence.timestamp).toLocaleDateString('es-MX')}</span>
+                            </>
+                          )}
+                        </div>
+                      </div>
+                    );
+                  })
+                ) : (
+                  // Fallback to simple source links
+                  claim.verification.sources.map((source, index) => {
+                    try {
+                      const hostname = new URL(source).hostname.replace('www.', '');
+                      return (
+                        <a
+                          key={index}
+                          href={source}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="
+                            inline-flex items-center gap-1.5 px-3 py-1.5 
+                            text-xs text-gray-700 
+                            bg-gray-50 
+                            hover:bg-gray-100
+                            rounded-lg transition-colors duration-200 
+                            border border-gray-200 
+                            font-medium
+                          "
+                        >
+                          <svg className="size-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                          </svg>
+                          {hostname}
+                        </a>
+                      );
+                    } catch (e) {
+                      return null;
+                    }
+                  })
+                )}
+              </div>
             </div>
           )}
         </>

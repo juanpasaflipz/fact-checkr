@@ -136,7 +136,7 @@ def create_default_user_balance(db: Session, user_id: int) -> UserBalance:
 # Tier limits configuration
 TIER_LIMITS = {
     SubscriptionTier.FREE: {
-        "verifications_per_month": 10,
+        "verifications_per_day": 10,  # Changed from verifications_per_month to daily limit
         "api_calls_per_day": 100,
         "search_queries_per_day": 50,
         "exports_per_month": 0,

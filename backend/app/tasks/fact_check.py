@@ -3,7 +3,7 @@ import os
 from celery import shared_task
 from app.database import SessionLocal, Source, Claim, VerificationStatus
 from app.agent import FactChecker
-from app.models import VerificationResult
+from app.models import VerificationResult, EvidenceDetail
 from app.services.rag_pipeline import RAGPipeline
 import logging
 import json
@@ -61,11 +61,49 @@ async def verify_source(source_id: str):
         # 4. Get evidence with actual content
         evidence_urls = context.get("evidence_urls", [])
         evidence_texts = context.get("evidence_texts", [])
+        web_evidence = context.get("web_evidence", [])  # Contains title, snippet, domain info
         
         # If no evidence texts, try to fetch them
         if not evidence_texts and evidence_urls:
             logger.info(f"Fetching content from {len(evidence_urls)} evidence URLs...")
             evidence_texts = await rag._fetch_evidence_content(evidence_urls[:5])
+        
+        # Build evidence_details with snippets
+        evidence_details = []
+        for i, url in enumerate(evidence_urls[:5]):  # Limit to top 5
+            snippet = ""
+            title = ""
+            domain = ""
+            
+            # Try to get snippet from web_evidence first (has title/snippet from search)
+            for evidence in web_evidence:
+                if evidence.get("url") == url:
+                    snippet = evidence.get("snippet", "")[:200]
+                    title = evidence.get("title", "")
+                    domain = evidence.get("domain", "")
+                    break
+            
+            # If no snippet from search, extract from fetched content
+            if not snippet and i < len(evidence_texts) and evidence_texts[i]:
+                snippet = evidence_texts[i][:200]
+            
+            # Extract domain if not found
+            if not domain:
+                try:
+                    from urllib.parse import urlparse
+                    parsed = urlparse(url)
+                    domain = parsed.netloc.lower().replace("www.", "")
+                except:
+                    domain = ""
+            
+            evidence_details.append({
+                "url": url,
+                "snippet": snippet,
+                "timestamp": None,  # Could be extracted from page if available
+                "relevance_score": 1.0 - (i * 0.1),  # Higher relevance for earlier results
+                "title": title,
+                "domain": domain
+            })
         
         # 5. Verify with enhanced context and evidence content
         # Option: Use multi-agent system for higher accuracy (can be toggled)
@@ -96,10 +134,18 @@ async def verify_source(source_id: str):
             else:
                 verdict_status = VerificationStatus.UNVERIFIED
             
+            # Convert evidence_details dicts to EvidenceDetail objects
+            evidence_details_objects = None
+            if evidence_details:
+                evidence_details_objects = [
+                    EvidenceDetail(**ed) for ed in evidence_details
+                ]
+            
             verification = VerificationResult(
                 status=verdict_status,
                 explanation=final_verdict.get("explanation", "No se pudo verificar."),
                 sources=evidence_urls,
+                evidence_details=evidence_details_objects,
                 confidence=final_verdict.get("confidence", 0.5),
                 evidence_strength="strong" if final_verdict.get("confidence", 0.5) > 0.7 else "moderate" if final_verdict.get("confidence", 0.5) > 0.5 else "weak",
                 key_evidence_points=final_verdict.get("key_evidence", [])
@@ -115,6 +161,9 @@ async def verify_source(source_id: str):
                 evidence_texts,
                 context
             )
+            # Add evidence_details to verification result
+            if evidence_details:
+                verification.evidence_details = [EvidenceDetail(**ed) for ed in evidence_details]
             agent_findings = None
         
         # 4. Extract Entities
@@ -139,6 +188,21 @@ async def verify_source(source_id: str):
         elif verification.confidence < 0.6:
             review_priority = "medium"
         
+        # Convert evidence_details to JSON format for storage
+        evidence_details_json = None
+        if verification.evidence_details:
+            evidence_details_json = [
+                {
+                    "url": ed.url,
+                    "snippet": ed.snippet,
+                    "timestamp": ed.timestamp,
+                    "relevance_score": ed.relevance_score,
+                    "title": ed.title,
+                    "domain": ed.domain
+                }
+                for ed in verification.evidence_details
+            ]
+        
         claim = Claim(
             id=f"claim_{source.id}",
             source_id=source.id,
@@ -147,6 +211,7 @@ async def verify_source(source_id: str):
             status=VerificationStatus(verification.status),
             explanation=verification.explanation,
             evidence_sources=verification.sources,
+            evidence_details=evidence_details_json,
             confidence=verification.confidence,
             evidence_strength=verification.evidence_strength,
             key_evidence_points=verification.key_evidence_points,
