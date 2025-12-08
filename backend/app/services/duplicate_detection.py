@@ -6,7 +6,7 @@ across different social media platforms.
 """
 
 import re
-from typing import List, Dict, Set, Tuple
+from typing import List, Dict, Set, Tuple, Optional
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
 from app.database.models import Source
