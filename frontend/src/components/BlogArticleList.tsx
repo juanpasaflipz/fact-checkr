@@ -71,8 +71,9 @@ export default function BlogArticleList({
             <Link
               key={article.id}
               href={`/blog/${article.slug}`}
-              className="block p-6 bg-[#111118] border-2 border-[#00f0ff]/30 rounded-lg hover:border-[#00f0ff] transition-all hover:scale-105"
+              className="group block p-6 bg-[#111118] border-2 border-[#00f0ff]/30 rounded-lg hover:border-[#00f0ff] transition-all hover:scale-105 cursor-pointer no-underline"
               style={{ boxShadow: '0 0 15px rgba(0, 240, 255, 0.1)' }}
+              prefetch={true}
             >
               <div className="mb-2">
                 <span className="text-xs text-[#00f0ff] font-semibold uppercase">
@@ -88,9 +89,14 @@ export default function BlogArticleList({
                   {article.excerpt}
                 </p>
               )}
-              <time className="text-xs text-gray-500">
-                {formatDate(article.published_at || article.created_at)}
-              </time>
+              <div className="flex items-center justify-between mt-4">
+                <time className="text-xs text-gray-500">
+                  {formatDate(article.published_at || article.created_at)}
+                </time>
+                <span className="text-xs text-[#00f0ff] opacity-0 group-hover:opacity-100 transition-opacity">
+                  Leer más →
+                </span>
+              </div>
             </Link>
           ))}
         </div>
