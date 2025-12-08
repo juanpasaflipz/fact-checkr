@@ -39,11 +39,33 @@ else
 fi
 
 echo ""
+echo "Testing Python import..."
+echo ""
+
+# Test if main.py can be imported (catch errors early)
+python -c "
+import sys
+import traceback
+try:
+    print('Testing main.py import...')
+    import main
+    print('✅ main.py imported successfully')
+    print(f'✅ FastAPI app: {main.app}')
+except Exception as e:
+    print(f'❌ Failed to import main.py: {e}')
+    traceback.print_exc()
+    sys.exit(1)
+" || {
+    echo "ERROR: Failed to import main.py - cannot start server"
+    exit 1
+}
+
+echo ""
 echo "Starting Gunicorn..."
 echo ""
 
 # Start Gunicorn (foreground process for Railway)
-echo "Starting Gunicorn server..."
+echo "Starting Gunicorn server on 0.0.0.0:${PORT}..."
 exec gunicorn main:app \
     --workers 1 \
     --worker-class uvicorn.workers.UvicornWorker \
@@ -52,4 +74,5 @@ exec gunicorn main:app \
     --access-logfile - \
     --error-logfile - \
     --log-level info \
-    --capture-output
+    --capture-output \
+    --preload
