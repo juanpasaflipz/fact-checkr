@@ -85,8 +85,17 @@ echo "Starting Gunicorn server..."
 echo "Binding to: 0.0.0.0:${PORT}"
 echo "=========================================="
 
+# Verify gunicorn is available
+if ! command -v gunicorn >/dev/null 2>&1; then
+    error_exit "Gunicorn not found - cannot start server"
+fi
+
+echo "✅ Gunicorn found: $(which gunicorn)"
+echo "✅ Starting server on 0.0.0.0:${PORT}"
+
 # Use exec to replace shell process (important for Railway)
 # This ensures Railway can properly monitor the process
+# Remove --preload to avoid issues with lazy database connections
 exec gunicorn main:app \
     --workers 1 \
     --worker-class uvicorn.workers.UvicornWorker \
@@ -96,4 +105,5 @@ exec gunicorn main:app \
     --error-logfile - \
     --log-level info \
     --capture-output \
-    --preload
+    --graceful-timeout 30 \
+    --keep-alive 5

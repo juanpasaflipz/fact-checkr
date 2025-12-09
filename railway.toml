@@ -4,5 +4,9 @@ dockerfilePath = "backend/Dockerfile"
 
 [deploy]
 service = "backend"
-startCommand = "sh /app/start.sh"
+startCommand = "sh /app/scripts/start.sh"
+healthcheckPath = "/health"
+healthcheckTimeout = 300
+restartPolicyType = "ON_FAILURE"
+restartPolicyMaxRetries = 10
 
