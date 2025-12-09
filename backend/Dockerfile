@@ -21,13 +21,12 @@ COPY . .
 RUN mkdir -p logs
 
 # Make startup script executable
-COPY scripts/start.sh /app/start.sh
-RUN chmod +x /app/start.sh
+RUN chmod +x /app/scripts/start.sh
 
 # Railway handles port mapping automatically - no EXPOSE needed
 # Railway sets $PORT environment variable at runtime
 
 # Default: run with startup script
 # The script handles migrations, logging, and gunicorn startup
-CMD ["sh", "/app/start.sh"]
+CMD ["sh", "/app/scripts/start.sh"]
 

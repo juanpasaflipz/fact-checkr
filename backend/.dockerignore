@@ -38,6 +38,8 @@ celerybeat-schedule*
 
 # Scripts (keep only what's needed)
 *.sh
-!start_workers.sh
-!start.sh
+!scripts/start.sh
+!scripts/start_workers.sh
+!scripts/start-worker.sh
+!scripts/start-beat.sh
 
