@@ -23,6 +23,10 @@ RUN mkdir -p logs
 # Make startup script executable
 RUN chmod +x /app/scripts/start.sh
 
+# Create symlink at /app/start.sh for backwards compatibility with Railway
+# (Railway service settings may override to /app/start.sh)
+RUN ln -sf /app/scripts/start.sh /app/start.sh
+
 # Railway handles port mapping automatically - no EXPOSE needed
 # Railway sets $PORT environment variable at runtime
 
