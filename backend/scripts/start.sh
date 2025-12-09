@@ -19,6 +19,7 @@ echo "=========================================="
 
 # Unbuffer Python output
 export PYTHONUNBUFFERED=1
+export PYTHONDONTWRITEBYTECODE=1
 
 # Get port (Railway sets this automatically)
 PORT=${PORT:-8000}
@@ -62,11 +63,20 @@ echo "Testing Python import of main.py..."
 if ! python -c "
 import sys
 import traceback
+import os
+# Set minimal env for testing
+os.environ.setdefault('DATABASE_URL', 'postgresql://localhost/test')
 try:
     print('Testing main.py import...')
     import main
     print('✅ main.py imported successfully')
     print(f'✅ FastAPI app: {main.app}')
+    # Test that health endpoint exists
+    routes = [route.path for route in main.app.routes]
+    if '/health' in routes:
+        print('✅ /health endpoint registered')
+    else:
+        print(f'⚠️ /health not found in routes: {routes}')
 except Exception as e:
     print(f'❌ Failed to import main.py: {e}')
     traceback.print_exc()
@@ -74,6 +84,10 @@ except Exception as e:
 "; then
     error_exit "Failed to import main.py - cannot start server"
 fi
+
+echo ""
+echo "✅ All startup checks passed"
+echo ""
 
 echo ""
 echo "Starting Gunicorn..."
@@ -85,25 +99,45 @@ echo "Starting Gunicorn server..."
 echo "Binding to: 0.0.0.0:${PORT}"
 echo "=========================================="
 
-# Verify gunicorn is available
-if ! command -v gunicorn >/dev/null 2>&1; then
-    error_exit "Gunicorn not found - cannot start server"
+# Try uvicorn first (simpler, better for Railway), fallback to gunicorn
+if command -v uvicorn >/dev/null 2>&1; then
+    echo "✅ Using uvicorn (found at: $(which uvicorn))"
+    echo "✅ Starting server on 0.0.0.0:${PORT}"
+    echo "✅ Server will be available at http://0.0.0.0:${PORT}/health"
+    # Use uvicorn directly - simpler and works better with Railway
+    # Don't use --no-access-log so we can see requests in logs
+    # Try uvloop if available, otherwise use default
+    if python -c "import uvloop" 2>/dev/null; then
+        echo "✅ Using uvloop for better performance"
+        exec uvicorn main:app \
+            --host 0.0.0.0 \
+            --port "${PORT}" \
+            --log-level info \
+            --timeout-keep-alive 5 \
+            --loop uvloop
+    else
+        echo "⚠️ uvloop not available, using default event loop"
+        exec uvicorn main:app \
+            --host 0.0.0.0 \
+            --port "${PORT}" \
+            --log-level info \
+            --timeout-keep-alive 5
+    fi
+elif command -v gunicorn >/dev/null 2>&1; then
+    echo "✅ Using gunicorn (found at: $(which gunicorn))"
+    echo "✅ Starting server on 0.0.0.0:${PORT}"
+    # Fallback to gunicorn if uvicorn not available
+    exec gunicorn main:app \
+        --workers 1 \
+        --worker-class uvicorn.workers.UvicornWorker \
+        --bind "0.0.0.0:${PORT}" \
+        --timeout 120 \
+        --access-logfile - \
+        --error-logfile - \
+        --log-level info \
+        --capture-output \
+        --graceful-timeout 30 \
+        --keep-alive 5
+else
+    error_exit "Neither uvicorn nor gunicorn found - cannot start server"
 fi
-
-echo "✅ Gunicorn found: $(which gunicorn)"
-echo "✅ Starting server on 0.0.0.0:${PORT}"
-
-# Use exec to replace shell process (important for Railway)
-# This ensures Railway can properly monitor the process
-# Remove --preload to avoid issues with lazy database connections
-exec gunicorn main:app \
-    --workers 1 \
-    --worker-class uvicorn.workers.UvicornWorker \
-    --bind "0.0.0.0:${PORT}" \
-    --timeout 120 \
-    --access-logfile - \
-    --error-logfile - \
-    --log-level info \
-    --capture-output \
-    --graceful-timeout 30 \
-    --keep-alive 5
