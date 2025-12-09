@@ -102,32 +102,35 @@ def upgrade() -> None:
     
     # Add question_embedding column to markets table for similarity search
     # Check if pgvector is available and add vector column
-    conn = op.get_bind()
-    try:
-        # Check if vector extension exists
-        result = conn.execute(sa.text("SELECT 1 FROM pg_extension WHERE extname = 'vector'")).fetchone()
-        if result:
-            op.add_column('markets', sa.Column('question_embedding', sa.LargeBinary(), nullable=True))
-            # Use raw SQL to set the type since alembic doesn't support vector natively
-            op.execute("ALTER TABLE markets ALTER COLUMN question_embedding TYPE vector(1536) USING question_embedding::vector(1536)")
-    except Exception:
-        # pgvector not available, skip vector column
-        pass
+    # Note: This is commented out in the model, so we'll skip it for now
+    # If needed later, uncomment and ensure pgvector extension is installed
+    # conn = op.get_bind()
+    # try:
+    #     # Check if vector extension exists
+    #     result = conn.execute(sa.text("SELECT 1 FROM pg_extension WHERE extname = 'vector'")).fetchone()
+    #     if result:
+    #         op.add_column('markets', sa.Column('question_embedding', sa.LargeBinary(), nullable=True))
+    #         # Use raw SQL to set the type since alembic doesn't support vector natively
+    #         op.execute("ALTER TABLE markets ALTER COLUMN question_embedding TYPE vector(1536) USING question_embedding::vector(1536)")
+    # except Exception:
+    #     # pgvector not available, skip vector column
+    #     pass
 
 
 def downgrade() -> None:
     """Remove market intelligence tables."""
     
     # Drop question_embedding from markets if it exists
-    conn = op.get_bind()
-    exists = conn.execute(
-        sa.text(
-            "SELECT 1 FROM information_schema.columns "
-            "WHERE table_name='markets' AND column_name='question_embedding'"
-        )
-    ).fetchone()
-    if exists:
-        op.drop_column('markets', 'question_embedding')
+    # Note: Commented out since we're not adding it in upgrade
+    # conn = op.get_bind()
+    # exists = conn.execute(
+    #     sa.text(
+    #         "SELECT 1 FROM information_schema.columns "
+    #         "WHERE table_name='markets' AND column_name='question_embedding'"
+    #     )
+    # ).fetchone()
+    # if exists:
+    #     op.drop_column('markets', 'question_embedding')
     
     # Drop tables
     op.drop_index('idx_mv_user', table_name='market_votes')
