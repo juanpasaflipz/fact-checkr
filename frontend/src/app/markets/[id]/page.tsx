@@ -4,6 +4,8 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 import Header from '@/components/Header';
+import PredictionExplanation from '@/components/markets/PredictionExplanation';
+import SentimentTimeline from '@/components/markets/SentimentTimeline';
 import { getApiBaseUrl } from '@/lib/api-config';
 
 interface MarketDetail {
@@ -47,6 +49,9 @@ export default function MarketDetailPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [previewShares, setPreviewShares] = useState<number | null>(null);
   const [previewPrice, setPreviewPrice] = useState<number | null>(null);
+  const [predictionData, setPredictionData] = useState<any>(null);
+  const [intelligenceData, setIntelligenceData] = useState<any>(null);
+  const [loadingIntelligence, setLoadingIntelligence] = useState(true);
 
   // Get auth token from localStorage
   const getAuthToken = () => {
@@ -107,9 +112,42 @@ export default function MarketDetailPage() {
     }
   };
 
+  const fetchIntelligence = async () => {
+    setLoadingIntelligence(true);
+    try {
+      const baseUrl = getApiBaseUrl();
+      
+      // Fetch prediction factors
+      const predictionResponse = await fetch(`${baseUrl}/api/markets/${marketId}/prediction`, {
+        headers: { 'Accept': 'application/json' }
+      });
+      
+      if (predictionResponse.ok) {
+        const prediction = await predictionResponse.json();
+        setPredictionData(prediction);
+      }
+      
+      // Fetch full intelligence data (includes sentiment and news)
+      const intelligenceResponse = await fetch(`${baseUrl}/api/markets/${marketId}/intelligence`, {
+        headers: { 'Accept': 'application/json' }
+      });
+      
+      if (intelligenceResponse.ok) {
+        const intelligence = await intelligenceResponse.json();
+        setIntelligenceData(intelligence);
+      }
+    } catch (error) {
+      console.error('Error fetching intelligence data:', error);
+      // Don't show error to user, just log it - intelligence is optional
+    } finally {
+      setLoadingIntelligence(false);
+    }
+  };
+
   useEffect(() => {
     fetchMarket();
     fetchBalance();
+    fetchIntelligence();
   }, [marketId]);
 
   const handleTrade = async () => {
@@ -523,6 +561,34 @@ export default function MarketDetailPage() {
                   </button>
                 </div>
               )}
+            </div>
+
+            {/* AI Intelligence Section */}
+            <div className="space-y-6">
+              {/* Prediction Explanation */}
+              <PredictionExplanation 
+                prediction={predictionData ? {
+                  raw_probability: predictionData.raw_probability,
+                  calibrated_probability: predictionData.calibrated_probability,
+                  confidence: predictionData.confidence,
+                  probability_low: predictionData.probability_low || predictionData.calibrated_probability - 0.1,
+                  probability_high: predictionData.probability_high || predictionData.calibrated_probability + 0.1,
+                  key_factors: predictionData.key_factors || [],
+                  risk_factors: predictionData.risk_factors || [],
+                  reasoning_chain: predictionData.reasoning_chain,
+                  summary: predictionData.summary,
+                  data_freshness_hours: predictionData.data_freshness_hours || 24,
+                  analysis_tier: predictionData.analysis_tier || 2
+                } : null}
+                loading={loadingIntelligence}
+              />
+
+              {/* Sentiment Timeline */}
+              <SentimentTimeline 
+                sentiment={intelligenceData?.sentiment_data || null}
+                news={intelligenceData?.news_data || null}
+                loading={loadingIntelligence}
+              />
             </div>
           </div>
         </main>

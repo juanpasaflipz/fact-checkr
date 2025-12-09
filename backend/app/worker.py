@@ -108,6 +108,22 @@ celery_app.conf.update(
             "task": "app.tasks.market_intelligence.reassess_inactive_markets",
             "schedule": 3600.0,  # Every hour
         },
+        # Tier 1: Lightweight update every 2 hours (no LLM, just sentiment/news tracking)
+        "tier1-lightweight-update": {
+            "task": "app.tasks.market_intelligence.tier1_lightweight_update",
+            "schedule": 7200.0,  # Every 2 hours
+            "options": {
+                "expires": 10800,  # Expires after 3 hours
+            }
+        },
+        # Tier 2: Daily full analysis for all open markets
+        "tier2-daily-analysis": {
+            "task": "app.tasks.market_intelligence.tier2_daily_analysis",
+            "schedule": crontab(hour=2, minute=0),  # Daily at 2 AM
+            "options": {
+                "expires": 86400,  # Expires after 24 hours
+            }
+        },
         # Trending topic detection: Every 2 hours
         "detect-trending-topics": {
             "task": "app.tasks.scraper.detect_and_prioritize_topics",

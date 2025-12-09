@@ -221,6 +221,61 @@ async def get_market_intelligence(
         for m in similar
     ]
     
+    # Get sentiment and news data from prediction factors or fetch fresh
+    sentiment_data = None
+    news_data = None
+    
+    if pred_record and pred_record.data_sources:
+        # Extract sentiment and news from data_sources if available
+        data_sources = pred_record.data_sources
+        if isinstance(data_sources, dict):
+            sentiment_data = data_sources.get("sentiment")
+            news_data = data_sources.get("news")
+    
+    # Only fetch fresh data if we're missing specific pieces, not everything
+    if not sentiment_data or not news_data:
+        try:
+            # Get current probability
+            total_liquidity = market.yes_liquidity + market.no_liquidity
+            current_prob = market.yes_liquidity / total_liquidity if total_liquidity > 0 else 0.5
+            
+            # Fetch fresh data using await (we're already in an async context)
+            aggregator = DataAggregator(db)
+            data_bundle = await aggregator.get_market_data(
+                market_id=market.id,
+                market_question=market.question,
+                market_category=market.category,
+                current_probability=current_prob,
+                include_similar=False
+            )
+            
+            # Only extract missing data, preserve cached data
+            if not sentiment_data and hasattr(data_bundle, 'sentiment') and data_bundle.sentiment:
+                sentiment_data = {
+                    "posts_analyzed": getattr(data_bundle.sentiment, 'posts_analyzed', 0),
+                    "weighted_sentiment": getattr(data_bundle.sentiment, 'weighted_sentiment', 0.0),
+                    "raw_sentiment": getattr(data_bundle.sentiment, 'raw_sentiment', 0.0),
+                    "sentiment_confidence": getattr(data_bundle.sentiment, 'sentiment_confidence', 0.0),
+                    "momentum": getattr(data_bundle.sentiment, 'momentum', 0.0),
+                    "volume_trend": getattr(data_bundle.sentiment, 'volume_trend', 0.0),
+                    "platform_breakdown": getattr(data_bundle.sentiment, 'platform_breakdown', {}),
+                    "freshness_hours": getattr(data_bundle.sentiment, 'freshness_hours', 24.0),
+                    "bot_filtered_count": getattr(data_bundle.sentiment, 'bot_filtered_count', 0)
+                }
+            
+            if not news_data and hasattr(data_bundle, 'news') and data_bundle.news:
+                news_data = {
+                    "volume": getattr(data_bundle.news, 'volume', 0),
+                    "overall_signal": getattr(data_bundle.news, 'overall_signal', 0.0),
+                    "credibility_weighted_signal": getattr(data_bundle.news, 'credibility_weighted_signal', 0.0),
+                    "freshness_hours": getattr(data_bundle.news, 'freshness_hours', 24.0)
+                }
+        except Exception as e:
+            # Log error but don't fail the request
+            import logging
+            logger = logging.getLogger(__name__)
+            logger.warning(f"Error fetching fresh sentiment/news data for market {market_id}: {e}")
+    
     # Calculate data quality
     data_quality = 0.0
     if prediction:
@@ -229,12 +284,16 @@ async def get_market_intelligence(
             data_quality += 0.2
     if similar_markets:
         data_quality += 0.2
+    if sentiment_data:
+        data_quality += 0.1
+    if news_data:
+        data_quality += 0.1
     
     return MarketIntelligenceResponse(
         prediction=prediction,
         similar_markets=similar_markets,
-        sentiment_data=None,  # Would be populated from cached data
-        news_data=None,  # Would be populated from cached data
+        sentiment_data=sentiment_data,
+        news_data=news_data,
         data_quality_score=data_quality
     )
 

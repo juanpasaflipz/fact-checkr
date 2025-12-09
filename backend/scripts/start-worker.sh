@@ -87,7 +87,9 @@ PY
 echo "Starting Celery worker..."
 
 # Run Celery worker
-exec celery -A app.worker.celery_app worker \
+# Note: Use app.worker:celery_app because the instance is explicitly named 'celery_app' in worker.py
+# Celery's -A flag format: module:attribute (colon separates module from attribute name)
+exec celery -A app.worker:celery_app worker \
     --loglevel=info \
     --concurrency=2 \
     --max-tasks-per-child=50 \

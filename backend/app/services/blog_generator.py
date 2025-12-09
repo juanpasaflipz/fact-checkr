@@ -49,11 +49,13 @@ class BlogArticleGenerator:
             "trending_topics": [{"name": t.topic_name, "score": t.final_priority_score} for t in trending_topics],
             "top_debunked": self._format_claims_for_context(top_debunked)
         }
-        data_context["context_enrichment"] = self._build_context_enrichment(
+        # Merge enrichment directly into data_context for UI access
+        enrichment = self._build_context_enrichment(
             claims=claims,
             topics=None,
             deep_topic=None
         )
+        data_context.update(enrichment)
         
         # Generate content
         content = await self._generate_article_content(
@@ -100,11 +102,13 @@ class BlogArticleGenerator:
             "platform_distribution": platform_dist,
             "deep_dive_topic": deep_dive_topic
         }
-        data_context["context_enrichment"] = self._build_context_enrichment(
+        # Merge enrichment directly into data_context for UI access
+        enrichment = self._build_context_enrichment(
             claims=claims,
             topics=topic_dist,
             deep_topic=deep_dive_topic
         )
+        data_context.update(enrichment)
         
         content = await self._generate_article_content(
             article_type="afternoon",
@@ -137,11 +141,13 @@ class BlogArticleGenerator:
             "top_viral": self._format_claims_for_context(top_viral),
             "verification_stats": verification_stats
         }
-        data_context["context_enrichment"] = self._build_context_enrichment(
+        # Merge enrichment directly into data_context for UI access
+        enrichment = self._build_context_enrichment(
             claims=claims,
             topics=None,
             deep_topic=None
         )
+        data_context.update(enrichment)
         
         content = await self._generate_article_content(
             article_type="evening",
@@ -171,11 +177,13 @@ class BlogArticleGenerator:
             "claims_count": len(claims),
             "breaking_claims": self._format_claims_for_context(claims)
         }
-        data_context["context_enrichment"] = self._build_context_enrichment(
+        # Merge enrichment directly into data_context for UI access
+        enrichment = self._build_context_enrichment(
             claims=claims,
             topics=None,
             deep_topic=None
         )
+        data_context.update(enrichment)
         
         content = await self._generate_article_content(
             article_type="breaking",

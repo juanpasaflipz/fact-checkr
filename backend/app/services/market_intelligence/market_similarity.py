@@ -82,6 +82,21 @@ class MarketSimilarityEngine:
             logger.error(f"Error finding similar markets: {e}")
             return []
     
+    def _has_embedding_column(self) -> bool:
+        """Check if the question_embedding column exists in the markets table."""
+        try:
+            result = self.db.execute(
+                text("""
+                    SELECT column_name
+                    FROM information_schema.columns
+                    WHERE table_name = 'markets'
+                      AND column_name = 'question_embedding'
+                """)
+            ).fetchone()
+            return result is not None
+        except Exception:
+            return False
+    
     def _vector_similarity_search(
         self,
         query_embedding: List[float],
@@ -93,7 +108,13 @@ class MarketSimilarityEngine:
         Search using pgvector similarity.
         
         Requires markets to have embeddings stored in a question_embedding column.
+        Falls back gracefully if the column doesn't exist.
         """
+        # Check if the column exists before attempting vector search
+        if not self._has_embedding_column():
+            logger.debug("question_embedding column not found, skipping vector similarity search")
+            return []
+        
         try:
             embedding_str = "[" + ",".join(str(x) for x in query_embedding) + "]"
             
@@ -368,7 +389,13 @@ class MarketSimilarityEngine:
         Generate and store embedding for a market's question.
         
         Should be called when a new market is created.
+        Returns False if the question_embedding column doesn't exist.
         """
+        # Check if the column exists before attempting to update
+        if not self._has_embedding_column():
+            logger.debug(f"question_embedding column not found, skipping embedding update for market {market_id}")
+            return False
+        
         try:
             # Get market question
             result = self.db.execute(
