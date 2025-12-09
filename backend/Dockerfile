@@ -26,7 +26,7 @@ RUN chmod +x /app/scripts/start.sh
 # Railway handles port mapping automatically - no EXPOSE needed
 # Railway sets $PORT environment variable at runtime
 
-# Default: run with startup script
-# The script handles migrations, logging, and gunicorn startup
-CMD ["sh", "/app/scripts/start.sh"]
+# Railway sets PORT env var - uvicorn reads it automatically
+# Use shell form to expand $PORT
+CMD sh -c "python -m uvicorn main:app --host 0.0.0.0 --port \${PORT:-8000}"
 
