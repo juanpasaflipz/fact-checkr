@@ -27,6 +27,6 @@ RUN chmod +x /app/scripts/start.sh
 # Railway sets $PORT environment variable at runtime
 
 # Railway sets PORT env var - uvicorn reads it automatically
-# Use shell form to expand $PORT
-CMD sh -c "python -m uvicorn main:app --host 0.0.0.0 --port \${PORT:-8000}"
+# Run migrations first (non-blocking on failure), then start uvicorn
+CMD sh -c "echo 'Running migrations...' && alembic upgrade head || echo 'Migration warning (continuing)' && echo 'Starting uvicorn...' && python -m uvicorn main:app --host 0.0.0.0 --port \${PORT:-8000}"
 
