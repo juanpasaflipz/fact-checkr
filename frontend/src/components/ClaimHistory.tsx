@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useRouter } from 'next/navigation';
 import { getClaimHistory, removeFromHistory, clearHistory, ClaimHistoryItem } from '@/lib/claimHistory';
 
@@ -9,18 +9,18 @@ export default function ClaimHistory() {
   const [history, setHistory] = useState<ClaimHistoryItem[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const loadHistory = useCallback(() => {
+    const items = getClaimHistory();
+    setHistory(items);
+    setLoading(false);
+  }, []);
+
   useEffect(() => {
     loadHistory();
     // Refresh history every 5 seconds if page is visible
     const interval = setInterval(loadHistory, 5000);
     return () => clearInterval(interval);
-  }, []);
-
-  const loadHistory = () => {
-    const items = getClaimHistory();
-    setHistory(items);
-    setLoading(false);
-  };
+  }, [loadHistory]);
 
   const handleRemove = (claimId: string) => {
     removeFromHistory(claimId);

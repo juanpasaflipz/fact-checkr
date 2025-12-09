@@ -131,7 +131,6 @@ export default function Home() {
           } else if (typeof fetchError === 'string') {
             errorMessage = fetchError;
           } else if (fetchError && typeof fetchError === 'object') {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             errorMessage = (fetchError as any).message || JSON.stringify(fetchError) || 'Unknown network error';
           }
           
@@ -258,16 +257,15 @@ export default function Home() {
       } else if (typeof error === 'string') {
         errorMessage = error;
         errorType = 'string';
-      } else if (error && typeof error === 'object') {
-        // Handle empty objects or objects with error info
-        if (Object.keys(error).length === 0) {
-          errorMessage = 'Empty error object - likely network/CORS issue';
-          errorType = 'empty_object';
-        } else {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          errorMessage = (error as any).message || (error as any).detail || JSON.stringify(error);
-          errorType = typeof error;
-        }
+        } else if (error && typeof error === 'object') {
+          // Handle empty objects or objects with error info
+          if (Object.keys(error).length === 0) {
+            errorMessage = 'Empty error object - likely network/CORS issue';
+            errorType = 'empty_object';
+          } else {
+            errorMessage = (error as any).message || (error as any).detail || JSON.stringify(error);
+            errorType = typeof error;
+          }
       } else {
         errorMessage = String(error);
         errorType = typeof error;
@@ -288,8 +286,7 @@ export default function Home() {
           : `${baseUrl}/claims?skip=${isLoadMore ? skip : 0}&limit=${LIMIT}`;
         
         // Log detailed error information
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const errorDetails: Record<string, any> = {
+        const errorDetails: Record<string, unknown> = {
           url: currentUrl,
           baseUrl,
           errorMessage: errorMessage,
@@ -480,7 +477,6 @@ export default function Home() {
     checkOnboarding();
     
     return () => clearInterval(statsInterval);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Refetch claims when tab changes
@@ -488,7 +484,6 @@ export default function Home() {
     setSkip(0);
     setClaims([]);
     fetchClaims(undefined, false, 0, activeTab);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeTab]);
 
   const handleSearch = (e: React.FormEvent) => {

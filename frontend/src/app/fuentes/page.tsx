@@ -125,7 +125,6 @@ export default function FuentesPage() {
   useEffect(() => {
     fetchSources();
     fetchStats();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchQuery, filterStatus, selectedPlatform]);
 
   const handleSearch = (e: React.FormEvent) => {

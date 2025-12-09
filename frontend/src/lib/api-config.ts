@@ -13,6 +13,15 @@
  * 3. Default to localhost for local development
  */
 export function getApiBaseUrl(): string {
+  // Server/SSR: require an absolute URL
+  if (typeof window === 'undefined') {
+    return (
+      process.env.NEXT_PUBLIC_API_URL ||
+      process.env.API_URL ||
+      'http://localhost:8000'
+    );
+  }
+
   // Check for explicit environment variable (highest priority)
   if (typeof window !== 'undefined' && (window as any).__NEXT_DATA__?.env?.NEXT_PUBLIC_API_URL) {
     return (window as any).__NEXT_DATA__.env.NEXT_PUBLIC_API_URL;
@@ -35,8 +44,8 @@ export function getApiBaseUrl(): string {
                     hostname.endsWith('.local');
 
     if (!isLocal) {
-      // Railway backend URL - set NEXT_PUBLIC_API_URL env var to override
-      return 'https://backend-production-72ea.up.railway.app';
+      // Default production backend (override via NEXT_PUBLIC_API_URL when set)
+      return 'https://fact-checkr-production.up.railway.app';
     }
   }
 

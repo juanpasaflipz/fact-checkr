@@ -1,4 +1,4 @@
-from sqlalchemy import Column, String, DateTime, Text, Enum, Integer, ForeignKey, Table, JSON, Boolean, Float, ARRAY
+from sqlalchemy import Column, String, DateTime, Text, Enum, Integer, ForeignKey, Table, JSON, Boolean, Float, ARRAY, Index
 from sqlalchemy.ext.declarative import declarative_base
 from sqlalchemy.orm import relationship
 from pgvector.sqlalchemy import Vector
@@ -297,6 +297,9 @@ class Market(Base):
     resolution_source = Column(String, nullable=True)  # Official data source (INEGI, INE, SESNSP, Banxico, etc.)
     resolution_criteria = Column(Text, nullable=True)  # Transparent resolution rules
     
+    # Market intelligence
+    # question_embedding = Column(Vector(1536), nullable=True)  # For similarity search - commented out until migration runs
+    
     # Relationships
     claim = relationship("Claim", back_populates="markets")
     trades = relationship("MarketTrade", back_populates="market")
@@ -512,3 +515,104 @@ class BlogArticle(Base):
     related_claims = relationship("Claim", secondary=blog_article_claims, back_populates="blog_articles")
     topic_id = Column(Integer, ForeignKey('topics.id'), nullable=True)
     topic = relationship("Topic")
+
+
+# =============================================================================
+# Market Intelligence Tables
+# =============================================================================
+
+class MarketPredictionFactors(Base):
+    """
+    Stores prediction outputs from the synthesizer agent.
+    
+    Each record represents one prediction analysis for a market,
+    including probability, confidence, key factors, and reasoning.
+    """
+    __tablename__ = 'market_prediction_factors'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    market_id = Column(Integer, ForeignKey('markets.id', ondelete='CASCADE'), nullable=False, index=True)
+    agent_type = Column(String(50), nullable=False)
+    analysis_tier = Column(Integer, default=2, nullable=False)  # 1=lightweight, 2=daily, 3=deep
+    
+    # Probabilities
+    raw_probability = Column(Float, nullable=False)
+    calibrated_probability = Column(Float, nullable=False)
+    confidence = Column(Float, nullable=False)
+    
+    # Confidence interval
+    probability_low = Column(Float, nullable=True)
+    probability_high = Column(Float, nullable=True)
+    
+    # Factors (JSONB)
+    key_factors = Column(JSON, nullable=True)
+    risk_factors = Column(JSON, nullable=True)
+    data_sources = Column(JSON, nullable=True)
+    
+    # Transparency
+    reasoning_chain = Column(Text, nullable=True)
+    summary = Column(Text, nullable=True)
+    data_freshness_hours = Column(Float, nullable=True)
+    
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    
+    # Relationships
+    market = relationship("Market", backref="prediction_factors")
+
+
+class AgentPerformance(Base):
+    """
+    Tracks prediction accuracy for calibration.
+    
+    Records each prediction and its outcome to calculate:
+    - Brier scores
+    - Calibration curves
+    - Agent performance over time
+    """
+    __tablename__ = 'agent_performance'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    agent_id = Column(String(50), nullable=False, index=True)
+    market_id = Column(Integer, ForeignKey('markets.id', ondelete='CASCADE'), nullable=False, index=True)
+    predicted_probability = Column(Float, nullable=False)
+    actual_outcome = Column(String(10), nullable=True)  # 'yes', 'no', or NULL if unresolved
+    brier_score = Column(Float, nullable=True)
+    prediction_date = Column(DateTime, nullable=False)
+    resolution_date = Column(DateTime, nullable=True)
+    
+    # Relationships
+    market = relationship("Market", backref="agent_predictions")
+    
+    # Unique constraint: one prediction per agent per market
+    __table_args__ = (
+        Index('idx_ap_agent_date', 'agent_id', 'prediction_date'),
+    )
+
+
+class MarketVote(Base):
+    """
+    User votes on market outcomes (separate from trading).
+    
+    Allows users to express their prediction without committing credits,
+    enabling "wisdom of the crowd" comparisons with AI predictions.
+    """
+    __tablename__ = 'market_votes'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    market_id = Column(Integer, ForeignKey('markets.id', ondelete='CASCADE'), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey('users.id', ondelete='CASCADE'), nullable=False, index=True)
+    outcome = Column(String(10), nullable=False)  # 'yes' or 'no'
+    confidence = Column(Integer, nullable=True)  # 1-5 scale
+    reasoning = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow, nullable=False)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow, nullable=False)
+    
+    # Relationships
+    market = relationship("Market", backref="votes")
+    user = relationship("User", backref="market_votes")
+    
+    # Constraints
+    __table_args__ = (
+        Index('idx_mv_market_user', 'market_id', 'user_id', unique=True),
+    )

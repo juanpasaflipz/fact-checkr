@@ -87,6 +87,9 @@ CORE_ROUTERS = ['auth', 'subscriptions', 'usage', 'whatsapp', 'telegraph']
 OPTIONAL_ROUTERS = {
     'intelligence': {'available': False, 'dependencies': []},
     'markets': {'available': False, 'dependencies': []},
+    'market_votes': {'available': False, 'dependencies': []},
+    'market_intelligence': {'available': False, 'dependencies': []},
+    'tokens': {'available': False, 'dependencies': []},
     'review': {'available': False, 'dependencies': []},
     'quota': {'available': False, 'dependencies': []},
     'trending': {'available': False, 'dependencies': []},
@@ -277,6 +280,8 @@ if ROUTERS_AVAILABLE:
                 app.include_router(module.router)  # Trending router already has /api/v1/trending prefix
             elif router_name == 'keywords':
                 app.include_router(module.router, prefix="/api", tags=["keywords"])
+            elif router_name in ['market_votes', 'market_intelligence', 'tokens']:
+                app.include_router(module.router)  # These routers have their own /api prefix
             else:
                 app.include_router(module.router, prefix="/api", tags=[router_name])
             logger.info(f"✅ Optional router '{router_name}' registered")
@@ -641,24 +646,24 @@ async def get_stats(request: Request, db: Session = Depends(get_db)):
 async def get_topics(db: Session = Depends(get_db)):
     """Get all topics"""
     try:
-    topics = db.query(DBTopic).all()
-    result = []
-    for t in topics:
+        topics = db.query(DBTopic).all()
+        result = []
+        for t in topics:
             try:
-        topic_id = getattr(t, 'id', None)
-        topic_name = getattr(t, 'name', None)
-        topic_slug = getattr(t, 'slug', None)
-        topic_description = getattr(t, 'description', None)
-        result.append(TopicResponse(
-            id=int(topic_id) if topic_id is not None else 0,
-            name=str(topic_name) if topic_name is not None else "",
-            slug=str(topic_slug) if topic_slug is not None else "",
-            description=str(topic_description) if topic_description is not None else None
-        ))
+                topic_id = getattr(t, 'id', None)
+                topic_name = getattr(t, 'name', None)
+                topic_slug = getattr(t, 'slug', None)
+                topic_description = getattr(t, 'description', None)
+                result.append(TopicResponse(
+                    id=int(topic_id) if topic_id is not None else 0,
+                    name=str(topic_name) if topic_name is not None else "",
+                    slug=str(topic_slug) if topic_slug is not None else "",
+                    description=str(topic_description) if topic_description is not None else None
+                ))
             except Exception as e:
                 logger.error(f"Error mapping topic {getattr(t, 'id', 'unknown')} to response: {e}")
                 continue
-    return result
+        return result
     except Exception as e:
         logger.error(f"Error fetching topics: {e}", exc_info=True)
         raise HTTPException(
@@ -773,41 +778,41 @@ async def get_trends_summary(
 ):
     """Get summary of trending topics and activity"""
     try:
-    today = datetime.utcnow()
-    start_date = today - timedelta(days=days)
-    previous_start = start_date - timedelta(days=days)
-    
-    # Current period claims
-    current_claims = db.query(func.count(DBClaim.id)).filter(DBClaim.created_at >= start_date).scalar() or 0
-    
-    # Previous period claims
-    previous_claims = db.query(func.count(DBClaim.id))\
-        .filter(DBClaim.created_at >= previous_start, DBClaim.created_at < start_date)\
-        .scalar() or 0
+        today = datetime.utcnow()
+        start_date = today - timedelta(days=days)
+        previous_start = start_date - timedelta(days=days)
         
-    # Calculate growth
-    growth = 0
-    if previous_claims > 0:
-        growth = ((current_claims - previous_claims) / previous_claims) * 100
+        # Current period claims
+        current_claims = db.query(func.count(DBClaim.id)).filter(DBClaim.created_at >= start_date).scalar() or 0
         
-    # Status breakdown
-    status_breakdown = db.query(
-        DBClaim.status,
-        func.count(DBClaim.id).label('count')
-    ).filter(DBClaim.created_at >= start_date)\
-    .group_by(DBClaim.status).all()
-    
-    return {
-        "period_days": days,
-        "total_claims": current_claims,
-        "previous_period_claims": previous_claims,
-        "growth_percentage": round(growth, 1),
-        "trend_up": growth > 0,
-        "status_breakdown": [
-            {"status": str(s.status.value) if hasattr(s.status, 'value') else str(s.status), "count": s.count}
-            for s in status_breakdown
-        ]
-    }
+        # Previous period claims
+        previous_claims = db.query(func.count(DBClaim.id))\
+            .filter(DBClaim.created_at >= previous_start, DBClaim.created_at < start_date)\
+            .scalar() or 0
+            
+        # Calculate growth
+        growth = 0
+        if previous_claims > 0:
+            growth = ((current_claims - previous_claims) / previous_claims) * 100
+            
+        # Status breakdown
+        status_breakdown = db.query(
+            DBClaim.status,
+            func.count(DBClaim.id).label('count')
+        ).filter(DBClaim.created_at >= start_date)\
+        .group_by(DBClaim.status).all()
+        
+        return {
+            "period_days": days,
+            "total_claims": current_claims,
+            "previous_period_claims": previous_claims,
+            "growth_percentage": round(growth, 1),
+            "trend_up": growth > 0,
+            "status_breakdown": [
+                {"status": str(s.status.value) if hasattr(s.status, 'value') else str(s.status), "count": s.count}
+                for s in status_breakdown
+            ]
+        }
     except Exception as e:
         logger.error(f"Error fetching trends summary: {e}", exc_info=True)
         raise HTTPException(
