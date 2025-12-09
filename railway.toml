@@ -1,6 +1,8 @@
 [build]
 builder = "DOCKERFILE"
-dockerfilePath = "backend/Dockerfile"
+# Note: Set Root Directory to "backend" in Railway dashboard for this to work
+# When Root Directory is set to "backend", Railway uses backend/Dockerfile automatically
+dockerfilePath = "Dockerfile"
 
 [deploy]
 service = "backend"
