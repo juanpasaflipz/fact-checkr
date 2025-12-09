@@ -7,7 +7,7 @@ import json
 import re
 import logging
 from datetime import datetime, timedelta
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Any
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, and_, func, case
 
@@ -49,6 +49,11 @@ class BlogArticleGenerator:
             "trending_topics": [{"name": t.topic_name, "score": t.final_priority_score} for t in trending_topics],
             "top_debunked": self._format_claims_for_context(top_debunked)
         }
+        data_context["context_enrichment"] = self._build_context_enrichment(
+            claims=claims,
+            topics=None,
+            deep_topic=None
+        )
         
         # Generate content
         content = await self._generate_article_content(
@@ -95,6 +100,11 @@ class BlogArticleGenerator:
             "platform_distribution": platform_dist,
             "deep_dive_topic": deep_dive_topic
         }
+        data_context["context_enrichment"] = self._build_context_enrichment(
+            claims=claims,
+            topics=topic_dist,
+            deep_topic=deep_dive_topic
+        )
         
         content = await self._generate_article_content(
             article_type="afternoon",
@@ -127,6 +137,11 @@ class BlogArticleGenerator:
             "top_viral": self._format_claims_for_context(top_viral),
             "verification_stats": verification_stats
         }
+        data_context["context_enrichment"] = self._build_context_enrichment(
+            claims=claims,
+            topics=None,
+            deep_topic=None
+        )
         
         content = await self._generate_article_content(
             article_type="evening",
@@ -156,6 +171,11 @@ class BlogArticleGenerator:
             "claims_count": len(claims),
             "breaking_claims": self._format_claims_for_context(claims)
         }
+        data_context["context_enrichment"] = self._build_context_enrichment(
+            claims=claims,
+            topics=None,
+            deep_topic=None
+        )
         
         content = await self._generate_article_content(
             article_type="breaking",
@@ -201,7 +221,8 @@ class BlogArticleGenerator:
             3. Sección: "Lo Más Viral" (top 3 claims con más engagement)
             4. Sección: "Tendencias" (topics trending)
             5. Sección: "Desmentidos Destacados" (top debunked)
-            6. Conclusión con takeaways clave
+            6. Sección: "Fuentes y Evidencia" (citar 3-5 enlaces con breve contexto y credibilidad)
+            7. Conclusión con takeaways clave
             
             FORMATO JSON:
             {{
@@ -220,10 +241,11 @@ class BlogArticleGenerator:
             ESTRUCTURA:
             1. Título atractivo
             2. Introducción con estadísticas del día
-            3. Análisis profundo del topic principal
-            4. Comparación de plataformas (Twitter vs YouTube vs News)
+            3. Análisis profundo del topic principal (incluye evidencias y fuentes clave)
+            4. Comparación de plataformas (Twitter vs YouTube vs News) con cifras
             5. Patrones de verificación observados
-            6. Conclusión
+            6. Sección: "Fuentes y Evidencia" (urls resumidas, credibilidad alta primero)
+            7. Conclusión
             
             FORMATO JSON:
             {{
@@ -244,8 +266,9 @@ class BlogArticleGenerator:
             2. Resumen ejecutivo del día
             3. Top 10 claims más virales
             4. Estadísticas de verificación (Verified vs Debunked)
-            5. Insights y patrones
-            6. Conclusión
+            5. Insights y patrones (con referencia a temas y fuentes)
+            6. Sección: "Fuentes y Evidencia" (lista priorizada de enlaces y por qué importan)
+            7. Conclusión
             
             FORMATO JSON:
             {{
@@ -265,7 +288,8 @@ class BlogArticleGenerator:
             1. Título urgente pero preciso
             2. Introducción breve
             3. Lista de verificaciones recientes (últimas 6 horas)
-            4. Conclusión rápida
+            4. Sección: "Fuentes y Evidencia" (solo enlaces críticos, 2-3 bullets)
+            5. Conclusión rápida
             
             FORMATO JSON:
             {{
@@ -326,6 +350,59 @@ class BlogArticleGenerator:
             "title": f"Resumen de Verificación - {article_type}",
             "excerpt": "Análisis de claims verificados",
             "body": content or f"# Resumen de Verificación\n\nContenido generado para {article_type}"
+        }
+
+    def _build_context_enrichment(
+        self,
+        claims: List[Claim],
+        topics: Optional[Dict[str, Any]] = None,
+        deep_topic: Optional[Dict[str, Any]] = None,
+    ) -> Dict[str, Any]:
+        """
+        Build richer context for the LLM and UI (sources, evidence, topics).
+        Keeps payload compact and JSON-safe.
+        """
+        sources_summary: List[Dict[str, Any]] = []
+        evidence_summary: List[Dict[str, Any]] = []
+
+        for claim in claims[:12]:
+            src = claim.source
+            engagement = src.engagement_metrics or {} if src else {}
+            sources_summary.append({
+                "url": src.url if src else None,
+                "platform": src.platform if src else None,
+                "credibility": getattr(src, "credibility_score", None),
+                "engagement": {
+                    "likes": engagement.get("likes", 0),
+                    "retweets": engagement.get("retweets", 0),
+                    "views": engagement.get("views", 0),
+                },
+                "claim_excerpt": claim.claim_text[:160] if claim.claim_text else "",
+                "status": str(claim.status),
+            })
+
+            if claim.evidence_sources:
+                evidence_summary.append({
+                    "claim_excerpt": claim.claim_text[:200],
+                    "status": str(claim.status),
+                    "evidence_urls": claim.evidence_sources[:5],
+                })
+
+        topic_cards: List[Dict[str, Any]] = []
+        if topics and isinstance(topics, dict) and "topics" in topics:
+            for t in topics["topics"][:5]:
+                topic_cards.append({
+                    "topic_name": t.get("topic_name"),
+                    "claim_count": t.get("claim_count", 0),
+                    "verified_count": t.get("verified_count", 0),
+                    "debunked_count": t.get("debunked_count", 0),
+                })
+
+        return {
+            "sources": sources_summary[:8],
+            "evidence": evidence_summary[:6],
+            "topics": topic_cards,
+            "deep_topic": deep_topic,
         }
     
     def _get_recent_claims(self, start_time: datetime, limit: int = 20) -> List[Claim]:

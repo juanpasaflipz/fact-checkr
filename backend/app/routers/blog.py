@@ -7,7 +7,7 @@ import logging
 from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from sqlalchemy import desc, and_, nullslast
-from typing import Dict, Optional
+from typing import Dict, Optional, Any
 from datetime import datetime
 from pydantic import BaseModel
 
@@ -72,6 +72,7 @@ class BlogArticleDetailResponse(BlogArticleResponse):
     telegraph_url: Optional[str]
     twitter_url: Optional[str]
     topic_id: Optional[int]
+    data_context: Optional[Dict[str, Any]]
     
     class Config:
         from_attributes = True

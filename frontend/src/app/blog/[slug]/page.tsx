@@ -17,6 +17,7 @@ interface BlogArticle {
   telegraph_url: string | null;
   twitter_url: string | null;
   topic_id: number | null;
+  data_context?: Record<string, unknown>;
 }
 
 export async function generateMetadata({ params }: { params: Promise<{ slug: string }> }): Promise<Metadata> {
