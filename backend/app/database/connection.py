@@ -91,7 +91,7 @@ SessionLocal = _LazySessionLocal()
 
 
 def get_db():
-    """Dependency for FastAPI endpoints with retry logic"""
+    """Dependency for FastAPI endpoints with retry logic and automatic commit/rollback"""
     from sqlalchemy import text
     max_retries = 3
     retry_delay = 1
@@ -128,6 +128,121 @@ def get_db():
     # Yield the database session
     try:
         yield db
+        
+        # Auto-commit if there are pending changes and we're still in a transaction
+        # This ensures changes are saved even if route doesn't explicitly commit
+        if db and db.is_active:
+            try:
+                # Check if there are pending changes
+                has_changes = (
+                    len(db.new) > 0 or 
+                    len(db.dirty) > 0 or 
+                    len(db.deleted) > 0
+                )
+                
+                if has_changes:
+                    # Try to commit - this will work if we're still in a transaction
+                    # If the route already committed, this might raise an error which we'll handle
+                    try:
+                        db.commit()
+                        logger.debug("Transaction auto-committed successfully")
+                    except Exception as commit_error:
+                        # Check if error is because transaction was already committed/closed
+                        error_str = str(commit_error).lower()
+                        error_type = type(commit_error).__name__
+                        
+                        # Common SQLAlchemy errors when transaction is already closed
+                        if any(phrase in error_str for phrase in [
+                            "no transaction", 
+                            "already closed",
+                            "connection is closed",
+                            "this session is closed"
+                        ]) or "InvalidRequestError" in error_type:
+                            # Transaction was already committed/closed by the route - that's fine
+                            logger.debug("Transaction was already committed by route handler")
+                        else:
+                            # Real error - log it but don't fail silently
+                            # Some errors might be recoverable, so we'll rollback and log
+                            logger.warning(f"Error during auto-commit (may be expected if route already committed): {commit_error}")
+                            try:
+                                # Try to rollback if possible
+                                if db.is_active:
+                                    db.rollback()
+                            except:
+                                pass
+                            # Don't re-raise - route might have already committed successfully
+                            
+            except Exception as e:
+                # If checking/committing fails, log but don't fail the request
+                # This could happen if session is in an unexpected state
+                logger.warning(f"Error in auto-commit check (non-critical): {e}")
+                
+    except Exception as e:
+        # Rollback on any exception if session is still active
+        if db and db.is_active:
+            try:
+                db.rollback()
+                logger.debug(f"Transaction rolled back due to exception: {type(e).__name__}")
+            except Exception as rollback_error:
+                logger.error(f"Error during rollback: {rollback_error}")
+        raise
+    finally:
+        if db:
+            try:
+                db.close()
+            except:
+                pass
+
+
+def get_db_session():
+    """
+    Context manager for database sessions in Celery tasks and other non-FastAPI contexts.
+    Ensures proper commit/rollback handling.
+    
+    Usage:
+        with get_db_session() as db:
+            # Use db here
+            db.add(something)
+            # Auto-commits on successful exit, rolls back on exception
+    """
+    db = SessionLocal()
+    try:
+        yield db
+        # Auto-commit on successful exit if there are changes
+        if db.is_active:
+            try:
+                has_changes = (
+                    len(db.new) > 0 or 
+                    len(db.dirty) > 0 or 
+                    len(db.deleted) > 0
+                )
+                if has_changes:
+                    db.commit()
+                    logger.debug("Task session auto-committed successfully")
+            except Exception as commit_error:
+                error_str = str(commit_error).lower()
+                if any(phrase in error_str for phrase in [
+                    "no transaction", 
+                    "already closed",
+                    "connection is closed"
+                ]):
+                    logger.debug("Task session was already committed")
+                else:
+                    logger.warning(f"Error during task auto-commit: {commit_error}")
+                    if db.is_active:
+                        try:
+                            db.rollback()
+                        except:
+                            pass
+    except Exception as e:
+        # Rollback on exception
+        if db.is_active:
+            try:
+                db.rollback()
+                logger.debug(f"Task session rolled back due to exception: {type(e).__name__}")
+            except Exception as rollback_error:
+                logger.error(f"Error during task rollback: {rollback_error}")
+        raise
     finally:
         if db:
             try:
