@@ -10,6 +10,8 @@ A comprehensive fact-checking platform for Mexican politics news and media posts
 - 💳 **Subscription Management** - Stripe integration for Pro and Team tiers
 - 📱 **WhatsApp Integration** - Receive and respond to fact-check requests via WhatsApp
 - 🌐 **Telegraph Publishing** - Auto-publish verified claims to Telegraph
+- 💹 **Prediction Markets** - Market-based consensus for truth verification
+
 
 ## Tech Stack
 
@@ -94,7 +96,7 @@ npm run dev
 ```bash
 cd backend
 source venv/bin/activate
-./start_workers.sh
+./start_local.sh
 ```
 
 ### 5. Verify

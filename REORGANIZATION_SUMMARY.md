@@ -35,7 +35,7 @@ docker build -f backend/Dockerfile -t test-backend ./backend
 - `start.sh` - Main startup script
 - `start-beat.sh` - Celery Beat scheduler
 - `start-worker.sh` - Celery Worker
-- `start_workers.sh` - Worker management
+- `start_local.sh` - Worker management
 - `run_worker.sh` - Worker runner
 - `backend_manager.sh` - Backend process manager
 - `worker_manager.sh` - Worker process manager

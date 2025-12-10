@@ -83,8 +83,8 @@ if [ -f "backend/start.sh" ]; then
 fi
 
 if [ -f "backend/start_workers.sh" ]; then
-    mv backend/start_workers.sh backend/scripts/
-    log "Moved start_workers.sh → backend/scripts/"
+    mv backend/start_workers.sh backend/scripts/start_local.sh
+    log "Moved start_workers.sh → backend/scripts/start_local.sh"
 fi
 
 if [ -f "backend/run_worker.sh" ]; then

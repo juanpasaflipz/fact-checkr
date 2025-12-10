@@ -35,7 +35,7 @@ pnpm dev
 ```bash
 cd /Users/juan/fact-checkr/backend
 source venv/bin/activate
-./start_workers.sh
+./start_local.sh
 # OR manually:
 # celery -A app.worker worker --beat --loglevel=info
 ```
@@ -118,7 +118,7 @@ cd /Users/juan/fact-checkr/backend
 source venv/bin/activate
 
 # Start workers using the script
-./start_workers.sh
+./start_local.sh
 
 # OR start manually:
 celery -A app.worker worker --beat --loglevel=info

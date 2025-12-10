@@ -62,6 +62,6 @@ except Exception as e:
 echo "Starting Celery beat scheduler..."
 
 # Run Celery beat
-exec celery -A app.worker.celery_app beat \
+exec celery -A app.worker:celery_app beat \
     --loglevel=info \
     --pidfile=/tmp/celerybeat.pid

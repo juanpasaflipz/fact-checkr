@@ -26,7 +26,7 @@ export function getApiBaseUrl(): string {
   if (typeof window !== 'undefined' && (window as any).__NEXT_DATA__?.env?.NEXT_PUBLIC_API_URL) {
     return (window as any).__NEXT_DATA__.env.NEXT_PUBLIC_API_URL;
   }
-  
+
   if (process.env.NEXT_PUBLIC_API_URL) {
     return process.env.NEXT_PUBLIC_API_URL;
   }
@@ -34,18 +34,18 @@ export function getApiBaseUrl(): string {
   // For production deployments, use Railway backend URL
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname;
-    
+
     // If we're on Railway/Vercel (not localhost), use Railway backend
     // Also check for local IP addresses (192.168.x.x, 10.x.x.x) to avoid hitting production from local network
-    const isLocal = hostname === 'localhost' || 
-                    hostname === '127.0.0.1' || 
-                    hostname.startsWith('192.168.') || 
-                    hostname.startsWith('10.') ||
-                    hostname.endsWith('.local');
+    const isLocal = hostname === 'localhost' ||
+      hostname === '127.0.0.1' ||
+      hostname.startsWith('192.168.') ||
+      hostname.startsWith('10.') ||
+      hostname.endsWith('.local');
 
     if (!isLocal) {
       // Default production backend (override via NEXT_PUBLIC_API_URL when set)
-      return 'https://fact-checkr-production.up.railway.app';
+      return 'https://backend-production-72ea.up.railway.app';
     }
   }
 
@@ -81,7 +81,7 @@ export function isDevelopment(): boolean {
 export function getConnectionErrorHelp(): string[] {
   const baseUrl = getApiBaseUrl();
   const isLocal = baseUrl.includes('localhost') || baseUrl.includes('127.0.0.1');
-  
+
   if (isLocal) {
     return [
       '1. Make sure backend is running locally: cd backend && python -m uvicorn main:app --reload',

@@ -62,7 +62,7 @@ start_worker() {
     source venv/bin/activate
     
     # Start worker in background
-    nohup celery -A app.worker worker \
+    nohup celery -A app.worker:celery_app worker \
         --loglevel=info \
         --concurrency=2 \
         --logfile="$WORKER_LOG" \
@@ -94,7 +94,7 @@ start_beat() {
     source venv/bin/activate
     
     # Start beat in background with explicit schedule file
-    nohup celery -A app.worker beat \
+    nohup celery -A app.worker:celery_app beat \
         --loglevel=info \
         --logfile="$BEAT_LOG" \
         --pidfile="$PIDFILE_BEAT" \

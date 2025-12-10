@@ -183,7 +183,7 @@ def print_report(worker_status, report):
         
         if not worker_status['beat']:
             print("   ⚠️  WARNING: Beat scheduler not running! Hourly scraping will NOT execute.")
-            print("   💡 Start with: celery -A app.worker worker --beat --loglevel=info")
+            print("   💡 Start with: celery -A app.worker:celery_app worker --beat --loglevel=info")
     
     print()
     

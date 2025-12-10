@@ -278,7 +278,7 @@ run_migrations() {
     # Check if Railway CLI is available
     if command -v railway &> /dev/null && railway whoami &> /dev/null; then
         step "Running migrations via Railway..."
-        if railway run --service backend sh -c "cd backend && alembic upgrade head"; then
+        if (cd backend && railway run --service backend python -c "import sys; from alembic.config import main; sys.exit(main())" upgrade head); then
             log "Migrations completed successfully on Railway"
         else
             error "Migration failed on Railway"
@@ -287,7 +287,7 @@ run_migrations() {
                 log "Migrations completed (alternative method)"
             else
                 error "Migration failed. Please run manually:"
-                info "  railway run --service backend sh -c 'cd backend && alembic upgrade head'"
+                info "  (cd backend && railway run --service backend python -c 'import sys; from alembic.config import main; sys.exit(main())' upgrade head)"
                 exit 1
             fi
         fi
@@ -483,7 +483,7 @@ verify_deployment() {
     # Backend health check
     if [ "$SKIP_BACKEND" = false ]; then
         step "Checking backend health..."
-        BACKEND_URL="https://fact-checkr-production.up.railway.app"
+        BACKEND_URL="https://backend-production-72ea.up.railway.app"
         if curl -s -f "${BACKEND_URL}/health" > /dev/null; then
             log "Backend health check passed"
             info "  URL: ${BACKEND_URL}/health"
@@ -554,7 +554,7 @@ main() {
     info "Next steps:"
     if [ "$SKIP_BACKEND" = false ]; then
         info "  • Monitor backend: railway logs --service backend"
-        info "  • Check backend health: curl https://fact-checkr-production.up.railway.app/health"
+        info "  • Check backend health: curl https://backend-production-72ea.up.railway.app/health"
     fi
     if [ "$SKIP_FRONTEND" = false ]; then
         info "  • Check Vercel dashboard: https://vercel.com"

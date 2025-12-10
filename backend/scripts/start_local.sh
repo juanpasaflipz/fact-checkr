@@ -15,5 +15,5 @@ fi
 
 # Start Celery worker with beat
 echo "Starting Celery worker with beat scheduler..."
-celery -A app.worker worker --beat --loglevel=info --concurrency=2
+celery -A app.worker:celery_app worker --beat --loglevel=info --concurrency=2
 

@@ -13,7 +13,7 @@ fact-checkr/
 │   │   ├── start.sh
 │   │   ├── start-beat.sh
 │   │   ├── start-worker.sh
-│   │   ├── start_workers.sh
+│   │   ├── start_local.sh
 │   │   ├── run_worker.sh
 │   │   ├── backend_manager.sh
 │   │   └── worker_manager.sh
