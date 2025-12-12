@@ -45,6 +45,7 @@ import tweepy
 import requests
 from datetime import datetime, timedelta
 import json
+from app.services.search_service import search_news
 
 # Optional Facebook SDK import
 try:
@@ -296,11 +297,44 @@ except ImportError:
 class GoogleNewsScraper(Scraper):
     async def fetch_posts(self, keywords: List[str]) -> List[SocialPost]:
         posts = []
-        # Construct RSS URL
-        # query: {keywords} when:1d
-        # hl=es-419&gl=MX&ceid=MX:es-419 (Mexico settings)
-        
         query_str = " OR ".join(keywords)
+        
+        # 1. Try Serper News API first (higher quality/more structured)
+        try:
+            # Append context to query if not present
+            search_query = query_str
+            if "mexico" not in search_query.lower():
+                search_query += " politica mexico"
+                
+            serper_results = await search_news(search_query)
+            
+            for item in serper_results:
+                # Parse relative dates like "2 hours ago" if possible, otherwise use now
+                # Serper returns "1 day ago", "2 hours ago" etc in 'date' field
+                # For simplicity in this iteration, we use now() or keep string if model supports it
+                # SocialPost expects ISO format string.
+                
+                posts.append(SocialPost(
+                    id=item.get('link'),
+                    platform="Google News (Serper)",
+                    content=f"{item.get('title', '')}\n{item.get('snippet', '')}".strip(),
+                    author=item.get('source', "Unknown Source"),
+                    timestamp=datetime.now().isoformat(), # Parsing relative time is complex, standardizing on fetch time
+                    url=item.get('link'),
+                    context_data={"source_type": "serper_news"}
+                ))
+            
+            if posts:
+                print(f"Serper returned {len(posts)} news items.")
+                # We can return here if we treat Serper as primary. 
+                # If we want to mix results, we can continue to RSS.
+                # Let's return to save generic RSS bandwidth/duplicates if we have good results.
+                return posts
+
+        except Exception as e:
+            print(f"Serper news search failed: {e}")
+
+        # 2. Fallback to RSS
         encoded_query = urllib.parse.quote(f"{query_str} when:1d")
         rss_url = f"https://news.google.com/rss/search?q={encoded_query}&hl=es-419&gl=MX&ceid=MX:es-419"
         
@@ -316,14 +350,14 @@ class GoogleNewsScraper(Scraper):
                 
                 posts.append(SocialPost(
                     id=entry.id if 'id' in entry else entry.link,
-                    platform="Google News",
+                    platform="Google News (RSS)",
                     content=f"{clean_title}\n{clean_summary}".strip(),
                     author=entry.source.title if 'source' in entry else "Unknown Source",
                     timestamp=datetime(*entry.published_parsed[:6]).isoformat() if 'published_parsed' in entry else datetime.now().isoformat(),
                     url=entry.link
                 ))
         except Exception as e:
-            print(f"Error fetching from Google News: {e}")
+            print(f"Error fetching from Google News RSS: {e}")
 
         return posts
 

@@ -1,6 +1,5 @@
 [build]
 builder = "DOCKERFILE"
-# Railway builds from repo root by default
 dockerfilePath = "backend/Dockerfile"
 
 [deploy]

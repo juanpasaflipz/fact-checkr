@@ -96,6 +96,93 @@ class TwitterPoster:
             logger.error(f"Error posting to Twitter: {e}")
             return None
     
+    def post_thread(self, tweets: list[str]) -> Optional[str]:
+        """Post a thread of tweets
+        
+        Args:
+            tweets: List of tweet strings
+            
+        Returns:
+            URL of the first tweet in the thread
+        """
+        if not self.client or not tweets:
+            return None
+            
+        try:
+            # Post first tweet
+            first_tweet = self.client.update_status(status=tweets[0])
+            previous_id = first_tweet.id
+            username = first_tweet.user.screen_name
+            first_url = f"https://twitter.com/{username}/status/{previous_id}"
+            
+            logger.info(f"Started thread: {first_url}")
+            
+            # Post replies
+            for text in tweets[1:]:
+                try:
+                    reply = self.client.update_status(
+                        status=text,
+                        in_reply_to_status_id=previous_id,
+                        auto_populate_reply_metadata=True
+                    )
+                    previous_id = reply.id
+                except Exception as e:
+                    logger.error(f"Error posting reply in thread: {e}")
+                    # Continue trying to post remaining tweets? Or break?
+                    # Breaking is safer to maintain order
+                    break
+                    
+            return first_url
+            
+        except Exception as e:
+            logger.error(f"Error posting thread start: {e}")
+            return None
+
+    def post_long_text(self, text: str) -> Optional[str]:
+        """Split long text into a thread and post it"""
+        chunks = self._chunk_text(text)
+        return self.post_thread(chunks)
+
+    def _chunk_text(self, text: str, limit: int = 280) -> list[str]:
+        """Split text into 280-char chunks with numbering (1/X)"""
+        import textwrap
+        
+        # First pass: rough split
+        # We need to reserve space for " (XX/XX)" suffix, approx 8 chars
+        # So we split at ~270 chars
+        
+        # Naive estimation of chunks
+        est_chunks = (len(text) // 270) + 1
+        
+        if est_chunks == 1:
+            return [text] if len(text) <= limit else textwrap.wrap(text, width=limit)
+            
+        current_chunks = []
+        words = text.split()
+        current_chunk = ""
+        
+        chunks = []
+        
+        # improved split logic could go here, but using textwrap for simplicity
+        # We'll stick to a simpler logic:
+        # 1. Split into chunks of 260 chars (leaving room for 1/99)
+        # 2. Add numbering
+        
+        raw_chunks = textwrap.wrap(text, width=270, break_long_words=False, replace_whitespace=False)
+        total = len(raw_chunks)
+        
+        final_chunks = []
+        for i, chunk in enumerate(raw_chunks):
+            suffix = f" {i+1}/{total}"
+            if len(chunk) + len(suffix) > limit:
+                # This rare case where adding suffix exceeds limit due to word wrapping edge cases
+                # We forced width=270 so this shouldn't happen often unless limit=280
+                # But to be safe, we might need to re-wrap or truncate
+                pass
+            final_chunks.append(f"{chunk}{suffix}")
+            
+        return final_chunks
+    
     def is_available(self) -> bool:
         """Check if Twitter posting is available"""
         return self.client is not None

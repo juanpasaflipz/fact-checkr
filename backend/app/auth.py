@@ -1,7 +1,8 @@
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
-from jose import JWTError, jwt
-from datetime import datetime, timedelta
+import firebase_admin
+from firebase_admin import auth, credentials
+from datetime import datetime
 import os
 import logging
 from typing import Optional
@@ -13,33 +14,23 @@ from app.utils import get_user_by_id
 
 logger = logging.getLogger(__name__)
 
-SECRET_KEY = os.getenv("JWT_SECRET_KEY", "your-secret-key-change-in-production")
-if SECRET_KEY == "your-secret-key-change-in-production":
-    logger.warning("⚠️ Using default insecure JWT_SECRET_KEY!")
-else:
-    logger.info("✅ Loaded JWT_SECRET_KEY from environment")
-
-ALGORITHM = "HS256"
-ACCESS_TOKEN_EXPIRE_MINUTES = 30 * 24 * 60  # 30 days for better UX
+# Initialize Firebase Admin SDK
+# On Cloud Run, this uses the default service account automatically.
+# On local/Railway, you must set GOOGLE_APPLICATION_CREDENTIALS env var to the path of your service account JSON.
+try:
+    if not firebase_admin._apps:
+        firebase_admin.initialize_app()
+    logger.info("✅ Firebase Admin SDK initialized")
+except Exception as e:
+    logger.warning(f"⚠️ Failed to initialize Firebase Admin SDK: {e}")
 
 security = HTTPBearer(auto_error=False)
-
-def create_access_token(data: dict, expires_delta: Optional[timedelta] = None):
-    """Create JWT access token"""
-    to_encode = data.copy()
-    if expires_delta:
-        expire = datetime.utcnow() + expires_delta
-    else:
-        expire = datetime.utcnow() + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
-    to_encode.update({"exp": expire})
-    encoded_jwt = jwt.encode(to_encode, SECRET_KEY, algorithm=ALGORITHM)
-    return encoded_jwt
 
 async def get_current_user(
     credentials: Optional[HTTPAuthorizationCredentials] = Depends(security),
     db: Session = Depends(get_db)
 ):
-    """Verify JWT token and return user from database"""
+    """Verify Firebase ID token and return user from database"""
     credentials_exception = HTTPException(
         status_code=status.HTTP_401_UNAUTHORIZED,
         detail="Could not validate credentials",
@@ -47,39 +38,38 @@ async def get_current_user(
     )
     
     if credentials is None:
-        logger.warning("❌ Auth failed: Missing authentication credentials")
+        # logger.warning("❌ Auth failed: Missing authentication credentials")
         raise credentials_exception
     
     if not credentials.credentials or not credentials.credentials.strip():
         logger.warning("❌ Auth failed: Empty authentication credentials")
         raise credentials_exception
     
+    token = credentials.credentials.strip()
+    
     try:
-        token = credentials.credentials.strip()
-        # Log token prefix for debugging
-        logger.info(f"🔑 Verifying token: {token[:10]}...")
+        # 1. Verify ID Token with Firebase
+        # This checks signature, expiry, and issuer
+        decoded_token = auth.verify_id_token(token)
+        uid = decoded_token['uid']
+        email = decoded_token.get('email')
         
-        payload = jwt.decode(token, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id_str = payload.get("sub")
-        
-        if user_id_str is None:
-            logger.warning("❌ Auth failed: Token missing 'sub' claim")
+        if not email:
+            logger.warning(f"❌ Auth failed: Firebase token missing email for UID {uid}")
             raise credentials_exception
+            
+        # 2. Lookup User in our SQL Database
+        # TEMPORARY MIGRATION LOGIC: Lookup by Email
+        # In the future, we should add a 'firebase_uid' column to the User table
+        user = db.query(User).filter(User.email == email).first()
         
-        try:
-            user_id = int(user_id_str)
-        except (ValueError, TypeError):
-            logger.warning(f"❌ Auth failed: Token 'sub' claim is not a valid integer: {user_id_str}")
-            raise credentials_exception
-        
-        # Get user from database
-        user = get_user_by_id(db, user_id)
         if user is None:
-            logger.warning(f"❌ Auth failed: User not found for id: {user_id}")
+            logger.warning(f"❌ Auth failed: User not found in SQL DB for email: {email}")
+            # Optional: Auto-create user here if desired
             raise credentials_exception
             
         if not user.is_active:
-            logger.warning(f"❌ Auth failed: User {user_id} is inactive")
+            logger.warning(f"❌ Auth failed: User {user.id} is inactive")
             raise credentials_exception
         
         # Update last login
@@ -87,21 +77,16 @@ async def get_current_user(
         db.commit()
         
         return user
-    except JWTError as e:
-        logger.warning(f"❌ Auth failed: JWT validation error: {str(e)}")
-        # Check if it might be a key mismatch
-        if "Signature verification failed" in str(e):
-            logger.error("⚠️  Signature verification failed. This often means JWT_SECRET_KEY mismatch between generator and verifier.")
+        
+    except auth.ExpiredIdTokenError:
+        logger.warning("❌ Auth failed: Token expired")
         raise credentials_exception
-    except HTTPException:
-        # Re-raise HTTP exceptions
-        raise
+    except auth.InvalidIdTokenError:
+        logger.warning("❌ Auth failed: Invalid token")
+        raise credentials_exception
     except Exception as e:
         logger.error(f"❌ Unexpected auth error: {str(e)}")
-        import traceback
-        logger.error(traceback.format_exc())
-        # Do NOT raise credentials_exception here. Let it bubble up as 500.
-        raise
+        raise credentials_exception
 
 # Optional dependency for protected routes
 async def get_optional_user(
@@ -111,18 +96,21 @@ async def get_optional_user(
     """Optional authentication - returns user if token present, None otherwise"""
     if credentials is None:
         return None
+    
     try:
-        payload = jwt.decode(credentials.credentials, SECRET_KEY, algorithms=[ALGORITHM])
-        user_id: int = payload.get("sub")
-        if user_id is None:
-            return None
+        token = credentials.credentials.strip()
+        decoded_token = auth.verify_id_token(token)
+        email = decoded_token.get('email')
         
-        user = get_user_by_id(db, user_id)
+        if not email:
+            return None
+            
+        user = db.query(User).filter(User.email == email).first()
         if user is None or not user.is_active:
             return None
         
         return user
-    except JWTError:
+    except Exception:
         return None
 
 async def get_admin_user(
@@ -136,3 +124,10 @@ async def get_admin_user(
         )
     return user
 
+# Legacy helpers to prevent ImportErrors in other modules if they still use them
+# (We might want to deprecate these)
+def create_access_token(data: dict, expires_delta: Optional[datetime] = None):
+    # This is now handled by Firebase Client SDK on frontend
+    # But we keep it to avoid breaking imports during transition
+    logger.warning("⚠️ create_access_token() called manually - this should be handled by Firebase now")
+    return "firebase-handled-token"

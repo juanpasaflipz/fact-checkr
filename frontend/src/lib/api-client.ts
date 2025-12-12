@@ -1,5 +1,6 @@
 import axios, { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
 import { getApiBaseUrl } from './api-config';
+import { auth } from './firebase';
 
 // --- Configuration ---
 
@@ -20,7 +21,7 @@ export interface ApiError {
 
 class ApiClient {
   private client: AxiosInstance;
-  private token: string | null = null;
+  // private token: string | null = null; // Removed mostly unused manual token setting favoring Firebase
 
   constructor() {
     this.client = axios.create({
@@ -29,18 +30,17 @@ class ApiClient {
         'Content-Type': 'application/json',
       },
       // Avoid throwing on 4xx/5xx to handle errors gracefully in wrapper
-      validateStatus: (status) => status < 500, 
+      validateStatus: (status) => status < 500,
     });
 
     // Interceptor to attach token
-    this.client.interceptors.request.use((config) => {
-      if (this.token) {
-        config.headers.Authorization = `Bearer ${this.token}`;
-      } else if (!isServer) {
-        // Fallback to localStorage for client-side
-        const storedToken = localStorage.getItem('auth_token');
-        if (storedToken) {
-          config.headers.Authorization = `Bearer ${storedToken}`;
+    this.client.interceptors.request.use(async (config) => {
+      if (!isServer && auth.currentUser) {
+        try {
+          const token = await auth.currentUser.getIdToken();
+          config.headers.Authorization = `Bearer ${token}`;
+        } catch (error) {
+          console.error("Error getting auth token", error);
         }
       }
       return config;
@@ -61,30 +61,24 @@ class ApiClient {
     );
   }
 
+  // Helper to manually set token if needed (e.g. during SSR if we passed it down)
+  // But generally verify via Firebase SDK on client
+  /*
   public setToken(token: string) {
     this.token = token;
-    if (!isServer) {
-      localStorage.setItem('auth_token', token);
-    }
   }
-
-  public clearToken() {
-    this.token = null;
-    if (!isServer) {
-      localStorage.removeItem('auth_token');
-    }
-  }
+  */
 
   // --- Generic Methods ---
 
   public async get<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
     const response = await this.client.get<T>(url, config);
     if (response.status >= 400) {
-        throw {
-            message: response.statusText,
-            status: response.status,
-            data: response.data
-        } as ApiError;
+      throw {
+        message: response.statusText,
+        status: response.status,
+        data: response.data
+      } as ApiError;
     }
     return response.data;
   }
@@ -92,11 +86,11 @@ class ApiClient {
   public async post<T>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T> {
     const response = await this.client.post<T>(url, data, config);
     if (response.status >= 400) {
-        throw {
-            message: response.statusText,
-            status: response.status,
-            data: response.data
-        } as ApiError;
+      throw {
+        message: response.statusText,
+        status: response.status,
+        data: response.data
+      } as ApiError;
     }
     return response.data;
   }
@@ -104,11 +98,11 @@ class ApiClient {
   public async put<T>(url: string, data?: any, config?: AxiosRequestConfig): Promise<T> {
     const response = await this.client.put<T>(url, data, config);
     if (response.status >= 400) {
-        throw {
-            message: response.statusText,
-            status: response.status,
-            data: response.data
-        } as ApiError;
+      throw {
+        message: response.statusText,
+        status: response.status,
+        data: response.data
+      } as ApiError;
     }
     return response.data;
   }
@@ -116,17 +110,14 @@ class ApiClient {
   public async delete<T>(url: string, config?: AxiosRequestConfig): Promise<T> {
     const response = await this.client.delete<T>(url, config);
     if (response.status >= 400) {
-        throw {
-            message: response.statusText,
-            status: response.status,
-            data: response.data
-        } as ApiError;
+      throw {
+        message: response.statusText,
+        status: response.status,
+        data: response.data
+      } as ApiError;
     }
     return response.data;
   }
 }
 
 export const api = new ApiClient();
-
-// Helper hook for SWR or React Query could go here
-

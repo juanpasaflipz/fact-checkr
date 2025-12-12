@@ -12,6 +12,7 @@ Outputs prioritized queue for fact-checking.
 from typing import List, Dict, Optional
 from datetime import datetime
 import logging
+from sqlalchemy import or_, and_, func
 
 from app.database.connection import SessionLocal
 from app.database.models import (

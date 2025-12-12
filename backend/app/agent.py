@@ -26,58 +26,9 @@ import anthropic
 import openai
 import json
 import asyncio
+from app.services.search_service import search_web
 
-async def search_web(query: str) -> List[str]:
-    """Search the web using Serper API for evidence gathering"""
-    serper_api_key = os.getenv("SERPER_API_KEY")
-    
-    if not serper_api_key:
-        print(f"Warning: SERPER_API_KEY not found. Using mock results for: {query}")
-        return [
-            "https://www.animalpolitico.com/verificacion-reforma-judicial",
-            "https://www.eluniversal.com.mx/nacion/sheinbaum-metro"
-        ]
-    
-    try:
-        import httpx
-        
-        # Serper API endpoint
-        url = "https://google.serper.dev/search"
-        headers = {
-            "X-API-KEY": serper_api_key,
-            "Content-Type": "application/json"
-        }
-        
-        # Search query optimized for Mexican news sources
-        payload = {
-            "q": f"{query} site:mx OR site:com.mx",
-            "num": 10,  # Get top 10 results
-            "gl": "mx",  # Country: Mexico
-            "hl": "es",  # Language: Spanish
-        }
-        
-        async with httpx.AsyncClient(timeout=10.0) as client:
-            response = await client.post(url, json=payload, headers=headers)
-            response.raise_for_status()
-            data = response.json()
-            
-            # Extract URLs from search results
-            urls = []
-            if "organic" in data:
-                for result in data["organic"]:
-                    if "link" in result:
-                        urls.append(result["link"])
-            
-            print(f"Serper API found {len(urls)} results for: {query}")
-            return urls[:10]  # Return top 10 URLs
-            
-    except Exception as e:
-        print(f"Error using Serper API: {e}. Falling back to mock results.")
-        # Fallback to mock results on error
-        return [
-            "https://www.animalpolitico.com/verificacion-reforma-judicial",
-            "https://www.eluniversal.com.mx/nacion/sheinbaum-metro"
-        ]
+
 
 class FactChecker:
     def __init__(self):
@@ -333,7 +284,7 @@ OUTPUT FORMAT (String only):
         if self.anthropic_client:
             try:
                 response = self.anthropic_client.messages.create(
-                    model="claude-sonnet-4-20250514",
+                    model="claude-3-5-sonnet-20240620",
                     max_tokens=150,
                     temperature=0.3,
                     system=system_prompt,
@@ -404,7 +355,7 @@ RESPONSE FORMAT (JSON only, no markdown):
         if self.anthropic_client:
             try:
                 response = self.anthropic_client.messages.create(
-                    model="claude-sonnet-4-20250514",
+                    model="claude-3-5-sonnet-20240620",
                     max_tokens=300,
                     temperature=0.3,
                     system=system_prompt,
@@ -576,7 +527,7 @@ RESPONSE FORMAT (JSON only, no markdown):
         if self.anthropic_client:
             try:
                 response = self.anthropic_client.messages.create(
-                    model="claude-sonnet-4-20250514",
+                    model="claude-3-5-sonnet-20240620",
                     max_tokens=400,
                     temperature=0.3,
                     system=system_prompt,
@@ -680,7 +631,7 @@ Return JSON format:
         if self.anthropic_client:
             try:
                 response = self.anthropic_client.messages.create(
-                    model="claude-sonnet-4-20250514",
+                    model="claude-3-5-sonnet-20240620",
                     max_tokens=200,
                     temperature=0.2,
                     system=system_prompt,
@@ -773,7 +724,7 @@ RESPONSE FORMAT (JSON only, no markdown):
         if self.anthropic_client:
             try:
                 response = self.anthropic_client.messages.create(
-                    model="claude-sonnet-4-20250514",
+                    model="claude-3-5-sonnet-20240620",
                     max_tokens=200,
                     temperature=0.2,
                     system=system_prompt,
@@ -829,3 +780,52 @@ RESPONSE FORMAT (JSON only, no markdown):
                 print(f"⚠️  Topic extraction error (OpenAI): {e}")
         
         return []
+
+    async def answer_question_about_claim(self, context: str, question: str) -> str:
+        """Answer a follow-up question about a claim using context"""
+        if not self.anthropic_client and not self.openai_client:
+            return "Lo siento, no puedo responder preguntas en este momento (AI no disponible)."
+            
+        system_prompt = """You are a helpful assistant for FactCheckr MX.
+Answer the user's question based strictly on the provided verification context.
+If the answer is not in the context, say so politely.
+Keep answers concise and in Mexican Spanish."""
+        
+        user_prompt = f"""CONTEXT:
+{context}
+
+QUESTION: "{question}"
+
+ANSWER:"""
+        
+        # Try Anthropic first
+        if self.anthropic_client:
+            try:
+                response = self.anthropic_client.messages.create(
+                    model="claude-3-5-sonnet-20240620",
+                    max_tokens=300,
+                    temperature=0.3,
+                    system=system_prompt,
+                    messages=[{"role": "user", "content": user_prompt}]
+                )
+                return response.content[0].text.strip()
+            except Exception as e:
+                print(f"⚠️  Chat error (Anthropic): {e}")
+        
+        # Fallback to OpenAI
+        if self.openai_client:
+            try:
+                response = self.openai_client.chat.completions.create(
+                    model="gpt-4o",
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt}
+                    ],
+                    max_tokens=300,
+                    temperature=0.3
+                )
+                return response.choices[0].message.content.strip()
+            except Exception as e:
+                print(f"⚠️  Chat error (OpenAI): {e}")
+                
+        return "Lo siento, hubo un error al procesar tu pregunta."

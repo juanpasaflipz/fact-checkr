@@ -11,13 +11,11 @@ RUN apt-get update && apt-get install -y \
     && rm -rf /var/lib/apt/lists/*
 
 # Copy requirements first for better caching
-# Works when build context is repo root (Railway default)
-COPY backend/requirements.txt .
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
-# Works when build context is repo root (Railway default)
-COPY backend/ .
+COPY . .
 
 # Create logs directory
 RUN mkdir -p logs

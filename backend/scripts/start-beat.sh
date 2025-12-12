@@ -7,6 +7,12 @@ echo "=========================================="
 echo "Starting FactCheckr Celery Beat Scheduler..."
 echo "=========================================="
 
+# Start a dummy HTTP server to satisfy Cloud Run health checks immediately
+# Cloud Run expects the container to listen on $PORT (default 8080)
+PORT="${PORT:-8080}"
+echo "Starting dummy HTTP server on port $PORT..."
+python3 -m http.server "$PORT" &
+
 # Set Python path to include current directory
 export PYTHONPATH=/app:$PYTHONPATH
 

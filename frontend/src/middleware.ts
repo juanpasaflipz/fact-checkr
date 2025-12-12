@@ -7,7 +7,7 @@ export function middleware(request: NextRequest) {
 
   // --- Auth Logic ---
   const { pathname } = request.nextUrl;
-  
+
   // Public routes that don't require authentication
   const publicRoutes = [
     '/',
@@ -18,23 +18,23 @@ export function middleware(request: NextRequest) {
     '/tendencias',
     '/estadisticas',
   ];
-  
+
   // Check if route is public
-  const isPublicRoute = publicRoutes.some(route => 
+  const isPublicRoute = publicRoutes.some(route =>
     pathname === route || pathname.startsWith(`${route}/`)
   );
-  
+
   // Check for auth token in cookies or headers
-  const authToken = request.cookies.get('auth_token')?.value || 
-                    request.headers.get('authorization')?.replace('Bearer ', '');
-  
+  // const authToken = request.cookies.get('auth_token')?.value || 
+  //                   request.headers.get('authorization')?.replace('Bearer ', '');
+
   // If no token and trying to access protected route, redirect to signin
-  if (!isPublicRoute && !authToken) {
-    const signInUrl = new URL('/signin', request.url);
-    signInUrl.searchParams.set('redirect', pathname);
-    return NextResponse.redirect(signInUrl);
-  }
-  
+  // if (!isPublicRoute && !authToken) {
+  //   const signInUrl = new URL('/signin', request.url);
+  //   signInUrl.searchParams.set('redirect', pathname);
+  //   return NextResponse.redirect(signInUrl);
+  // }
+
   // --- Security & Performance ---
   const response = NextResponse.next();
 

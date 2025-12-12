@@ -106,3 +106,74 @@ async def get_share_content(
         explanation=claim.explanation or ""
     )
 
+
+# --- Video Generation ---
+
+# In-memory video generator instance
+try:
+    from app.services.video_generator import VideoGenerator
+    video_generator = VideoGenerator()
+except ImportError:
+    video_generator = None
+
+
+class VideoGenerationRequest(BaseModel):
+    """Request to generate a video from a claim"""
+    platform: str = "youtube"  # youtube or tiktok
+
+
+class VideoGenerationResponse(BaseModel):
+    """Response with video URL"""
+    video_url: str
+    message: str
+
+
+@router.post("/video/{claim_id}", response_model=VideoGenerationResponse)
+async def generate_video(
+    claim_id: str,
+    request: VideoGenerationRequest,
+    db: Session = Depends(get_db)
+):
+    """Generate a video for a specific claim"""
+    if not video_generator or not video_generator.is_available():
+        raise HTTPException(
+            status_code=503, 
+            detail="Video generation service unavailable (missing dependencies)"
+        )
+
+    claim = db.query(DBClaim).filter(DBClaim.id == claim_id).first()
+    if not claim:
+        raise HTTPException(status_code=404, detail="Claim not found")
+
+    # Prepare article dictionary for VideoGenerator
+    article = {
+        "title": f"FactCheck: {claim.claim_text[:50]}...",
+        "content": claim.explanation or claim.claim_text,
+        "excerpt": claim.claim_text,
+        "slug": f"claim-{claim_id}"
+    }
+
+    try:
+        # Generate video
+        video_path = await video_generator.generate_video_from_article(
+            article, 
+            platform=request.platform
+        )
+        
+        if not video_path:
+            raise HTTPException(status_code=500, detail="Video generation failed (returned None)")
+
+        # Convert local path to URL
+        # Assumption: app/static is mounted at /static
+        filename = video_path.split("/")[-1]
+        video_url = f"/static/videos/{filename}"
+
+        return VideoGenerationResponse(
+            video_url=video_url,
+            message="Video generated successfully"
+        )
+
+    except Exception as e:
+        import traceback
+        print(traceback.format_exc())
+        raise HTTPException(status_code=500, detail=f"Error generating video: {str(e)}")

@@ -5,6 +5,7 @@
 
 import { loadStripe, Stripe } from '@stripe/stripe-js';
 import { getApiBaseUrl } from './api-config';
+import { auth } from './firebase';
 
 let stripePromise: Promise<Stripe | null>;
 
@@ -15,15 +16,15 @@ let stripePromise: Promise<Stripe | null>;
 export const getStripe = (): Promise<Stripe | null> => {
   if (!stripePromise) {
     const publishableKey = process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY;
-    
+
     if (!publishableKey) {
       console.warn('Stripe publishable key not found. Stripe features will be disabled.');
       return Promise.resolve(null);
     }
-    
+
     stripePromise = loadStripe(publishableKey);
   }
-  
+
   return stripePromise;
 };
 
@@ -41,17 +42,19 @@ export const createCheckoutSession = async (
 ): Promise<string | null> => {
   try {
     const apiUrl = getApiBaseUrl();
-    
-    // Get auth token from localStorage or cookies
-    const token = localStorage.getItem('auth_token') || 
-                  document.cookie.split('; ').find(row => row.startsWith('auth_token='))?.split('=')[1];
-    
+
+    // Get auth token from Firebase
+    let token = null;
+    if (auth.currentUser) {
+      token = await auth.currentUser.getIdToken();
+    }
+
     // Construct URL properly - handle empty apiUrl case
     const endpoint = '/api/subscriptions/create-checkout-session';
     const url = apiUrl ? `${apiUrl}${endpoint}` : endpoint;
-    
+
     console.log('Creating checkout session:', { url, tier, billingCycle, hasToken: !!token });
-    
+
     const response = await fetch(url, {
       method: 'POST',
       headers: {
@@ -64,7 +67,7 @@ export const createCheckoutSession = async (
         trial_days: trialDays,
       }),
     });
-    
+
     if (!response.ok) {
       if (response.status === 401) {
         // Redirect to signin if not authenticated
@@ -74,10 +77,10 @@ export const createCheckoutSession = async (
       const error = await response.json().catch(() => ({ detail: `HTTP ${response.status}: ${response.statusText}` }));
       throw new Error(error.detail || 'Failed to create checkout session');
     }
-    
+
     const data = await response.json();
     return data.checkout_url;
-  } catch (error) {
+  } catch (error: any) {
     // Enhanced error logging
     if (error instanceof TypeError && error.message === 'Failed to fetch') {
       const apiUrl = getApiBaseUrl();
@@ -113,7 +116,7 @@ export const redirectToCheckout = async (
 ): Promise<void> => {
   try {
     const checkoutUrl = await createCheckoutSession(tier, billingCycle, trialDays);
-    
+
     if (checkoutUrl) {
       window.location.href = checkoutUrl;
     } else {
@@ -125,4 +128,3 @@ export const redirectToCheckout = async (
     throw new Error(message);
   }
 };
-

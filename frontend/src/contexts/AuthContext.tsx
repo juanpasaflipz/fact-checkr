@@ -1,7 +1,13 @@
-'use client';
+"use client";
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { User, getCurrentUser, isAuthenticated, logout as authLogout } from '@/lib/auth';
+import {
+  onAuthStateChanged,
+  User,
+  getIdToken,
+  signOut
+} from "firebase/auth";
+import { auth } from "@/lib/firebase";
 
 interface AuthContextType {
   user: User | null;
@@ -17,31 +23,41 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
 
-  const refreshUser = async () => {
-    if (!isAuthenticated()) {
-      setUser(null);
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
+      if (currentUser) {
+        try {
+          // Force token refresh to ensure we have a valid token
+          // helpful if custom claims (like admin) changed
+          await getIdToken(currentUser, true);
+          setUser(currentUser);
+        } catch (error) {
+          console.error("Error refreshing token:", error);
+          setUser(null);
+        }
+      } else {
+        setUser(null);
+      }
       setLoading(false);
-      return;
-    }
+    });
 
-    try {
-      const currentUser = await getCurrentUser();
-      setUser(currentUser);
-    } catch (error) {
-      console.error('Error fetching user:', error);
-      setUser(null);
-    } finally {
-      setLoading(false);
+    return () => unsubscribe();
+  }, []);
+
+  const refreshUser = async () => {
+    if (auth.currentUser) {
+      await auth.currentUser.reload();
+      setUser(auth.currentUser);
     }
   };
 
-  useEffect(() => {
-    refreshUser();
-  }, []);
-
-  const logout = () => {
-    authLogout();
-    setUser(null);
+  const logout = async () => {
+    try {
+      await signOut(auth);
+      setUser(null);
+    } catch (error) {
+      console.error("Error signing out:", error);
+    }
   };
 
   return (
@@ -66,4 +82,3 @@ export function useAuth() {
   }
   return context;
 }
-

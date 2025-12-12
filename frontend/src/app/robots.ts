@@ -9,7 +9,7 @@ export default function robots(): MetadataRoute.Robots {
         disallow: ['/api/', '/admin/'],
       },
     ],
-    sitemap: 'https://factcheck.mx/sitemap.xml',
+    sitemap: 'https://app.factcheck.mx/sitemap.xml',
   };
 }
 

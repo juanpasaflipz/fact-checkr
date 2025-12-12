@@ -124,20 +124,20 @@ celery_app.conf.update(
                 "expires": 86400,  # Expires after 24 hours
             }
         },
-        # Trending topic detection: Every 2 hours
+        # Trending topic detection: Every 15 minutes (was 2 hours)
         "detect-trending-topics": {
             "task": "app.tasks.scraper.detect_and_prioritize_topics",
-            "schedule": crontab(minute=0, hour="*/2"),  # Every 2 hours
+            "schedule": crontab(minute="*/15"),  # Every 15 minutes
             "options": {
-                "expires": 3600,  # 1 hour
+                "expires": 900,  # 15 minutes
             }
         },
-        # Scrape prioritized topics: Every 30 minutes
+        # Scrape prioritized topics: Every 5 minutes (was 30 minutes)
         "scrape-prioritized-topics": {
             "task": "app.tasks.scraper.scrape_prioritized_topics",
-            "schedule": crontab(minute="*/30"),  # Every 30 minutes
+            "schedule": crontab(minute="*/5"),  # Every 5 minutes
             "options": {
-                "expires": 1800,  # 30 minutes
+                "expires": 300,  # 5 minutes
             }
         },
         # Blog article generation: 3-4 times daily

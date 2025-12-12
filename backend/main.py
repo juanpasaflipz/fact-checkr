@@ -96,6 +96,7 @@ OPTIONAL_ROUTERS = {
     'analytics': {'available': False, 'dependencies': []},
     'keywords': {'available': False, 'dependencies': []},
     'blog': {'available': False, 'dependencies': []},
+    'chat': {'available': False, 'dependencies': []},
 }
 
 # Load core routers (always required)
@@ -143,6 +144,8 @@ default_origins = ",".join([
     "http://localhost:3001",
     "https://factcheck.mx",
     "https://www.factcheck.mx",
+    "https://app.factcheck.mx",
+    "https://www.app.factcheck.mx",
     "https://fact-checkr-production.up.railway.app",
     "https://fact-checkr.vercel.app",
     "https://fact-checkr-juanpasa.vercel.app",
@@ -159,6 +162,15 @@ app.add_middleware(
     allow_headers=["*"],
 )
 logger.info(f"✅ CORS middleware configured with origins: {cors_origins} + Vercel regex")
+
+# --- Static Files ---
+from fastapi.staticfiles import StaticFiles
+static_dir = os.path.join(os.path.dirname(__file__), "app/static")
+if not os.path.exists(static_dir):
+    os.makedirs(static_dir, exist_ok=True)
+
+app.mount("/static", StaticFiles(directory=static_dir), name="static")
+logger.info(f"✅ Static files mounted at /static from {static_dir}")
 
 # --- Health Check (Priority) ---
 @app.get("/health")

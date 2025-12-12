@@ -3,13 +3,14 @@
 import { useState, useEffect, useRef, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
-import { login, googleLogin, handleOAuthCallback, isAuthenticated } from '@/lib/auth';
 import { useAuth } from '@/contexts/AuthContext';
+import { signInWithEmailAndPassword, signInWithPopup, GoogleAuthProvider } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
 
 function SignInForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { refreshUser, isAuthenticated: isAuthenticatedContext, loading: authLoading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loading, setLoading] = useState(false);
@@ -25,56 +26,12 @@ function SignInForm() {
     if (authLoading) return;
 
     // Check if user is already authenticated via context
-    if (isAuthenticatedContext) {
+    if (user) {
       hasRedirected.current = true;
       router.replace('/subscription');
       return;
     }
-
-    // Handle OAuth callback
-    try {
-      const token = handleOAuthCallback();
-      if (token) {
-        hasRedirected.current = true;
-        setSuccess(true);
-        // Refresh user in auth context and redirect
-        refreshUser().then(() => {
-          router.replace('/subscription');
-        }).catch(() => {
-          // Even if refreshUser fails, redirect anyway - subscription page will handle it
-          router.replace('/subscription');
-        });
-        return;
-      }
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'OAuth authentication failed');
-    }
-
-    // Check for error in URL params
-    const urlError = searchParams.get('error');
-    const errorDetail = searchParams.get('detail');
-    if (urlError) {
-      const errorMessages: Record<string, string> = {
-        oauth_cancelled: 'Autenticación con Google cancelada',
-        invalid_callback: 'Error en el callback de autenticación',
-        invalid_state: 'Sesión de autenticación inválida',
-        oauth_not_configured: 'Autenticación con Google no configurada',
-        token_exchange_failed: 'Error al obtener token de autenticación',
-        invalid_user_info: 'Error al obtener información del usuario',
-        oauth_error: 'Error en la autenticación con Google',
-        oauth_http_error: 'Error de comunicación con Google',
-        redirect_uri_mismatch: 'Error de configuración: El redirect URI no coincide. Por favor contacta al administrador.',
-        invalid_client: 'Error de configuración: Credenciales de Google inválidas.',
-        invalid_grant: 'Código de autorización inválido o expirado. Por favor intenta de nuevo.',
-        database_error: 'Error al guardar en la base de datos. Por favor intenta de nuevo.',
-        user_already_exists: 'Este usuario ya existe. Por favor inicia sesión con tu contraseña.',
-        server_error: errorDetail
-          ? `Error del servidor: ${errorDetail.replace(/_/g, ' ')}. Por favor revisa los logs del servidor o contacta al soporte.`
-          : 'Error del servidor. Por favor revisa los logs del servidor o contacta al soporte.',
-      };
-      setError(errorMessages[urlError] || 'Error de autenticación');
-    }
-  }, [router, searchParams, authLoading, isAuthenticatedContext, refreshUser]);
+  }, [router, authLoading, user]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -82,20 +39,35 @@ function SignInForm() {
     setLoading(true);
 
     try {
-      await login(email, password);
+      await signInWithEmailAndPassword(auth, email, password);
       setSuccess(true);
+      // AuthContext will detect the change and redirect via the useEffect above,
+      // but we can also force it here for better UX
       setTimeout(() => {
         router.push('/subscription');
-      }, 1500);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al iniciar sesión');
+      }, 1000);
+    } catch (err: any) {
+      console.error(err);
+      let msg = 'Error al iniciar sesión';
+      if (err.code === 'auth/invalid-credential') msg = 'Credenciales incorrectas';
+      if (err.code === 'auth/user-not-found') msg = 'Usuario no encontrado';
+      if (err.code === 'auth/wrong-password') msg = 'Contraseña incorrecta';
+      if (err.code === 'auth/too-many-requests') msg = 'Demasiados intentos. Intenta más tarde.';
+      setError(msg);
       setLoading(false);
     }
   };
 
-  const handleGoogleLogin = () => {
+  const handleGoogleLogin = async () => {
     setError(null);
-    googleLogin();
+    try {
+      const provider = new GoogleAuthProvider();
+      await signInWithPopup(auth, provider);
+      // Redirect handled by useEffect
+    } catch (err: any) {
+      console.error(err);
+      setError('Error al iniciar sesión con Google');
+    }
   };
 
   return (
@@ -245,4 +217,3 @@ export default function SignInPage() {
     </Suspense>
   );
 }
-

@@ -1,0 +1,16 @@
+steps:
+  - name: "gcr.io/cloud-builders/docker"
+    args:
+      [
+        "build",
+        "-t",
+        "gcr.io/$PROJECT_ID/factcheckr-beat",
+        "-f",
+        "Dockerfile.beat",
+        ".",
+      ]
+    dir: "backend"
+  - name: "gcr.io/cloud-builders/docker"
+    args: ["push", "gcr.io/$PROJECT_ID/factcheckr-beat"]
+images:
+  - "gcr.io/$PROJECT_ID/factcheckr-beat"

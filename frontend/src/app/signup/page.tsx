@@ -3,10 +3,13 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { register, googleLogin, isAuthenticated } from '@/lib/auth';
+import { createUserWithEmailAndPassword, signInWithPopup, GoogleAuthProvider, updateProfile } from 'firebase/auth';
+import { auth } from '@/lib/firebase';
+import { useAuth } from '@/contexts/AuthContext';
 
 export default function SignUpPage() {
   const router = useRouter();
+  const { user } = useAuth();
   const [formData, setFormData] = useState({
     email: '',
     username: '',
@@ -21,23 +24,23 @@ export default function SignUpPage() {
 
   useEffect(() => {
     // Check if user is already authenticated
-    if (isAuthenticated()) {
+    if (user) {
       router.push('/subscription');
       return;
     }
-  }, [router]);
+  }, [router, user]);
 
   useEffect(() => {
     // Calculate password strength
     const password = formData.password;
     let strength = 0;
-    
+
     if (password.length >= 8) strength++;
     if (password.length >= 12) strength++;
     if (/[a-z]/.test(password) && /[A-Z]/.test(password)) strength++;
     if (/\d/.test(password)) strength++;
     if (/[^a-zA-Z\d]/.test(password)) strength++;
-    
+
     setPasswordStrength(strength);
   }, [formData.password]);
 
@@ -60,7 +63,7 @@ export default function SignUpPage() {
       return false;
     }
 
-    if (!formData.email || !formData.username || !formData.password) {
+    if (!formData.email || !formData.password) {
       setError('Por favor completa todos los campos requeridos');
       return false;
     }
@@ -79,19 +82,40 @@ export default function SignUpPage() {
     setLoading(true);
 
     try {
-      const { confirmPassword, ...registerData } = formData;
-      await register(registerData);
+      const { email, password, username, full_name } = formData;
+      const userCredential = await createUserWithEmailAndPassword(auth, email, password);
+
+      // Update profile with username/fullname if provided
+      if (username || full_name) {
+        await updateProfile(userCredential.user, {
+          displayName: full_name || username
+        });
+      }
+
+      // TODO: Call backend to create user record in SQL DB if needed
+      // (Currently the backend does "lookup by email" so it might handle missing users gracefully or we might need an endpoint)
+
       // Redirect to subscription page after successful registration
       router.push('/subscription');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Error al registrar usuario');
+    } catch (err: any) {
+      console.error(err);
+      let msg = 'Error al registrar usuario';
+      if (err.code === 'auth/email-already-in-use') msg = 'El email ya está registrado';
+      if (err.code === 'auth/weak-password') msg = 'La contraseña es muy débil';
+      setError(msg);
       setLoading(false);
     }
   };
 
-  const handleGoogleLogin = () => {
+  const handleGoogleLogin = async () => {
     setError(null);
-    googleLogin();
+    try {
+      const provider = new GoogleAuthProvider();
+      await signInWithPopup(auth, provider);
+    } catch (err: any) {
+      console.error(err);
+      setError('Error al registrarse con Google');
+    }
   };
 
   const getPasswordStrengthLabel = (): string => {
@@ -321,4 +345,3 @@ export default function SignUpPage() {
     </div>
   );
 }
-

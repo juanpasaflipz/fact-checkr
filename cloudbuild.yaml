@@ -1,0 +1,32 @@
+steps:
+  # 1. Build the container image
+  - name: "gcr.io/cloud-builders/docker"
+    args: ["build", "-t", "gcr.io/$PROJECT_ID/factcheckr-backend", "./backend"]
+
+  # 2. Push the container image to Container Registry
+  - name: "gcr.io/cloud-builders/docker"
+    args: ["push", "gcr.io/$PROJECT_ID/factcheckr-backend"]
+
+  # 3. Deploy container to Cloud Run
+  - name: "gcr.io/google.com/cloudsdktool/cloud-sdk"
+    entrypoint: gcloud
+    args:
+      - "run"
+      - "deploy"
+      - "factcheckr-backend"
+      - "--image"
+      - "gcr.io/$PROJECT_ID/factcheckr-backend"
+      - "--region"
+      - "us-central1"
+      - "--platform"
+      - "managed"
+      - "--allow-unauthenticated"
+      - "--vpc-connector"
+      - "factcheckr-conn"
+      - "--add-cloudsql-instances"
+      - "fact-check-mx-934bc:us-central1:factcheckr-db"
+      - "--set-env-vars"
+      - "DATABASE_URL=postgresql://postgres:${_DB_PASSWORD}@/factcheckr_db?host=/cloudsql/fact-check-mx-934bc:us-central1:factcheckr-db,REDIS_URL=redis://10.239.24.51:6379,OPENAI_API_KEY=${_OPENAI_API_KEY},ANTHROPIC_API_KEY=${_ANTHROPIC_API_KEY},TWITTER_API_KEY=${_TWITTER_API_KEY},TWITTER_API_SECRET=${_TWITTER_API_SECRET},TWITTER_ACCESS_TOKEN=${_TWITTER_ACCESS_TOKEN},TWITTER_ACCESS_SECRET=${_TWITTER_ACCESS_SECRET},TWITTER_BEARER_TOKEN=${_TWITTER_BEARER_TOKEN},SERPER_API_KEY=${_SERPER_API_KEY},STRIPE_SECRET_KEY=${_STRIPE_SECRET_KEY},STRIPE_PUBLISHABLE_KEY=${_STRIPE_PUBLISHABLE_KEY},STRIPE_WEBHOOK_SECRET=${_STRIPE_WEBHOOK_SECRET},STRIPE_PRO_MONTHLY_PRICE_ID=${_STRIPE_PRO_MONTHLY_PRICE_ID},STRIPE_PRO_YEARLY_PRICE_ID=${_STRIPE_PRO_YEARLY_PRICE_ID},STRIPE_TEAM_MONTHLY_PRICE_ID=${_STRIPE_TEAM_MONTHLY_PRICE_ID},STRIPE_TEAM_YEARLY_PRICE_ID=${_STRIPE_TEAM_YEARLY_PRICE_ID},FIREBASE_CREDENTIALS=${_FIREBASE_CREDENTIALS_JSON},JWT_SECRET_KEY=${_JWT_SECRET_KEY},SCRAPING_KEYWORD_PRIORITY=all,USE_MULTI_AGENT_VERIFICATION=true,CORS_ORIGINS=*"
+
+substitutions:
+  _DB_PASSWORD: "YOUR_DB_PASSWORD_HERE" # Will be substituted at build time
