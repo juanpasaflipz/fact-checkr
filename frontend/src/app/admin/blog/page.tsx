@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 import Header from '@/components/Header';
 import { getApiBaseUrl } from '@/lib/api-config';
+import { useAuth } from '@/contexts/AuthContext';
 import Link from 'next/link';
 
 interface Article {
@@ -26,20 +27,25 @@ export default function AdminBlogPage() {
     const [filter, setFilter] = useState<'all' | 'published' | 'draft'>('all');
     const [searchQuery, setSearchQuery] = useState('');
 
+    const { user } = useAuth();
+
     useEffect(() => {
-        fetchArticles();
-    }, [filter]);
+        if (user) {
+            fetchArticles();
+        }
+    }, [user, filter]);
 
     const fetchArticles = async () => {
         try {
             setLoading(true);
             const baseUrl = getApiBaseUrl();
-            const token = localStorage.getItem('auth_token');
 
-            if (!token) {
+            if (!user) {
                 router.push('/');
                 return;
             }
+
+            const token = await user.getIdToken();
 
             // Using the status param we simplified in the backend
             const statusParam = `?status=${filter}&limit=50`;
@@ -76,7 +82,8 @@ export default function AdminBlogPage() {
 
         try {
             const baseUrl = getApiBaseUrl();
-            const token = localStorage.getItem('auth_token');
+            if (!user) return;
+            const token = await user.getIdToken();
 
             const response = await fetch(`${baseUrl}/api/blog/articles/${articleId}/publish?publish_to_telegraph=true&publish_to_twitter=true`, {
                 method: 'POST',

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import Sidebar from '@/components/Sidebar';
 import Header from '@/components/Header';
 import { getApiBaseUrl } from '@/lib/api-config';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface Proposal {
   id: number;
@@ -75,7 +76,8 @@ export default function AdminMarketProposalsPage() {
 
     try {
       const baseUrl = getApiBaseUrl();
-      const token = localStorage.getItem('auth_token');
+      if (!user) return;
+      const token = await user.getIdToken();
 
       const response = await fetch(`${baseUrl}/api/markets/admin/proposals/${proposalId}/approve`, {
         method: 'POST',
@@ -105,7 +107,8 @@ export default function AdminMarketProposalsPage() {
 
     try {
       const baseUrl = getApiBaseUrl();
-      const token = localStorage.getItem('auth_token');
+      if (!user) return;
+      const token = await user.getIdToken();
 
       const response = await fetch(`${baseUrl}/api/markets/admin/proposals/${proposalId}/reject`, {
         method: 'POST',

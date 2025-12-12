@@ -29,13 +29,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         try {
           // Force token refresh to ensure we have a valid token
           // helpful if custom claims (like admin) changed
-          await getIdToken(currentUser, true);
+          const token = await getIdToken(currentUser, true);
+          localStorage.setItem('auth_token', token);
           setUser(currentUser);
         } catch (error) {
           console.error("Error refreshing token:", error);
+          localStorage.removeItem('auth_token');
           setUser(null);
         }
       } else {
+        localStorage.removeItem('auth_token');
         setUser(null);
       }
       setLoading(false);
@@ -54,6 +57,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const logout = async () => {
     try {
       await signOut(auth);
+      localStorage.removeItem('auth_token');
       setUser(null);
     } catch (error) {
       console.error("Error signing out:", error);
