@@ -22,29 +22,31 @@ interface Proposal {
 
 export default function AdminMarketProposalsPage() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'pending' | 'all'>('pending');
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
-    if (user) {
-      fetchProposals();
+    // Wait for auth check to complete
+    if (authLoading) return;
+
+    if (!user) {
+      router.push('/');
+      return;
     }
-  }, [user, filter]);
+
+    fetchProposals();
+  }, [user, authLoading, filter]);
 
   const fetchProposals = async () => {
+    // Don't fetch if still checking auth or not logged in
+    if (authLoading || !user) return;
+
     try {
       setLoading(true);
       const baseUrl = getApiBaseUrl();
-
-      if (!user) {
-        // If auth context is still loading, wait. If not user but loaded, redirect handled by wrapper?
-        // Check router.push('/') if strictly needed, but let's rely on user check
-        return;
-      }
-
       const token = await user.getIdToken();
 
       const statusParam = filter === 'pending' ? '?status=pending' : '';
@@ -250,4 +252,3 @@ export default function AdminMarketProposalsPage() {
     </div>
   );
 }
-

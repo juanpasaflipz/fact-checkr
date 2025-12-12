@@ -27,13 +27,21 @@ export default function AdminBlogPage() {
     const [filter, setFilter] = useState<'all' | 'published' | 'draft'>('all');
     const [searchQuery, setSearchQuery] = useState('');
 
-    const { user } = useAuth();
+    const { user, loading: authLoading } = useAuth();
 
     useEffect(() => {
-        if (user) {
-            fetchArticles();
+        // Wait for auth to initialize
+        if (authLoading) return;
+
+        if (!user) {
+            // If finished loading and no user, redirect
+            router.push('/');
+            return;
         }
-    }, [user, filter]);
+
+        // Only fetch if we have a user
+        fetchArticles();
+    }, [user, authLoading, filter]);
 
     const fetchArticles = async () => {
         try {
