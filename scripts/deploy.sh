@@ -1,6 +1,6 @@
 #!/bin/bash
 # Comprehensive Deployment Script for FactCheckr
-# Automates full deployment: migrations, backend (Railway), frontend (Vercel)
+# Automates full deployment: migrations, backend (Railway), frontend (Firebase)
 # Usage: ./scripts/deploy.sh [--skip-migrations] [--skip-backend] [--skip-frontend] [--verify-only]
 
 set -e
@@ -130,17 +130,23 @@ check_prerequisites() {
         log "Railway CLI found: $(railway --version 2>/dev/null || echo 'installed')"
     fi
     
-    # Vercel CLI
-    if ! command -v vercel &> /dev/null; then
-        warn "Vercel CLI not found"
-        if [ "$SKIP_FRONTEND" = false ]; then
-            info "  Install: npm i -g vercel"
-            info "  Or deploy manually via Vercel dashboard"
-        fi
+    # Firebase CLI
+    # Check for firebase command or npx firebase-tools
+    if command -v firebase &> /dev/null; then
+        log "Firebase CLI found: $(firebase --version)"
+        FIREBASE_CMD="firebase"
+    elif npx --no-install firebase-tools --version &> /dev/null; then
+        log "Firebase CLI found (via npx)"
+        FIREBASE_CMD="npx firebase-tools"
     else
-        log "Vercel CLI found: $(vercel --version 2>/dev/null || echo 'installed')"
+        warn "Firebase CLI not found"
+        if [ "$SKIP_FRONTEND" = false ]; then
+            info "  Install: npm i -g firebase-tools"
+            info "  Or we will try to use 'npx firebase-tools' (which may require confirmation)"
+            FIREBASE_CMD="npx -y firebase-tools"
+        fi
     fi
-    
+
     # Alembic (for migrations)
     if ! command -v alembic &> /dev/null; then
         warn "Alembic not found (required for migrations)"
@@ -237,26 +243,20 @@ check_railway() {
     fi
 }
 
-# Verify Vercel connection
-check_vercel() {
+# Verify Firebase connection
+check_firebase() {
     if [ "$SKIP_FRONTEND" = true ]; then
         return 0
     fi
     
-    section "Checking Vercel Connection"
+    section "Checking Firebase Connection"
     
-    if ! command -v vercel &> /dev/null; then
-        warn "Vercel CLI not available - skipping Vercel checks"
-        return 0
-    fi
-    
-    if vercel whoami &> /dev/null; then
-        log "Logged in to Vercel"
-        VERCEL_USER=$(vercel whoami 2>/dev/null || echo "unknown")
-        info "  User: $VERCEL_USER"
+    if $FIREBASE_CMD projects:list &> /dev/null; then
+        log "Logged in to Firebase"
     else
-        warn "Not logged in to Vercel"
-        info "  Run: vercel login"
+        warn "Not logged in to Firebase"
+        info "  Run: $FIREBASE_CMD login"
+        # Try to login if interactive? No, just warn.
     fi
 }
 
@@ -369,43 +369,35 @@ deploy_backend() {
     fi
 }
 
-# Deploy frontend to Vercel
+# Deploy frontend to Firebase
 deploy_frontend() {
     if [ "$SKIP_FRONTEND" = true ]; then
         warn "Skipping frontend deployment"
         return 0
     fi
     
-    section "Deploying Frontend to Vercel"
+    section "Deploying Frontend to Firebase"
     
     if [ "$VERIFY_ONLY" = true ]; then
         info "Verify-only mode: checking frontend status"
-        if command -v vercel &> /dev/null; then
-            cd frontend
-            vercel ls 2>/dev/null || warn "No Vercel deployments found"
-            cd ..
-        fi
+        $FIREBASE_CMD hosting:sites:list --project fact-check-mx-934bc
         return 0
     fi
     
     cd frontend
     
-    # Check if .env.local exists and has required variables
-    if [ -f ".env.local" ]; then
-        if grep -q "NEXT_PUBLIC_API_URL" .env.local; then
-            log "Frontend environment variables found"
-        else
-            warn "NEXT_PUBLIC_API_URL not found in .env.local"
-        fi
-    else
-        warn ".env.local not found"
-        info "Make sure environment variables are set in Vercel dashboard"
+    # Build test
+    step "Building frontend for production..."
+    
+    # Check if NEXT_PUBLIC_API_URL is set in environment or .env
+    # Note: Firebase build runs locally, so we need env vars here
+    if [ -z "$NEXT_PUBLIC_API_URL" ]; then
+        warn "NEXT_PUBLIC_API_URL is not set in shell environment"
+        info "Ideally set this before building, or ensure it's in .env.production"
     fi
     
-    # Build test
-    step "Testing frontend build..."
-    if npm run build > /dev/null 2>&1; then
-        log "Frontend build test passed"
+    if npm run build; then
+        log "Frontend build passed"
     else
         error "Frontend build failed"
         info "Run 'npm run build' in frontend/ to see errors"
@@ -413,67 +405,18 @@ deploy_frontend() {
         exit 1
     fi
     
-    if ! command -v vercel &> /dev/null; then
-        warn "Vercel CLI not available"
-        info "Deploy manually via Vercel dashboard or GitHub auto-deploy"
-        info "  URL: https://vercel.com"
-        cd ..
-        return 0
-    fi
+    step "Deploying to Firebase Hosting..."
     
-    if ! vercel whoami &> /dev/null; then
-        error "Not logged in to Vercel"
-        info "Run: vercel login"
-        cd ..
+    # Go back to root as firebase.json is likely there
+    cd ..
+    
+    # Using --only hosting to avoid deploying other Firebase services accidentally
+    if $FIREBASE_CMD deploy --only hosting --project fact-check-mx-934bc; then
+        log "Frontend deployed to Firebase Hosting"
+    else
+        error "Firebase deployment failed"
         exit 1
     fi
-    
-    # Check if project is linked
-    if [ ! -f ".vercel/project.json" ]; then
-        warn "Vercel project not linked"
-        read -p "Link Vercel project now? (y/N): " -n 1 -r
-        echo
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            vercel link
-        else
-            info "Skipping Vercel link. Deploy manually"
-            cd ..
-            return 0
-        fi
-    fi
-    
-    step "Deploying to Vercel..."
-    
-    # Check if we should push to trigger auto-deploy
-    cd ..
-    LOCAL=$(git rev-parse @)
-    REMOTE=$(git rev-parse @{u} 2>/dev/null || echo "")
-    cd frontend
-    
-    if [ -z "$REMOTE" ] || [ "$LOCAL" != "$REMOTE" ]; then
-        warn "Local changes not pushed to remote"
-        info "Vercel auto-deploy requires code to be pushed to GitHub"
-        read -p "Deploy to Vercel now anyway? (y/N): " -n 1 -r
-        echo
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            vercel --prod
-            log "Frontend deployed to Vercel"
-        else
-            info "Skipping Vercel deployment. Push to GitHub for auto-deploy"
-        fi
-    else
-        log "Code is up to date on remote"
-        read -p "Deploy to Vercel production now? (y/N): " -n 1 -r
-        echo
-        if [[ $REPLY =~ ^[Yy]$ ]]; then
-            vercel --prod
-            log "Frontend deployed to Vercel"
-        else
-            info "Vercel will auto-deploy if configured"
-        fi
-    fi
-    
-    cd ..
 }
 
 # Verify deployment
@@ -493,11 +436,17 @@ verify_deployment() {
         fi
     fi
     
-    # Frontend check (if we know the URL)
+    # Frontend check
     if [ "$SKIP_FRONTEND" = false ]; then
         step "Frontend deployment check..."
-        info "Check Vercel dashboard for frontend URL"
-        info "  URL: https://vercel.com"
+        info "Checking Firebase Hosting URL..."
+        FRONTEND_URL="https://app.factcheck.mx"
+        if curl -s -f -I "$FRONTEND_URL" > /dev/null; then
+             log "Frontend reachable at $FRONTEND_URL"
+        else
+             warn "Frontend might not be reachable yet or custom domain issue"
+             info "Check standard Firebase URL: https://fact-check-mx-934bc.web.app"
+        fi
     fi
     
     # Database migrations verification
@@ -529,7 +478,7 @@ main() {
     
     # Platform checks
     check_railway
-    check_vercel
+    check_firebase
     
     # Deployment steps
     if [ "$VERIFY_ONLY" = false ]; then
@@ -557,12 +506,12 @@ main() {
         info "  • Check backend health: curl https://backend-production-72ea.up.railway.app/health"
     fi
     if [ "$SKIP_FRONTEND" = false ]; then
-        info "  • Check Vercel dashboard: https://vercel.com"
+        info "  • Check Firebase: https://console.firebase.google.com/project/fact-check-mx-934bc/hosting"
+        info "  • App URL: https://app.factcheck.mx"
     fi
     if [ "$SKIP_MIGRATIONS" = false ]; then
         info "  • Verify migrations: ./scripts/deploy-production.sh verify"
     fi
-    info "  • Test features: Google OAuth, Stripe checkout, new features"
     echo ""
 }
 

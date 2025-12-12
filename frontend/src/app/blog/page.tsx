@@ -44,24 +44,24 @@ interface BlogResponse {
 
 async function getBlogArticles(): Promise<BlogResponse> {
   const apiUrl = getApiBaseUrl();
-  
+
   try {
     const url = `${apiUrl}/api/blog/articles?limit=20`;
     console.log('Fetching blog articles from:', url);
-    
+
     const response = await fetch(url, {
       next: { revalidate: 300 }, // Revalidate every 5 minutes
       headers: {
         'Content-Type': 'application/json',
       },
     });
-    
+
     if (!response.ok) {
       const errorText = await response.text();
       console.error('Failed to fetch articles:', response.status, errorText);
       throw new Error(`Failed to fetch articles: ${response.status} ${errorText}`);
     }
-    
+
     const data = await response.json();
     return data;
   } catch (error) {
@@ -77,23 +77,22 @@ async function getBlogArticles(): Promise<BlogResponse> {
 
 export default async function BlogPage() {
   const data = await getBlogArticles();
-  
+
   return (
-    <div className="min-h-screen bg-[#0a0a0f] flex">
+    <div className="min-h-screen bg-[var(--bg-secondary)] flex">
       <Sidebar />
       <div className="flex-1 lg:ml-64">
         <Header />
         <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-12">
           <div className="mb-8">
-            <h1 className="text-4xl font-bold text-[#00f0ff] mb-4"
-                style={{ textShadow: '0 0 10px rgba(0, 240, 255, 0.5)' }}>
+            <h1 className="text-4xl font-bold text-[var(--primary-blue)] mb-4">
               Blog de Verificación
             </h1>
-            <p className="text-gray-300 text-lg">
+            <p className="text-[var(--text-secondary)] text-lg">
               Análisis diario de verificación de hechos, tendencias y desinformación en política mexicana
             </p>
           </div>
-          
+
           <BlogArticleList articles={data.articles} tier={data.tier} freeTierLimit={data.free_tier_limit} />
         </main>
       </div>

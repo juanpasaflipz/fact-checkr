@@ -19,14 +19,14 @@ interface BlogArticleListProps {
   freeTierLimit?: number;
 }
 
-export default function BlogArticleList({ 
-  articles, 
+export default function BlogArticleList({
+  articles,
   tier,
-  freeTierLimit 
+  freeTierLimit
 }: BlogArticleListProps) {
   const { isAuthenticated } = useAuth();
   const isFree = tier === 'free';
-  
+
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'Fecha no disponible';
     const date = new Date(dateString);
@@ -36,7 +36,7 @@ export default function BlogArticleList({
       day: 'numeric'
     });
   };
-  
+
   const getArticleTypeLabel = (type: string) => {
     const labels: Record<string, string> = {
       'morning': 'Resumen Matutino',
@@ -46,24 +46,24 @@ export default function BlogArticleList({
     };
     return labels[type] || type;
   };
-  
+
   return (
     <div>
       {isFree && freeTierLimit && articles.length >= freeTierLimit && (
-        <div className="mb-6 p-4 bg-[#1a1a24] border-2 border-[#ff00ff]/50 rounded-lg">
-          <p className="text-sm text-gray-300 mb-2">
+        <div className="mb-6 p-4 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg shadow-sm">
+          <p className="text-sm text-[var(--text-secondary)] mb-2">
             Mostrando los {freeTierLimit} artículos más recientes.{' '}
-            <Link href="/subscription" className="text-[#ff00ff] hover:underline font-semibold">
+            <Link href="/subscription" className="text-[var(--primary-blue)] hover:underline font-semibold">
               Actualiza a PRO
             </Link>
             {' '}para acceso completo a todos los artículos.
           </p>
         </div>
       )}
-      
+
       {articles.length === 0 ? (
         <div className="text-center py-12">
-          <p className="text-gray-400 text-lg">No hay artículos disponibles aún.</p>
+          <p className="text-[var(--text-tertiary)] text-lg">No hay artículos disponibles aún.</p>
         </div>
       ) : (
         <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
@@ -71,29 +71,27 @@ export default function BlogArticleList({
             <Link
               key={article.id}
               href={`/blog/${article.slug}`}
-              className="group block p-6 bg-[#111118] border-2 border-[#00f0ff]/30 rounded-lg hover:border-[#00f0ff] transition-all hover:scale-105 cursor-pointer no-underline"
-              style={{ boxShadow: '0 0 15px rgba(0, 240, 255, 0.1)' }}
+              className="group block p-6 bg-[var(--bg-primary)] border border-[var(--border-color)] rounded-lg hover:border-[var(--primary-blue)] transition-all hover:shadow-md cursor-pointer no-underline"
               prefetch={true}
             >
               <div className="mb-2">
-                <span className="text-xs text-[#00f0ff] font-semibold uppercase">
+                <span className="text-xs text-[var(--primary-blue)] font-semibold uppercase bg-blue-50 px-2 py-1 rounded-full">
                   {getArticleTypeLabel(article.article_type)}
                 </span>
               </div>
-              <h2 className="text-xl font-bold text-[#00f0ff] mb-2 line-clamp-2"
-                  style={{ textShadow: '0 0 5px rgba(0, 240, 255, 0.3)' }}>
+              <h2 className="text-xl font-bold text-[var(--text-primary)] mb-2 line-clamp-2 group-hover:text-[var(--primary-blue)] transition-colors">
                 {article.title}
               </h2>
               {article.excerpt && (
-                <p className="text-gray-300 text-sm mb-4 line-clamp-3">
+                <p className="text-[var(--text-secondary)] text-sm mb-4 line-clamp-3">
                   {article.excerpt}
                 </p>
               )}
               <div className="flex items-center justify-between mt-4">
-                <time className="text-xs text-gray-500">
+                <time className="text-xs text-[var(--text-tertiary)]">
                   {formatDate(article.published_at || article.created_at)}
                 </time>
-                <span className="text-xs text-[#00f0ff] opacity-0 group-hover:opacity-100 transition-opacity">
+                <span className="text-xs text-[var(--primary-blue)] opacity-0 group-hover:opacity-100 transition-opacity">
                   Leer más →
                 </span>
               </div>
