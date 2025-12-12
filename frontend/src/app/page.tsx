@@ -111,10 +111,10 @@ export default function Home() {
 
         // Handle network errors (backend not running, CORS, etc.)
         // Check for various network error patterns
-        const isNetworkError = 
-          fetchError instanceof TypeError || 
+        const isNetworkError =
+          fetchError instanceof TypeError ||
           (fetchError instanceof Error && (
-            fetchError.message?.includes('fetch') || 
+            fetchError.message?.includes('fetch') ||
             fetchError.message?.includes('Failed to fetch') ||
             fetchError.message?.includes('NetworkError') ||
             fetchError.message?.includes('Network request failed') ||
@@ -122,7 +122,7 @@ export default function Home() {
           )) ||
           // Handle empty error objects (common with fetch failures)
           (fetchError && typeof fetchError === 'object' && Object.keys(fetchError).length === 0);
-        
+
         if (isNetworkError) {
           // Safely extract error message
           let errorMessage = 'Network request failed';
@@ -133,20 +133,20 @@ export default function Home() {
           } else if (fetchError && typeof fetchError === 'object') {
             errorMessage = (fetchError as any).message || JSON.stringify(fetchError) || 'Unknown network error';
           }
-          
+
           const errorDetails = {
             url,
             baseUrl,
             errorMessage,
             errorType: fetchError instanceof Error ? fetchError.constructor.name : typeof fetchError,
             troubleshooting: getConnectionErrorHelp(),
-            note: baseUrl.includes('localhost') 
+            note: baseUrl.includes('localhost')
               ? 'Using localhost backend. Make sure backend is running locally or set NEXT_PUBLIC_API_URL to your Railway backend URL.'
               : `Using remote backend: ${baseUrl}. Make sure this URL is correct and the backend is accessible.`
           };
-          
+
           console.error('Network error - Backend may not be running', errorDetails);
-          
+
           // Don't retry network errors - they're likely configuration issues
           setLoading(false);
           return;
@@ -176,7 +176,7 @@ export default function Home() {
         let errorMessage = `HTTP ${response.status}: ${response.statusText}`;
         let errorType = 'unknown';
         let retryAfter = 3;
-        
+
         try {
           const errorJson = JSON.parse(errorText);
           if (errorJson.detail) {
@@ -192,7 +192,7 @@ export default function Home() {
           // If not JSON, use the text as is
           if (errorText) errorMessage = errorText;
         }
-        
+
         // Handle 503 Service Unavailable with retry logic
         if (response.status === 503 && retryCount < 2) {
           const retryDelay = retryAfter * 1000 * (retryCount + 1);
@@ -200,7 +200,7 @@ export default function Home() {
           await new Promise(resolve => setTimeout(resolve, retryDelay));
           return fetchClaims(query, isLoadMore, retryCount + 1, statusFilter);
         }
-        
+
         // Handle 504 Gateway Timeout with retry logic
         if (response.status === 504 && retryCount < 2) {
           const retryDelay = 2000 * (retryCount + 1);
@@ -208,17 +208,23 @@ export default function Home() {
           await new Promise(resolve => setTimeout(resolve, retryDelay));
           return fetchClaims(query, isLoadMore, retryCount + 1, statusFilter);
         }
-        
+
         throw new Error(errorMessage);
       }
 
       const data = await response.json();
 
+      const validData = data.filter((c: Claim) => {
+        const text = c.claim_text || '';
+        const normalized = text.replace(/['"]/g, '').trim();
+        return normalized !== 'SKIP';
+      });
+
       if (isLoadMore) {
-        setClaims(prev => [...prev, ...data]);
+        setClaims(prev => [...prev, ...validData]);
         setSkip(prev => prev + LIMIT);
       } else {
-        setClaims(data);
+        setClaims(validData);
         setSkip(LIMIT);
       }
 
@@ -250,41 +256,41 @@ export default function Home() {
       // Safely extract error information
       let errorMessage = 'Unknown error';
       let errorType = 'unknown';
-      
+
       if (error instanceof Error) {
         errorMessage = error.message || error.name || 'Error occurred';
         errorType = error.constructor.name;
       } else if (typeof error === 'string') {
         errorMessage = error;
         errorType = 'string';
-        } else if (error && typeof error === 'object') {
-          // Handle empty objects or objects with error info
-          if (Object.keys(error).length === 0) {
-            errorMessage = 'Empty error object - likely network/CORS issue';
-            errorType = 'empty_object';
-          } else {
-            errorMessage = (error as any).message || (error as any).detail || JSON.stringify(error);
-            errorType = typeof error;
-          }
+      } else if (error && typeof error === 'object') {
+        // Handle empty objects or objects with error info
+        if (Object.keys(error).length === 0) {
+          errorMessage = 'Empty error object - likely network/CORS issue';
+          errorType = 'empty_object';
+        } else {
+          errorMessage = (error as any).message || (error as any).detail || JSON.stringify(error);
+          errorType = typeof error;
+        }
       } else {
         errorMessage = String(error);
         errorType = typeof error;
       }
 
-      const isNetworkError = errorType === 'TypeError' || 
-                            errorMessage.includes('Failed to fetch') ||
-                            errorMessage.includes('fetch') ||
-                            errorMessage.includes('NetworkError') ||
-                            errorMessage.includes('Network request failed') ||
-                            errorMessage.includes('network') ||
-                            errorType === 'empty_object';
+      const isNetworkError = errorType === 'TypeError' ||
+        errorMessage.includes('Failed to fetch') ||
+        errorMessage.includes('fetch') ||
+        errorMessage.includes('NetworkError') ||
+        errorMessage.includes('Network request failed') ||
+        errorMessage.includes('network') ||
+        errorType === 'empty_object';
 
       if (isNetworkError) {
         const baseUrl = getApiBaseUrl();
-        const currentUrl = query 
+        const currentUrl = query
           ? `${baseUrl}/claims/search?query=${encodeURIComponent(query)}`
           : `${baseUrl}/claims?skip=${isLoadMore ? skip : 0}&limit=${LIMIT}`;
-        
+
         // Log detailed error information
         const errorDetails: Record<string, unknown> = {
           url: currentUrl,
@@ -293,14 +299,14 @@ export default function Home() {
           errorType: errorType,
           troubleshooting: getConnectionErrorHelp()
         };
-        
+
         // Only include error object if it has useful information
         if (error && typeof error === 'object' && Object.keys(error).length > 0) {
           errorDetails.errorObject = error;
         } else if (error) {
           errorDetails.rawError = String(error);
         }
-        
+
         console.error('Network error - Backend may not be running:', errorDetails);
       } else {
         console.error('Error fetching claims:', error);
@@ -315,25 +321,25 @@ export default function Home() {
       if (retryCount >= 2) {
         let errorMsg = 'No se pudieron cargar las afirmaciones.';
         const baseUrl = getApiBaseUrl();
-        
+
         if (isNetworkError) {
           if (baseUrl.includes('localhost')) {
             errorMsg = 'No se pudo conectar con el servidor local. Verifica que el backend esté ejecutándose:\n\n' +
-                       'cd backend\n' +
-                       'source venv/bin/activate\n' +
-                       'python main.py\n\n' +
-                       `O verifica: ${baseUrl}/health`;
+              'cd backend\n' +
+              'source venv/bin/activate\n' +
+              'python main.py\n\n' +
+              `O verifica: ${baseUrl}/health`;
           } else {
             errorMsg = `No se pudo conectar con el servidor remoto: ${baseUrl}\n\n` +
-                       'Verifica que el backend esté desplegado y accesible.';
+              'Verifica que el backend esté desplegado y accesible.';
           }
         } else if (error instanceof Error) {
-          if (error.message.includes('Database connection timeout') || 
-              error.message.includes('temporarily unavailable') ||
-              error.message.includes('database_connection_error')) {
+          if (error.message.includes('Database connection timeout') ||
+            error.message.includes('temporarily unavailable') ||
+            error.message.includes('database_connection_error')) {
             errorMsg = 'El servicio de base de datos está temporalmente no disponible. Por favor, intenta de nuevo en unos momentos.';
-          } else if (error.message.includes('Database connection error') || 
-                     error.message.includes('Database error')) {
+          } else if (error.message.includes('Database connection error') ||
+            error.message.includes('Database error')) {
             errorMsg = 'Error de conexión a la base de datos. Por favor, intenta de nuevo más tarde.';
           } else {
             errorMsg = `Error: ${errorMessage}`;
@@ -341,7 +347,7 @@ export default function Home() {
         } else {
           errorMsg = `Error desconocido: ${errorMessage}`;
         }
-        
+
         // Only show alert if we have a meaningful error message
         if (errorMessage && errorMessage !== 'Unknown error') {
           console.error('Final error after retries:', errorMsg);
@@ -374,52 +380,52 @@ export default function Home() {
       const baseUrl = getApiBaseUrl();
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 10000); // 10 second timeout
-      
+
       try {
         const response = await fetch(`${baseUrl}/stats`, {
           headers: { 'Accept': 'application/json' },
           signal: controller.signal
         });
-        
+
         clearTimeout(timeoutId);
-        
+
         if (response.ok) {
           const data = await response.json();
           const trendSign = data.trend_up ? '+' : '';
           const trendText = data.trend_percentage !== 0 ? `${trendSign}${data.trend_percentage}% vs ayer` : 'Sin cambios';
-          
+
           setStats([
-            { 
-              title: "Noticias Analizadas", 
-              value: data.total_analyzed.toLocaleString('es-MX'), 
-              trend: trendText, 
-              trendUp: data.trend_up, 
-              icon: "DocumentSearch", 
-              color: "blue" as const 
+            {
+              title: "Noticias Analizadas",
+              value: data.total_analyzed.toLocaleString('es-MX'),
+              trend: trendText,
+              trendUp: data.trend_up,
+              icon: "DocumentSearch",
+              color: "blue" as const
             },
-            { 
-              title: "Fake News Detectadas", 
-              value: data.fake_news_detected.toLocaleString('es-MX'), 
-              trend: trendText, 
-              trendUp: false, 
-              icon: "AlertTriangle", 
-              color: "rose" as const 
+            {
+              title: "Fake News Detectadas",
+              value: data.fake_news_detected.toLocaleString('es-MX'),
+              trend: trendText,
+              trendUp: false,
+              icon: "AlertTriangle",
+              color: "rose" as const
             },
-            { 
-              title: "Verificadas", 
-              value: data.verified.toLocaleString('es-MX'), 
-              trend: trendText, 
-              trendUp: data.trend_up, 
-              icon: "ShieldCheck", 
-              color: "emerald" as const 
+            {
+              title: "Verificadas",
+              value: data.verified.toLocaleString('es-MX'),
+              trend: trendText,
+              trendUp: data.trend_up,
+              icon: "ShieldCheck",
+              color: "emerald" as const
             },
-            { 
-              title: "Fuentes Activas", 
-              value: data.active_sources.toLocaleString('es-MX'), 
-              trend: `${data.recent_24h} últimas 24h`, 
-              trendUp: true, 
-              icon: "Activity", 
-              color: "amber" as const 
+            {
+              title: "Fuentes Activas",
+              value: data.active_sources.toLocaleString('es-MX'),
+              trend: `${data.recent_24h} últimas 24h`,
+              trendUp: true,
+              icon: "Activity",
+              color: "amber" as const
             },
           ]);
         } else {
@@ -449,7 +455,7 @@ export default function Home() {
     fetchStats();
     // Refresh stats every 30 seconds
     const statsInterval = setInterval(fetchStats, 30000);
-    
+
     // Check onboarding status
     const checkOnboarding = async () => {
       const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') : null;
@@ -475,7 +481,7 @@ export default function Home() {
       }
     };
     checkOnboarding();
-    
+
     return () => clearInterval(statsInterval);
   }, []);
 
@@ -516,7 +522,12 @@ export default function Home() {
         });
         if (response.ok) {
           const data = await response.json();
-          setBreakingNews(data.slice(0, 3));
+          const validBreaking = data.filter((c: Claim) => {
+            const text = c.claim_text || '';
+            const normalized = text.replace(/['"]/g, '').trim();
+            return normalized !== 'SKIP';
+          });
+          setBreakingNews(validBreaking.slice(0, 3));
         }
       } catch (error) {
         console.error('Error fetching breaking news:', error);
@@ -531,7 +542,13 @@ export default function Home() {
         });
         if (response.ok) {
           const data = await response.json();
-          setTrendingNow(data);
+          // Filter out SKIP claims (with or without quotes)
+          const validTrending = data.filter((c: Claim) => {
+            const text = c.claim_text || '';
+            const normalized = text.replace(/['"]/g, '').trim();
+            return normalized !== 'SKIP';
+          });
+          setTrendingNow(validTrending);
         }
       } catch (error) {
         // Endpoint might not exist, that's okay
@@ -554,16 +571,16 @@ export default function Home() {
       )}
       <Sidebar />
       <div className="lg:pl-64 relative z-10">
-        <Header 
-          searchQuery={searchQuery} 
-          setSearchQuery={setSearchQuery} 
-          onSearch={handleSearch} 
+        <Header
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          onSearch={handleSearch}
         />
         <main className="p-6 lg:p-8">
           <div className="max-w-7xl mx-auto space-y-8">
             {/* Quota Warning */}
             <QuotaWarning />
-            
+
             {/* Breaking News Banner */}
             {breakingNews.length > 0 && (
               <div className="bg-white rounded-lg p-5 border border-gray-200 shadow-sm">
@@ -633,14 +650,13 @@ export default function Home() {
                             {claim.verification && (
                               <>
                                 <span>•</span>
-                                <span className={`font-semibold ${
-                                  claim.verification.status === 'Verified' ? 'text-gray-900' :
+                                <span className={`font-semibold ${claim.verification.status === 'Verified' ? 'text-gray-900' :
                                   claim.verification.status === 'Debunked' ? 'text-gray-700' :
-                                  'text-gray-600'
-                                }`}>
+                                    'text-gray-600'
+                                  }`}>
                                   {claim.verification.status === 'Verified' ? 'Verificado' :
-                                   claim.verification.status === 'Debunked' ? 'Falso' :
-                                   'En verificación'}
+                                    claim.verification.status === 'Debunked' ? 'Falso' :
+                                      'En verificación'}
                                 </span>
                               </>
                             )}
@@ -665,10 +681,10 @@ export default function Home() {
                 <h2 className="text-gray-900 mb-5 text-xl font-semibold">
                   Feed de Verificación
                 </h2>
-                
+
                 {/* Tabs with Counts */}
                 <div className="relative">
-                  <div 
+                  <div
                     className="flex gap-2 sm:gap-3 overflow-x-auto pb-1 scrollbar-hide"
                     style={{
                       scrollbarWidth: 'none',
@@ -704,7 +720,7 @@ export default function Home() {
                         const fake = parseInt(stats.find(s => s.title === 'Fake News Detectadas')?.value.replace(/,/g, '') || '0');
                         count = Math.max(0, total - verified - fake);
                       }
-                      
+
                       return (
                         <button
                           key={tab.id}
@@ -745,7 +761,7 @@ export default function Home() {
                             {tab.label}
                           </span>
                           {count > 0 && (
-                            <span 
+                            <span
                               className={`
                                 ml-1.5 sm:ml-2 px-1.5 sm:px-2 py-0.5 rounded-full text-[10px] sm:text-xs font-semibold pointer-events-none
                                 ${activeTab === tab.id
@@ -825,15 +841,15 @@ export default function Home() {
                       </div>
                       <h3 className="text-gray-900 font-bold text-2xl mb-3">No se encontraron resultados</h3>
                       <p className="text-gray-600 font-medium mb-6 max-w-md mx-auto">
-                        {activeTab === 'todos' 
+                        {activeTab === 'todos'
                           ? 'Aún no hay afirmaciones verificadas. Nuestro sistema está analizando contenido en tiempo real.'
                           : activeTab === 'verificados'
-                          ? 'No hay afirmaciones verificadas en este momento. Revisa otros filtros para ver contenido.'
-                          : activeTab === 'falsos'
-                          ? 'No hay afirmaciones falsas detectadas. ¡Eso es una buena señal!'
-                          : 'Hay afirmaciones pendientes de verificación. Vuelve pronto para ver los resultados.'}
+                            ? 'No hay afirmaciones verificadas en este momento. Revisa otros filtros para ver contenido.'
+                            : activeTab === 'falsos'
+                              ? 'No hay afirmaciones falsas detectadas. ¡Eso es una buena señal!'
+                              : 'Hay afirmaciones pendientes de verificación. Vuelve pronto para ver los resultados.'}
                       </p>
-                      
+
                       {/* Quick Stats Preview */}
                       <div className="grid grid-cols-2 md:grid-cols-4 gap-4 max-w-2xl mx-auto mb-8">
                         {stats.map((stat, index) => (
@@ -861,7 +877,7 @@ export default function Home() {
                           Actualizar Feed
                         </button>
                       </div>
-                      
+
                       {/* Enhanced Navigation Cards */}
                       <div className="mt-8 pt-8 border-t border-gray-200">
                         <p className="text-sm text-gray-600 mb-6 font-semibold">Explora otras secciones:</p>
