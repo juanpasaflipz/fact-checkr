@@ -22,25 +22,30 @@ interface Proposal {
 
 export default function AdminMarketProposalsPage() {
   const router = useRouter();
+  const { user } = useAuth();
   const [proposals, setProposals] = useState<Proposal[]>([]);
   const [loading, setLoading] = useState(true);
   const [filter, setFilter] = useState<'pending' | 'all'>('pending');
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
-    fetchProposals();
-  }, [filter]);
+    if (user) {
+      fetchProposals();
+    }
+  }, [user, filter]);
 
   const fetchProposals = async () => {
     try {
       setLoading(true);
       const baseUrl = getApiBaseUrl();
-      const token = localStorage.getItem('auth_token');
 
-      if (!token) {
-        router.push('/');
+      if (!user) {
+        // If auth context is still loading, wait. If not user but loaded, redirect handled by wrapper?
+        // Check router.push('/') if strictly needed, but let's rely on user check
         return;
       }
+
+      const token = await user.getIdToken();
 
       const statusParam = filter === 'pending' ? '?status=pending' : '';
       const response = await fetch(`${baseUrl}/api/markets/admin/proposals${statusParam}`, {
