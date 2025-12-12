@@ -12,6 +12,16 @@ const firebaseConfig = {
     appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
 };
 
+// Debug config
+if (typeof window !== 'undefined') {
+    console.log('[Firebase Init] Config:', {
+        authDomain: firebaseConfig.authDomain,
+        projectId: firebaseConfig.projectId,
+        hasApiKey: !!firebaseConfig.apiKey,
+        apiKeyPrefix: firebaseConfig.apiKey ? firebaseConfig.apiKey.substring(0, 5) + '...' : 'N/A'
+    });
+}
+
 // Initialize Firebase
 const app = getApps().length === 0 ? initializeApp(firebaseConfig) : getApps()[0];
 const auth = getAuth(app);
