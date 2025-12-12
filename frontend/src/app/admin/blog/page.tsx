@@ -34,7 +34,7 @@ export default function AdminBlogPage() {
         try {
             setLoading(true);
             const baseUrl = getApiBaseUrl();
-            const token = localStorage.getItem('token');
+            const token = localStorage.getItem('auth_token');
 
             if (!token) {
                 router.push('/');
@@ -76,7 +76,7 @@ export default function AdminBlogPage() {
 
         try {
             const baseUrl = getApiBaseUrl();
-            const token = localStorage.getItem('token');
+            const token = localStorage.getItem('auth_token');
 
             const response = await fetch(`${baseUrl}/api/blog/articles/${articleId}/publish?publish_to_telegraph=true&publish_to_twitter=true`, {
                 method: 'POST',
