@@ -45,13 +45,26 @@ class TwitterPoster:
             else:
                 logger.warning("Twitter posting credentials not configured")
     
-    def post_article(self, title: str, url: str, excerpt: Optional[str] = None) -> Optional[str]:
+    def upload_media(self, file_path: str) -> Optional[str]:
+        """Upload media to Twitter/X and return media_id"""
+        if not self.client or not os.path.exists(file_path):
+            return None
+        try:
+            # For V1.1 API, we use api.media_upload
+            media = self.client.media_upload(filename=file_path)
+            return media.media_id_string
+        except Exception as e:
+            logger.error(f"Error uploading media: {e}")
+            return None
+
+    def post_article(self, title: str, url: str, excerpt: Optional[str] = None, image_path: Optional[str] = None) -> Optional[str]:
         """Post article link to Twitter/X
         
         Args:
             title: Article title
             url: Article URL (factcheck.mx/blog/slug)
             excerpt: Optional article excerpt
+            image_path: Optional path to local image file to attach
             
         Returns:
             Tweet URL if successful, None otherwise
@@ -59,6 +72,13 @@ class TwitterPoster:
         if not self.client:
             logger.warning("Twitter client not available, skipping post")
             return None
+            
+        # Upload media if present
+        media_ids = []
+        if image_path:
+            mid = self.upload_media(image_path)
+            if mid:
+                media_ids.append(mid)
         
         # Build tweet text (max 280 chars)
         # Format: "Title\n\nExcerpt...\n\n[URL]"
@@ -88,7 +108,7 @@ class TwitterPoster:
             base_text = f"{title}\n\n{excerpt[:50] if excerpt else ''}\n\n{url}" if excerpt else f"{title}\n\n{url}"
         
         try:
-            tweet = self.client.update_status(status=base_text)
+            tweet = self.client.update_status(status=base_text, media_ids=media_ids if media_ids else None)
             tweet_url = f"https://twitter.com/{tweet.user.screen_name}/status/{tweet.id}"
             logger.info(f"Posted article to Twitter: {tweet_url}")
             return tweet_url
@@ -96,11 +116,12 @@ class TwitterPoster:
             logger.error(f"Error posting to Twitter: {e}")
             return None
     
-    def post_thread(self, tweets: list[str]) -> Optional[str]:
+    def post_thread(self, tweets: list[str], media_ids: Optional[list[str]] = None) -> Optional[str]:
         """Post a thread of tweets
         
         Args:
             tweets: List of tweet strings
+            media_ids: Optional list of media_ids to attach to the FIRST tweet
             
         Returns:
             URL of the first tweet in the thread
@@ -110,7 +131,10 @@ class TwitterPoster:
             
         try:
             # Post first tweet
-            first_tweet = self.client.update_status(status=tweets[0])
+            first_tweet = self.client.update_status(
+                status=tweets[0], 
+                media_ids=media_ids if media_ids else None
+            )
             previous_id = first_tweet.id
             username = first_tweet.user.screen_name
             first_url = f"https://twitter.com/{username}/status/{previous_id}"

@@ -473,6 +473,7 @@ RESPONDE EN JSON:
     "confidence": 0.0-1.0,
     "explanation": "Explicación de 2-3 oraciones en español mexicano neutral",
     "key_evidence": ["puntos clave de evidencia"],
+    "source_types": ["Gobierno", "Medios", "Académico", "Redes Sociales", "Sátira"],
     "caveats": ["advertencias importantes si las hay"],
     "agent_agreement": "high|medium|low",
     "recommended_action": "publish|review|investigate_more"

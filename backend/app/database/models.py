@@ -114,6 +114,7 @@ class Claim(Base):
     review_priority = Column(String, nullable=True)  # "high|medium|low"
     agent_findings = Column(JSON, nullable=True)  # Multi-agent analysis results
     embedding = Column(Vector(1536))  # OpenAI text-embedding-3-small dimensions
+    image_url = Column(String, nullable=True)  # Path/URL to generated verdict card
     
     # Metadata
     created_at = Column(DateTime, default=datetime.utcnow)

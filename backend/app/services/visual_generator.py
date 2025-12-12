@@ -38,7 +38,7 @@ class VisualGenerator:
             "text": "#000000"
         }
         
-    def generate_verdict_card(self, claim_text: str, verdict: str, explanation: Optional[str] = None) -> Optional[str]:
+    def generate_verdict_card(self, claim_text: str, verdict: str, explanation: Optional[str] = None, sources: Optional[list] = None) -> Optional[str]:
         """Generate a social media card with the fact-check verdict"""
         if not PIL_AVAILABLE:
             logger.warning("Pillow not available. Cannot generate images.")
@@ -50,6 +50,15 @@ class VisualGenerator:
             width, height = 1200, 675
             img = Image.new('RGB', (width, height), color='white')
             draw = ImageDraw.Draw(img)
+            
+            # Map verdict to proper Spanish if needed, or keep English but styled
+            verdict_map = {
+                "Verified": "VERDADERO",
+                "Debunked": "FALSO",
+                "Misleading": "ENGAÑOSO",
+                "Unverified": "NO VERIFICADO"
+            }
+            display_verdict = verdict_map.get(verdict, verdict.upper())
             
             # Draw header bar
             header_height = 80
@@ -71,14 +80,12 @@ class VisualGenerator:
                 font_verdict = ImageFont.truetype("Arial", 80)
             except IOError:
                 font_verdict = ImageFont.load_default()
-                
-            verdict_text = verdict.upper()
             
             # Center verdict text relative to image, below header
             # Using textbbox to get dimensions (left, top, right, bottom)
-            bbox = draw.textbbox((0, 0), verdict_text, font=font_verdict)
+            bbox = draw.textbbox((0, 0), display_verdict, font=font_verdict)
             text_w = bbox[2] - bbox[0]
-            draw.text(((width - text_w) / 2, 130), verdict_text, fill=header_color, font=font_verdict)
+            draw.text(((width - text_w) / 2, 130), display_verdict, fill=header_color, font=font_verdict)
             
             # Draw Claim Text
             try:
@@ -109,6 +116,22 @@ class VisualGenerator:
                     text_w = bbox[2] - bbox[0]
                     draw.text(((width - text_w) / 2, y_text), line, font=font_expl, fill="#555555")
                     y_text += 35
+
+            # Draw Sources if provided (Transparency Footer)
+            if sources:
+                y_text = height - 60  # Position near bottom
+                try:
+                    font_source = ImageFont.truetype("Arial", 20)
+                except IOError:
+                    font_source = ImageFont.load_default()
+                
+                source_text = "Fuentes: " + ", ".join(sources[:3])  # Top 3 sources
+                if len(sources) > 3:
+                     source_text += ", ..."
+                     
+                bbox = draw.textbbox((0, 0), source_text, font=font_source)
+                text_w = bbox[2] - bbox[0]
+                draw.text(((width - text_w) / 2, y_text), source_text, fill="#888888", font=font_source)
 
             # Save image
             filename = f"verdict_{datetime.now().strftime('%Y%m%d%H%M%S')}.png"

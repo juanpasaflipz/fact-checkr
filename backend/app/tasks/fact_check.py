@@ -190,19 +190,43 @@ async def verify_source(source_id: str):
         
         # Convert evidence_details to JSON format for storage
         evidence_details_json = None
+        source_domains = []
         if verification.evidence_details:
-            evidence_details_json = [
-                {
+            evidence_details_json = []
+            for ed in verification.evidence_details:
+                evidence_details_json.append({
                     "url": ed.url,
                     "snippet": ed.snippet,
                     "timestamp": ed.timestamp,
                     "relevance_score": ed.relevance_score,
                     "title": ed.title,
                     "domain": ed.domain
-                }
-                for ed in verification.evidence_details
-            ]
+                })
+                if ed.domain:
+                    source_domains.append(ed.domain)
         
+        # Deduplicate domains
+        source_domains = list(set(source_domains))
+
+        # Generate Visual Verdict Card
+        image_url = None
+        try:
+            from app.services.visual_generator import VisualGenerator
+            visual_gen = VisualGenerator()
+            # If we have agent findings with structured source types, use them? 
+            # For now, we use the specific domains we found.
+            image_path = visual_gen.generate_verdict_card(
+                claim_text=claim_text,
+                verdict=verification.status.value,  # Enum value
+                explanation=verification.explanation,
+                sources=source_domains
+            )
+            if image_path:
+                # Store relative path for frontend serving
+                image_url = "/" + os.path.relpath(image_path, "app")
+        except Exception as e:
+            logger.error(f"Failed to generate verdict card: {e}")
+
         claim = Claim(
             id=f"claim_{source.id}",
             source_id=source.id,
@@ -217,7 +241,8 @@ async def verify_source(source_id: str):
             key_evidence_points=verification.key_evidence_points,
             needs_review=needs_review,
             review_priority=review_priority,
-            agent_findings=json.dumps(agent_findings) if agent_findings else None
+            agent_findings=json.dumps(agent_findings) if agent_findings else None,
+            image_url=image_url
         )
         
         db.add(claim)
