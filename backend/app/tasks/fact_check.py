@@ -29,7 +29,7 @@ async def verify_source(source_id: str):
         # 1. Extract Claim
         claim_text = await checker._extract_claim(source.content)
         
-        if claim_text == "SKIP":
+        if claim_text.replace('"', '').replace("'", "").strip() == "SKIP":
             source.processed = 2 # Skipped
             db.commit()
             return

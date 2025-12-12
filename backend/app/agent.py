@@ -291,7 +291,10 @@ OUTPUT FORMAT (String only):
                     messages=[{"role": "user", "content": user_prompt}]
                 )
                 claim = response.content[0].text.strip()
-                return claim if claim != "SKIP" else "SKIP"
+                # Handle SKIP with or without quotes
+                if claim.replace('"', '').replace("'", "").strip() == "SKIP":
+                    return "SKIP"
+                return claim
             except Exception as e:
                 print(f"⚠️  Anthropic API error, falling back to OpenAI: {e}")
         
@@ -308,7 +311,10 @@ OUTPUT FORMAT (String only):
                     temperature=0.3
                 )
                 claim = response.choices[0].message.content.strip()
-                return claim if claim != "SKIP" else "SKIP"
+                # Handle SKIP with or without quotes
+                if claim.replace('"', '').replace("'", "").strip() == "SKIP":
+                    return "SKIP"
+                return claim
             except Exception as e:
                 print(f"⚠️  OpenAI API error: {e}")
         
