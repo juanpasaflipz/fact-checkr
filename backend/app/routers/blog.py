@@ -82,24 +82,36 @@ class BlogArticleDetailResponse(BlogArticleResponse):
 async def list_articles(
     limit: int = Query(20, ge=1, le=100),
     article_type: Optional[str] = None,
+    status: Optional[str] = Query("published", pattern="^(published|draft|all)$"),
     user: Optional[User] = Depends(get_optional_user),
     db: Session = Depends(get_db)
 ):
-    """List published blog articles with subscription-based access
+    """List blog articles with subscription-based access
     
     Free tier: Returns only 3 most recent articles
     PRO tier: Returns all articles with pagination
+    Admin: Can view drafts/all articles
     """
     try:
         # Log the request for debugging
-        logger.info(f"Blog articles request: user={user.id if user else None}, article_type={article_type}, limit={limit}")
+        logger.info(f"Blog articles request: user={user.id if user else None}, article_type={article_type}, limit={limit}, status={status}")
         
-        # Check total articles count for debugging
-        total_articles = db.query(BlogArticle).count()
-        published_count = db.query(BlogArticle).filter(BlogArticle.published == True).count()
-        logger.info(f"Blog articles stats: total={total_articles}, published={published_count}")
+        query = db.query(BlogArticle)
         
-        query = db.query(BlogArticle).filter(BlogArticle.published == True)
+        # Admin-only status filtering
+        is_admin = user and user.is_admin
+        
+        if status == "draft":
+            if not is_admin:
+                raise HTTPException(status_code=403, detail="Only admins can view drafts")
+            query = query.filter(BlogArticle.published == False)
+        elif status == "all":
+            if not is_admin:
+                raise HTTPException(status_code=403, detail="Only admins can view all articles")
+            # No filter on published
+        else:
+            # Default: only published
+            query = query.filter(BlogArticle.published == True)
         
         if article_type:
             query = query.filter(BlogArticle.article_type == article_type)
@@ -108,8 +120,8 @@ async def list_articles(
         tier = get_user_tier(db, user.id) if user else SubscriptionTier.FREE
         logger.info(f"User tier determined: {tier.value}")
         
-        # Free tier: limit to most recent 3 articles
-        if tier == SubscriptionTier.FREE:
+        # Free tier limit (only applies to non-admins)
+        if tier == SubscriptionTier.FREE and not is_admin:
             # Order by published_at (NULLS LAST) or created_at as fallback
             query = query.order_by(
                 nullslast(desc(BlogArticle.published_at)),
@@ -121,8 +133,15 @@ async def list_articles(
                 nullslast(desc(BlogArticle.published_at)),
                 desc(BlogArticle.created_at)
             ).limit(limit)
+            
             # Check if there are more articles
-            total_count = db.query(BlogArticle).filter(BlogArticle.published == True).count()
+            count_query = db.query(BlogArticle)
+            if status == "published" or not is_admin:
+                count_query = count_query.filter(BlogArticle.published == True)
+            elif status == "draft":
+                count_query = count_query.filter(BlogArticle.published == False)
+            
+            total_count = count_query.count()
             has_more = total_count > limit
         
         articles = query.all()
@@ -134,6 +153,8 @@ async def list_articles(
             "has_more": has_more,
             "free_tier_limit": FREE_TIER_ARTICLE_LIMIT if tier == SubscriptionTier.FREE else None
         }
+    except HTTPException:
+        raise
     except Exception as e:
         logger.error(f"Error fetching blog articles: {e}", exc_info=True)
         # Return empty result on error instead of crashing
