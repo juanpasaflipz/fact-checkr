@@ -520,7 +520,7 @@ async def general_exception_handler(request: Request, exc: Exception):
 
 @app.get("/")
 async def root():
-    return {"message": "Fact Checkr API is running (Database Backed)"}
+    return {"message": "Fact Checkr API v1.1 (CORS Fixed)"}
 
 # --- Public Data Endpoints (Restored) ---
 
