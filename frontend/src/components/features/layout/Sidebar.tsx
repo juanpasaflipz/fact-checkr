@@ -1,6 +1,7 @@
 'use client';
 
 import { usePathname } from 'next/navigation';
+import Image from 'next/image';
 import Link from 'next/link';
 
 const menuItems = [
@@ -24,21 +25,24 @@ export default function Sidebar() {
         <div className="flex flex-col grow bg-white border-r border-gray-200 shadow-sm">
           {/* Logo */}
           <div className="flex items-center gap-3 px-6 py-6 border-b border-gray-200 bg-white">
-            <div className="flex items-center justify-center size-10 rounded-lg bg-gray-900">
-              <div className="size-6 bg-white rounded flex items-center justify-center">
-                <div className="size-4 bg-gray-900 rounded-sm"></div>
-              </div>
+            <div className="relative w-40 h-10">
+              <Image
+                src="/logo-full.png"
+                alt="FactCheck MX"
+                fill
+                className="object-contain object-left"
+                priority
+              />
             </div>
-            <span className="text-xl font-bold text-gray-900">FactCheckr</span>
           </div>
 
           {/* Navigation */}
           <nav className="flex-1 px-4 py-6 space-y-1">
             {menuItems.map((item) => {
               // Match exact path or paths that start with the item path (for sub-routes)
-              const isActive = pathname === item.path || 
+              const isActive = pathname === item.path ||
                 (item.path !== '/' && pathname.startsWith(item.path + '/'));
-              
+
               return (
                 <Link
                   key={item.id}
@@ -46,8 +50,8 @@ export default function Sidebar() {
                   className={`
                     group w-full flex items-center gap-3 px-4 py-3 rounded-lg 
                     transition-all duration-200 font-normal
-                    ${isActive 
-                      ? 'bg-gray-100 text-gray-900 border-l-4 border-gray-900' 
+                    ${isActive
+                      ? 'bg-gray-100 text-gray-900 border-l-4 border-gray-900'
                       : 'text-gray-700 hover:bg-gray-50 hover:text-gray-900'
                     }
                   `}
@@ -79,17 +83,17 @@ export default function Sidebar() {
         <nav className="flex justify-around items-center px-1 py-2">
           {menuItems.map((item) => {
             // Match exact path or paths that start with the item path (for sub-routes)
-            const isActive = pathname === item.path || 
+            const isActive = pathname === item.path ||
               (item.path !== '/' && pathname.startsWith(item.path + '/'));
-            
+
             return (
               <Link
                 key={item.id}
                 href={item.path}
                 className={`
                   flex flex-col items-center gap-1 px-2 py-1 rounded-lg transition-colors flex-1
-                  ${isActive 
-                    ? 'text-blue-600' 
+                  ${isActive
+                    ? 'text-blue-600'
                     : 'text-gray-500'
                   }
                 `}
