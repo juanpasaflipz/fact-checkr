@@ -153,6 +153,20 @@ default_origins = ",".join([
 cors_origins = os.getenv("CORS_ORIGINS", default_origins).split(",")
 # Clean up any empty strings from splitting
 cors_origins = [origin.strip() for origin in cors_origins if origin.strip()]
+
+# FORCE CRITICAL ORIGINS: Ensure app.factcheck.mx is always allowed, even if CORS_ORIGINS is set
+critical_origins = [
+    "https://app.factcheck.mx",
+    "https://www.app.factcheck.mx",
+    "https://factcheck.mx",
+    "https://www.factcheck.mx",
+    "https://fact-check-mx-934bc.web.app",
+    "https://fact-check-mx-934bc.firebaseapp.com"
+]
+for origin in critical_origins:
+    if origin not in cors_origins:
+        cors_origins.append(origin)
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
