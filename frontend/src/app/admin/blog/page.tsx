@@ -37,7 +37,8 @@ export default function AdminBlogPage() {
 
         if (!user) {
             // If finished loading and no user, redirect
-            router.push('/');
+            // router.push('/');
+            console.log('No user found, but not redirecting for debugging');
             return;
         }
 
@@ -68,9 +69,9 @@ export default function AdminBlogPage() {
             });
 
             if (response.status === 403) {
-                alert('No tienes permisos de administrador');
-                router.push('/');
-                return;
+                // alert('No tienes permisos de administrador');
+                // router.push('/');
+                throw new Error('No tienes permisos de administrador. Verifica tu cuenta.');
             }
 
             if (!response.ok) {
