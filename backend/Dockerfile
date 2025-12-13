@@ -32,5 +32,5 @@ RUN ln -sf /app/scripts/start.sh /app/start.sh
 
 # Railway sets PORT env var - uvicorn reads it automatically
 # Run migrations first (non-blocking on failure), then start uvicorn
-CMD sh -c "echo 'Running migrations...' && alembic upgrade head || echo 'Migration warning (continuing)' && echo 'Starting uvicorn...' && python -m uvicorn main:app --host 0.0.0.0 --port \${PORT:-8000}"
+CMD sh -c "echo 'Running migrations...' && alembic upgrade head || echo 'Migration warning (continuing)' && echo 'Starting uvicorn...' && python -m uvicorn app.main:app --host 0.0.0.0 --port \${PORT:-8000}"
 

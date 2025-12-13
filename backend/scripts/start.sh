@@ -36,13 +36,15 @@ echo "Contents of /app:"
 ls -la /app | head -20
 
 # Verify main.py exists
-if [ ! -f "main.py" ]; then
-    echo "ERROR: main.py not found in /app!"
+if [ ! -f "app/main.py" ]; then
+    echo "ERROR: app/main.py not found in /app!"
     echo "Full directory listing:"
     ls -la /app
+    echo "app directory listing:"
+    ls -la /app/app
     exit 1
 fi
-echo "✅ main.py found"
+echo "✅ app/main.py found"
 
 # Run migrations in background (non-blocking) so app can start quickly
 if command -v alembic >/dev/null 2>&1; then
@@ -59,7 +61,7 @@ echo "Testing Python import..."
 echo ""
 
 # Test if main.py can be imported (catch errors early)
-echo "Testing Python import of main.py..."
+echo "Testing Python import of app.main..."
 if ! python -c "
 import sys
 import traceback
@@ -67,9 +69,9 @@ import os
 # Set minimal env for testing
 os.environ.setdefault('DATABASE_URL', 'postgresql://localhost/test')
 try:
-    print('Testing main.py import...')
-    import main
-    print('✅ main.py imported successfully')
+    print('Testing app.main import...')
+    import app.main as main
+    print('✅ app.main imported successfully')
     print(f'✅ FastAPI app: {main.app}')
     # Test that health endpoint exists
     routes = [route.path for route in main.app.routes]
@@ -78,11 +80,11 @@ try:
     else:
         print(f'⚠️ /health not found in routes: {routes}')
 except Exception as e:
-    print(f'❌ Failed to import main.py: {e}')
+    print(f'❌ Failed to import app.main: {e}')
     traceback.print_exc()
     sys.exit(1)
 "; then
-    error_exit "Failed to import main.py - cannot start server"
+    error_exit "Failed to import app.main - cannot start server"
 fi
 
 echo ""
@@ -109,7 +111,7 @@ if command -v uvicorn >/dev/null 2>&1; then
     # Try uvloop if available, otherwise use default
     if python -c "import uvloop" 2>/dev/null; then
         echo "✅ Using uvloop for better performance"
-        exec uvicorn main:app \
+        exec uvicorn app.main:app \
             --host 0.0.0.0 \
             --port "${PORT}" \
             --log-level info \
@@ -117,7 +119,7 @@ if command -v uvicorn >/dev/null 2>&1; then
             --loop uvloop
     else
         echo "⚠️ uvloop not available, using default event loop"
-        exec uvicorn main:app \
+        exec uvicorn app.main:app \
             --host 0.0.0.0 \
             --port "${PORT}" \
             --log-level info \
@@ -127,7 +129,7 @@ elif command -v gunicorn >/dev/null 2>&1; then
     echo "✅ Using gunicorn (found at: $(which gunicorn))"
     echo "✅ Starting server on 0.0.0.0:${PORT}"
     # Fallback to gunicorn if uvicorn not available
-    exec gunicorn main:app \
+    exec gunicorn app.main:app \
         --workers 1 \
         --worker-class uvicorn.workers.UvicornWorker \
         --bind "0.0.0.0:${PORT}" \
