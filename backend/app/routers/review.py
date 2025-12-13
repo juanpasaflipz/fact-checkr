@@ -9,8 +9,8 @@ from sqlalchemy import desc
 from typing import Optional, List
 from app.database import get_db
 from app.database.models import Claim, User
-from app.auth import get_current_user
-from app.models import VerificationStatus
+from app.core.auth import get_current_user
+from app.schemas import VerificationStatus
 import logging
 
 logger = logging.getLogger(__name__)

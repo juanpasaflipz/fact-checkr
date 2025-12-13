@@ -15,10 +15,10 @@ from datetime import datetime, timedelta
 import logging
 
 from app.database.connection import get_db
-from app.auth import get_optional_user
+from app.core.auth import get_optional_user
 from app.services.embeddings import EmbeddingService
 from app.services.rag_pipeline import RAGPipeline
-from app.utils import get_user_tier
+from app.core.utils import get_user_tier
 from app.database.models import SubscriptionTier
 
 logger = logging.getLogger(__name__)

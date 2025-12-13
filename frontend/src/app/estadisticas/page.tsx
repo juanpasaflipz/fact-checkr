@@ -1,9 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Sidebar from '@/components/Sidebar';
-import Header from '@/components/Header';
-import StatsCard from '@/components/StatsCard';
+import Sidebar from '@/components/features/layout/Sidebar';
+import Header from '@/components/features/layout/Header';
+import StatsCard from '@/components/ui/StatsCard';
 
 interface Stats {
   total_analyzed: number;

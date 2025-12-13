@@ -70,7 +70,7 @@ from app.database.models import (
     MarketStatus,
     claim_topics
 )
-from app.models import (
+from app.schemas import (
     Claim as ClaimResponse, 
     VerificationResult, 
     SocialPost, 
@@ -79,8 +79,8 @@ from app.models import (
     Source as SourceResponse,
     MarketSummary
 )
-from app.rate_limit import limiter, setup_rate_limiting
-from app.auth import get_optional_user, create_access_token
+from app.core.rate_limit import limiter, setup_rate_limiting
+from app.core.auth import get_optional_user, create_access_token
 
 # Define available routers and their optional dependencies
 CORE_ROUTERS = ['auth', 'subscriptions', 'usage', 'whatsapp', 'telegraph']
@@ -339,7 +339,7 @@ def map_db_claim_to_response(db_claim: DBClaim, db: Optional[Session] = None) ->
     evidence_details = getattr(db_claim, 'evidence_details', None)
     evidence_details_list = None
     if evidence_details:
-        from app.models import EvidenceDetail
+        from app.schemas import EvidenceDetail
         if isinstance(evidence_details, list):
             evidence_details_list = [
                 EvidenceDetail(**ed) if isinstance(ed, dict) else ed

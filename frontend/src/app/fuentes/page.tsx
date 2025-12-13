@@ -1,9 +1,9 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Sidebar from '@/components/Sidebar';
-import Header from '@/components/Header';
-import SourceCard from '@/components/SourceCard';
+import Sidebar from '@/components/features/layout/Sidebar';
+import Header from '@/components/features/layout/Header';
+import SourceCard from '@/components/features/claims/SourceCard';
 
 interface Source {
   id: string;

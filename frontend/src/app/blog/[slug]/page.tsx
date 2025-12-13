@@ -1,9 +1,9 @@
 import { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { getApiBaseUrl } from '@/lib/api-config';
-import BlogArticleContent from '@/components/BlogArticleContent';
-import Sidebar from '@/components/Sidebar';
-import Header from '@/components/Header';
+import BlogArticleContent from '@/components/features/blog/BlogArticleContent';
+import Sidebar from '@/components/features/layout/Sidebar';
+import Header from '@/components/features/layout/Header';
 
 interface BlogArticle {
   id: number;

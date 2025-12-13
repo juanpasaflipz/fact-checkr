@@ -16,8 +16,8 @@ logger = logging.getLogger(__name__)
 
 from app.database.connection import get_db
 from app.database.models import User
-from app.auth import create_access_token, get_current_user
-from app.utils import (
+from app.core.auth import create_access_token, get_current_user
+from app.core.utils import (
     get_user_by_email,
     get_user_by_username,
     verify_password,

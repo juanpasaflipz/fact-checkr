@@ -10,7 +10,7 @@ from sqlalchemy.orm import Session
 
 from app.database.connection import get_db
 from app.database.models import User
-from app.utils import get_user_by_id
+from app.core.utils import get_user_by_id
 
 logger = logging.getLogger(__name__)
 

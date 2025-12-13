@@ -639,7 +639,7 @@ async def get_comprehensive_analytics(
     """Get all analytics data in one call for dashboard"""
     # Call each endpoint function directly
     from fastapi import Request
-    from app.rate_limit import limiter
+    from app.core.rate_limit import limiter
     
     # Create a mock request for rate limiting (if needed)
     # In practice, these endpoints don't need rate limiting when called internally

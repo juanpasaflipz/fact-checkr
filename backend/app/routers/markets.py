@@ -11,12 +11,12 @@ from app.database.models import (
     Market, MarketStatus, MarketTrade, UserBalance, User, Claim,
     MarketProposal, UserMarketStats, SubscriptionTier, MarketNotification
 )
-from app.auth import get_current_user, get_admin_user, get_optional_user
-from app.middleware import TierChecker
-from app.utils import (
+from app.core.auth import get_current_user, get_admin_user, get_optional_user
+from app.core.middleware import TierChecker
+from app.core.utils import (
     get_user_tier, check_user_limit, track_usage, get_tier_limit
 )
-from app.models import (
+from app.schemas import (
     MarketSummary,
     MarketDetail,
     TradeRequest,

@@ -2,8 +2,8 @@
 
 import { useEffect, useState, Suspense } from 'react';
 import { useSearchParams, useRouter } from 'next/navigation';
-import Sidebar from '@/components/Sidebar';
-import Header from '@/components/Header';
+import Sidebar from '@/components/features/layout/Sidebar';
+import Header from '@/components/features/layout/Header';
 
 function SubscriptionSuccessContent() {
   const searchParams = useSearchParams();

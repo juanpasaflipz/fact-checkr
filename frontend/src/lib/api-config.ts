@@ -45,7 +45,7 @@ export function getApiBaseUrl(): string {
 
     if (!isLocal) {
       // Default production backend (override via NEXT_PUBLIC_API_URL when set)
-      return 'https://factcheckr-backend-149064704036.us-central1.run.app';
+      return 'https://fact-checkr-production.up.railway.app';
     }
   }
 

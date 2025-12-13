@@ -15,7 +15,7 @@ from sqlalchemy import func
 
 from app.database.connection import get_db
 from app.database.models import MarketVote, Market, User
-from app.auth import get_current_user, get_optional_user
+from app.core.auth import get_current_user, get_optional_user
 
 router = APIRouter(prefix="/api/markets", tags=["market-votes"])
 

@@ -7,14 +7,14 @@ from functools import wraps
 from app.database.connection import get_db
 from app.database.models import User, SubscriptionTier
 from sqlalchemy.orm import Session
-from app.utils import (
+from app.core.utils import (
     get_user_tier,
     check_user_limit,
     track_usage,
     is_limit_unlimited,
     get_tier_limit,
 )
-from app.auth import get_optional_user as get_optional_user_dep
+from app.core.auth import get_optional_user as get_optional_user_dep
 
 class TierChecker:
     """Middleware for checking tier-based limits"""

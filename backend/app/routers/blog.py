@@ -13,8 +13,8 @@ from pydantic import BaseModel
 
 from app.database.connection import get_db
 from app.database.models import BlogArticle, User, SubscriptionTier
-from app.auth import get_current_user, get_optional_user
-from app.utils import get_user_tier
+from app.core.auth import get_current_user, get_optional_user
+from app.core.utils import get_user_tier
 
 logger = logging.getLogger(__name__)
 

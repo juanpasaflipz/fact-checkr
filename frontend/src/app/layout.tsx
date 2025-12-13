@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { Noto_Sans, Noto_Serif } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/contexts/AuthContext";
-import ErrorBoundary from "@/components/ErrorBoundary";
+import ErrorBoundary from "@/components/ui/ErrorBoundary";
 
 const notoSans = Noto_Sans({
   variable: "--font-noto-sans",

@@ -7,9 +7,9 @@ from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from app.database.connection import get_db
 from app.services.quota_manager import quota_manager
-from app.auth import get_current_user, get_optional_user
+from app.core.auth import get_current_user, get_optional_user
 from app.database.models import User
-from app.utils import get_user_tier, get_current_usage, check_user_limit, TIER_LIMITS, get_tier_limit
+from app.core.utils import get_user_tier, get_current_usage, check_user_limit, TIER_LIMITS, get_tier_limit
 from app.database.models import SubscriptionTier
 import logging
 

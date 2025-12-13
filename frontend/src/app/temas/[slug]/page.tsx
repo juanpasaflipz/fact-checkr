@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import Sidebar from '@/components/Sidebar';
-import Header from '@/components/Header';
-import ClaimCard from '@/components/ClaimCard';
+import Sidebar from '@/components/features/layout/Sidebar';
+import Header from '@/components/features/layout/Header';
+import ClaimCard from '@/components/features/claims/ClaimCard';
 import Link from 'next/link';
 
 interface Topic {

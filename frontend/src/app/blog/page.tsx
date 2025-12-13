@@ -1,8 +1,8 @@
 import { Metadata } from 'next';
 import { getApiBaseUrl } from '@/lib/api-config';
-import BlogArticleList from '@/components/BlogArticleList';
-import Sidebar from '@/components/Sidebar';
-import Header from '@/components/Header';
+import BlogArticleList from '@/components/features/blog/BlogArticleList';
+import Sidebar from '@/components/features/layout/Sidebar';
+import Header from '@/components/features/layout/Header';
 
 export const metadata: Metadata = {
   title: 'Blog - FactCheckr MX | Análisis y Verificación de Noticias',

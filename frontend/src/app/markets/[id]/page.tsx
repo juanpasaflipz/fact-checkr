@@ -2,10 +2,10 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import Sidebar from '@/components/Sidebar';
-import Header from '@/components/Header';
-import PredictionExplanation from '@/components/markets/PredictionExplanation';
-import SentimentTimeline from '@/components/markets/SentimentTimeline';
+import Sidebar from '@/components/features/layout/Sidebar';
+import Header from '@/components/features/layout/Header';
+import PredictionExplanation from '@/components/features/markets/markets/PredictionExplanation';
+import SentimentTimeline from '@/components/features/markets/markets/SentimentTimeline';
 import { getApiBaseUrl } from '@/lib/api-config';
 
 interface MarketDetail {

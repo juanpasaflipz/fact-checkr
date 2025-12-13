@@ -15,7 +15,7 @@ from app.database.models import (
     Claim, Source, Topic, TrendingTopic,
     VerificationStatus, BlogArticle
 )
-from app.agent import FactChecker
+from app.agents import FactChecker
 
 logger = logging.getLogger(__name__)
 

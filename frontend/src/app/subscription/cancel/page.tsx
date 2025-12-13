@@ -1,8 +1,8 @@
 'use client';
 
 import { useRouter } from 'next/navigation';
-import Sidebar from '@/components/Sidebar';
-import Header from '@/components/Header';
+import Sidebar from '@/components/features/layout/Sidebar';
+import Header from '@/components/features/layout/Header';
 
 export default function SubscriptionCancelPage() {
   const router = useRouter();

@@ -2,9 +2,9 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import Sidebar from '@/components/Sidebar';
-import Header from '@/components/Header';
-import TopicCard from '@/components/TopicCard';
+import Sidebar from '@/components/features/layout/Sidebar';
+import Header from '@/components/features/layout/Header';
+import TopicCard from '@/components/features/topics/TopicCard';
 
 interface Topic {
   id: number;

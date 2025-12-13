@@ -1,7 +1,7 @@
 import asyncio
 from celery import shared_task
 from app.database import SessionLocal, Source
-from app.scraper import TwitterScraper, GoogleNewsScraper
+from app.services.scrapers.web_scraper import TwitterScraper, GoogleNewsScraper
 from app.tasks.fact_check import process_source
 from datetime import datetime
 import logging
@@ -10,7 +10,7 @@ logger = logging.getLogger(__name__)
 
 # Import YouTube scraper
 try:
-    from app.scraper_youtube import YouTubeScraper
+    from app.services.scrapers.youtube_scraper import YouTubeScraper
     YOUTUBE_AVAILABLE = True
 except ImportError:
     YOUTUBE_AVAILABLE = False

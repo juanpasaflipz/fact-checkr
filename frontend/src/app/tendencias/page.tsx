@@ -1,12 +1,12 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import Sidebar from '@/components/Sidebar';
-import Header from '@/components/Header';
-import ClaimCard from '@/components/ClaimCard';
-import TrendingTopicsGrid from '@/components/TrendingTopicsGrid';
-import TrendingEntitiesList from '@/components/TrendingEntitiesList';
-import PlatformActivityChart from '@/components/PlatformActivityChart';
+import Sidebar from '@/components/features/layout/Sidebar';
+import Header from '@/components/features/layout/Header';
+import ClaimCard from '@/components/features/claims/ClaimCard';
+import TrendingTopicsGrid from '@/components/features/topics/TrendingTopicsGrid';
+import TrendingEntitiesList from '@/components/features/topics/TrendingEntitiesList';
+import PlatformActivityChart from '@/components/features/analytics/PlatformActivityChart';
 
 interface Claim {
   id: string;

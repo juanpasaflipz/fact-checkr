@@ -12,7 +12,7 @@ from sqlalchemy.orm import Session
 
 from app.database.connection import get_db
 from app.database.models import User
-from app.auth import get_current_user
+from app.core.auth import get_current_user
 from app.services.tokens import VirtualTokenManager
 
 router = APIRouter(prefix="/api/tokens", tags=["tokens"])

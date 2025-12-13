@@ -2,7 +2,7 @@ import os
 from celery import Celery
 from celery.schedules import crontab
 from dotenv import load_dotenv
-from app.utils import get_redis_url
+from app.core.utils import get_redis_url
 
 load_dotenv()
 

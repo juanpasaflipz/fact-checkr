@@ -2,8 +2,8 @@ import asyncio
 import os
 from celery import shared_task
 from app.database import SessionLocal, Source, Claim, VerificationStatus
-from app.agent import FactChecker
-from app.models import VerificationResult, EvidenceDetail
+from app.agents import FactChecker
+from app.schemas import VerificationResult, EvidenceDetail
 from app.services.rag_pipeline import RAGPipeline
 import logging
 import json

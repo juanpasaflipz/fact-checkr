@@ -8,8 +8,8 @@ from datetime import datetime
 
 from app.database.connection import get_db
 from app.database.models import User, Subscription, SubscriptionTier, SubscriptionStatus
-from app.auth import get_current_user
-from app.subscriptions import (
+from app.core.auth import get_current_user
+from app.services.subscription_service import (
     create_stripe_customer,
     create_stripe_subscription,
     cancel_stripe_subscription,
@@ -17,7 +17,7 @@ from app.subscriptions import (
     sync_subscription_from_stripe,
     STRIPE_PRICE_IDS,
 )
-from app.utils import get_user_subscription, get_user_tier
+from app.core.utils import get_user_subscription, get_user_tier
 import stripe
 
 router = APIRouter(prefix="/subscriptions", tags=["subscriptions"])

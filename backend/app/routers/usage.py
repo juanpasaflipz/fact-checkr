@@ -6,8 +6,8 @@ from typing import Optional
 
 from app.database.connection import get_db
 from app.database.models import User
-from app.auth import get_current_user
-from app.utils import get_current_usage, get_user_tier, get_tier_limit, TIER_LIMITS
+from app.core.auth import get_current_user
+from app.core.utils import get_current_usage, get_user_tier, get_tier_limit, TIER_LIMITS
 from app.database.models import SubscriptionTier
 
 router = APIRouter(prefix="/usage", tags=["usage"])

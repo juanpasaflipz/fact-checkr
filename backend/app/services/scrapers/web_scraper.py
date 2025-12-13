@@ -1,6 +1,6 @@
 from abc import ABC, abstractmethod
 from typing import List
-from app.models import SocialPost
+from app.schemas import SocialPost
 import uuid
 import os
 from datetime import datetime
@@ -289,7 +289,7 @@ import urllib.parse
 
 # Import YouTube scraper
 try:
-    from app.scraper_youtube import YouTubeScraper
+    from app.services.scrapers.youtube_scraper import YouTubeScraper
 except ImportError:
     YouTubeScraper = None
     print("Warning: YouTube scraper not available (missing dependencies)")

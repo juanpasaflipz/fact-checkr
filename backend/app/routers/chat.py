@@ -4,8 +4,8 @@ from pydantic import BaseModel
 from sqlalchemy.orm import Session
 from app.database.connection import get_db
 from app.database.models import Claim, User
-from app.agent import FactChecker
-from app.utils import get_user_by_id  # Assuming auth utils
+from app.agents import FactChecker
+from app.core.utils import get_user_by_id  # Assuming auth utils
 # We might need authentication dependency, checking existing routers would be good.
 # For now, I'll assume an open endpoint or standard auth if I find it.
 # Based on utils.py, there is user management.

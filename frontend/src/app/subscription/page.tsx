@@ -4,8 +4,8 @@ import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { redirectToCheckout } from '@/lib/stripe';
 import { useAuth } from '@/contexts/AuthContext';
-import Sidebar from '@/components/Sidebar';
-import Header from '@/components/Header';
+import Sidebar from '@/components/features/layout/Sidebar';
+import Header from '@/components/features/layout/Header';
 
 export default function SubscriptionPage() {
   const router = useRouter();

@@ -7,8 +7,8 @@ import EngagementMetricsChart from '@/components/charts/EngagementMetricsChart';
 import DailyActivityChart from '@/components/charts/DailyActivityChart';
 import TopicComparisonChart from '@/components/charts/TopicComparisonChart';
 import AudienceStatsChart from '@/components/charts/AudienceStatsChart';
-import Header from '@/components/Header';
-import Sidebar from '@/components/Sidebar';
+import Header from '@/components/features/layout/Header';
+import Sidebar from '@/components/features/layout/Sidebar';
 
 export default function AnalyticsPage() {
   const [days, setDays] = useState(30);

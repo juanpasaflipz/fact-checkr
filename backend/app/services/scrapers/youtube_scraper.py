@@ -11,7 +11,7 @@ from googleapiclient.discovery import build
 from googleapiclient.errors import HttpError
 from youtube_transcript_api import YouTubeTranscriptApi
 from youtube_transcript_api._errors import TranscriptsDisabled, NoTranscriptFound
-from app.models import SocialPost
+from app.schemas import SocialPost
 import logging
 
 # Load environment variables

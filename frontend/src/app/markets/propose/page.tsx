@@ -2,9 +2,9 @@
 
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import Sidebar from '@/components/Sidebar';
-import Header from '@/components/Header';
-import MarketProposalForm from '@/components/MarketProposalForm';
+import Sidebar from '@/components/features/layout/Sidebar';
+import Header from '@/components/features/layout/Header';
+import MarketProposalForm from '@/components/features/markets/MarketProposalForm';
 import { getApiBaseUrl } from '@/lib/api-config';
 
 interface Proposal {

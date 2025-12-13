@@ -1,8 +1,8 @@
 'use client';
 
 import React from 'react';
-import Sidebar from '@/components/Sidebar';
-import Header from '@/components/Header';
+import Sidebar from '@/components/features/layout/Sidebar';
+import Header from '@/components/features/layout/Header';
 import ClaimHistory from '@/components/ClaimHistory';
 
 export default function HistorialPage() {

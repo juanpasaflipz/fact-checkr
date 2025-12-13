@@ -11,7 +11,7 @@ from app.database.connection import get_db
 from app.database.models import TrendingTopic, TopicPriorityQueue, Source
 from app.services.topic_prioritizer import TopicPrioritizer
 from app.services.trending_detector import TrendingDetector
-from app.auth import get_current_user, get_optional_user
+from app.core.auth import get_current_user, get_optional_user
 
 router = APIRouter(prefix="/api/v1/trending", tags=["Trending Topics"])
 

@@ -1,13 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import ClaimCard from '@/components/ClaimCard';
-import Sidebar from '@/components/Sidebar';
-import Header from '@/components/Header';
-import StatsCard from '@/components/StatsCard';
-import OnboardingModal from '@/components/OnboardingModal';
-import TrendingTopics from '@/components/TrendingTopics';
-import QuotaWarning from '@/components/QuotaWarning';
+import ClaimCard from '@/components/features/claims/ClaimCard';
+import Sidebar from '@/components/features/layout/Sidebar';
+import Header from '@/components/features/layout/Header';
+import StatsCard from '@/components/ui/StatsCard';
+import OnboardingModal from '@/components/features/user/OnboardingModal';
+import TrendingTopics from '@/components/features/topics/TrendingTopics';
+import QuotaWarning from '@/components/features/user/QuotaWarning';
 import { getApiBaseUrl, getConnectionErrorHelp } from '@/lib/api-config';
 
 // Define types matching the backend response
