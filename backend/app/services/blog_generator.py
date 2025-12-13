@@ -314,7 +314,7 @@ class BlogArticleGenerator:
         if self.fact_checker.anthropic_client:
             try:
                 response = self.fact_checker.anthropic_client.messages.create(
-                    model="claude-sonnet-4-20250514",
+                    model="claude-3-5-sonnet-latest",
                     max_tokens=4000,
                     temperature=0.7,
                     system=system_prompt,
