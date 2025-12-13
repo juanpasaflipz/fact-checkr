@@ -308,6 +308,7 @@ class BlogArticleGenerator:
             """
         }
         
+        # Trigger deployment 2025-12-12
         user_prompt = prompts.get(article_type, prompts["morning"])
         
         # Use existing FactChecker's LLM client
