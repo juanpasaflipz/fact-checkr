@@ -2,7 +2,7 @@
  * API Configuration Utility
  * Centralized configuration for backend API URLs
  * 
- * Backend URL: https://backend-production-72ea.up.railway.app
+ * Backend URL: https://factcheckr-backend-rdgcp6i5ta-uc.a.run.app
  */
 
 /**
@@ -35,8 +35,6 @@ export function getApiBaseUrl(): string {
   if (typeof window !== 'undefined') {
     const hostname = window.location.hostname;
 
-    // If we're on Railway/Vercel (not localhost), use Railway backend
-    // Also check for local IP addresses (192.168.x.x, 10.x.x.x) to avoid hitting production from local network
     const isLocal = hostname === 'localhost' ||
       hostname === '127.0.0.1' ||
       hostname.startsWith('192.168.') ||
@@ -45,7 +43,8 @@ export function getApiBaseUrl(): string {
 
     if (!isLocal) {
       // Default production backend (override via NEXT_PUBLIC_API_URL when set)
-      return 'https://fact-checkr-production.up.railway.app';
+      // Switched to Cloud Run (2025-12-15)
+      return 'https://factcheckr-backend-rdgcp6i5ta-uc.a.run.app';
     }
   }
 
@@ -91,12 +90,13 @@ export function getConnectionErrorHelp(): string[] {
     ];
   } else {
     return [
-      `1. Verify Railway backend is deployed and running`,
-      `2. Check NEXT_PUBLIC_API_URL in Vercel environment variables (should be https://backend-production-72ea.up.railway.app)`,
+      `1. Verify Backend is deployed and running (Cloud Run)`,
+      `2. Check NEXT_PUBLIC_API_URL in environment variables (should be https://factcheckr-backend-rdgcp6i5ta-uc.a.run.app)`,
       `3. Test backend health: curl ${baseUrl}/health`,
       `4. Ensure CORS is configured in backend to allow requests from ${typeof window !== 'undefined' ? window.location.origin : 'your domain'}`,
-      `5. Check Railway backend logs for startup errors`
+      `5. Check Cloud Run logs for startup errors`
     ];
   }
+
 }
 
