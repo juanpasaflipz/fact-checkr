@@ -1,7 +1,7 @@
 steps:
   # 1. Build the container image
   - name: "gcr.io/cloud-builders/docker"
-    args: ["build", "-t", "gcr.io/$PROJECT_ID/factcheckr-backend", "./backend"]
+    args: ["build", "-t", "gcr.io/$PROJECT_ID/factcheckr-backend", "-f", "backend/Dockerfile", "."]
 
   # 2. Push the container image to Container Registry
   - name: "gcr.io/cloud-builders/docker"

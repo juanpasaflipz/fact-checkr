@@ -1,6 +1,6 @@
 import asyncio
 import os
-from celery import shared_task
+# from celery import shared_task # Removed for Cloud Run migration
 from app.database import SessionLocal, Source, Claim, VerificationStatus
 from app.agents import FactChecker
 from app.schemas import VerificationResult, EvidenceDetail
@@ -289,13 +289,9 @@ async def verify_source(source_id: str):
     finally:
         db.close()
 
-@shared_task
-def process_source(source_id: str):
-    """Celery task to process a single source"""
-    # Run async function in sync Celery task
-    loop = asyncio.get_event_loop()
-    if loop.is_closed():
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        
-    return loop.run_until_complete(verify_source(source_id))
+# Celery wrapper removed for Cloud Run migration
+# direct calls to verify_source should be used instead
+
+# async def process_source(source_id: str):
+#     """Legacy wrapper alias"""
+#     return await verify_source(source_id)

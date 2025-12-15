@@ -16,7 +16,10 @@ COPY backend/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application code
-COPY backend/ .
+# Copy application code explicitly
+COPY backend/app ./app
+COPY backend/scripts ./scripts
+COPY backend/alembic.ini .
 
 # Create logs directory
 RUN mkdir -p logs

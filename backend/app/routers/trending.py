@@ -1,7 +1,7 @@
 """
 Trending Topics API Endpoints
 """
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query, BackgroundTasks
 from typing import List, Optional
 from datetime import datetime, timedelta
 from sqlalchemy.orm import Session
@@ -132,17 +132,17 @@ async def get_topic_details(
 
 @router.post("/topics/detect")
 async def trigger_trending_detection(
+    background_tasks: BackgroundTasks,
     user = Depends(get_current_user)  # Require auth
 ):
     """Manually trigger trending topic detection"""
     from app.tasks.scraper import detect_and_prioritize_topics
     
     # Trigger async task
-    task = detect_and_prioritize_topics.delay()
+    background_tasks.add_task(detect_and_prioritize_topics)
     
     return {
         "status": "started",
-        "task_id": task.id,
         "message": "Trending topic detection started"
     }
 

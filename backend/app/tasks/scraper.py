@@ -2,7 +2,7 @@ import asyncio
 from celery import shared_task
 from app.database import SessionLocal, Source
 from app.services.scrapers.web_scraper import TwitterScraper, GoogleNewsScraper
-from app.tasks.fact_check import process_source
+from app.tasks.fact_check import verify_source
 from datetime import datetime
 import logging
 
@@ -64,6 +64,8 @@ async def fetch_and_store(keywords):
             logger.warning("No posts scraped from any source.")
         
         new_count = 0
+        new_source_ids = []
+        
         for post in all_posts:
             # Check if exists
             exists = db.query(Source).filter(Source.id == post.id).first()
@@ -98,12 +100,24 @@ async def fetch_and_store(keywords):
                 )
                 db.add(source)
                 db.commit()
-                
-                # Trigger fact-check task
-                process_source.delay(source.id)
+                # Track for processing
+                new_source_ids.append(source.id)
                 new_count += 1
                 
         logger.info(f"Scraped {len(all_posts)} posts, {new_count} new.")
+        
+        # Process new sources concurrently
+        if new_source_ids:
+            logger.info(f"Starting verification for {len(new_source_ids)} new sources...")
+            # Use chunks to avoid overwhelming resources if many new sources
+            BATCH_SIZE = 5
+            for i in range(0, len(new_source_ids), BATCH_SIZE):
+                batch_ids = new_source_ids[i:i+BATCH_SIZE]
+                logger.info(f"Processing batch {i//BATCH_SIZE + 1} ({len(batch_ids)} items)")
+                verification_tasks = [verify_source(sid) for sid in batch_ids]
+                # Gather with return_exceptions=True to prevent one failure stopping others
+                await asyncio.gather(*verification_tasks, return_exceptions=True)
+                
         return new_count
         
     except Exception as e:
@@ -112,22 +126,10 @@ async def fetch_and_store(keywords):
     finally:
         db.close()
 
-@shared_task(
-    bind=True,  # Bind task to get access to self (for retries)
-    autoretry_for=(Exception,),
-    retry_backoff=True,
-    retry_backoff_max=600,
-    retry_jitter=True,
-    max_retries=3,
-)
-def scrape_all_sources(self):
-    """Celery task to scrape all sources including YouTube
-    
-    Automatically retries on failure with exponential backoff.
-    """
+# Celery task converted to async function for Cloud Run
+async def scrape_all_sources():
+    """Async task to scrape all sources including YouTube"""
     # Get keywords from configuration
-    # Can be overridden via environment variable: SCRAPING_KEYWORD_PRIORITY
-    # Options: "high", "medium", "low", "all", "default"
     import os
     from app.config.scraping_keywords import get_keywords_for_scraping
     
@@ -137,71 +139,42 @@ def scrape_all_sources(self):
     logger.info(f"Using {len(keywords)} keywords for scraping (priority: {priority})")
     
     try:
-        # Run async function in sync Celery task
-        loop = asyncio.get_event_loop()
-        if loop.is_closed():
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            
-        result = loop.run_until_complete(fetch_and_store(keywords))
+        # Run async function directly
+        result = await fetch_and_store(keywords)
         logger.info(f"Scraping task completed successfully. New sources: {result}")
         return result
         
     except Exception as exc:
         logger.error(f"Scraping task failed: {exc}", exc_info=True)
-        # Re-raise to trigger automatic retry
-        raise self.retry(exc=exc)
+        # No more retry functionality from Celery here
+        # We could implement a simple retry loop if needed, but CloudScheduler retries on 500
+        raise
 
 
-@shared_task(
-    bind=True,
-    autoretry_for=(Exception,),
-    retry_backoff=True,
-    retry_backoff_max=600,
-    retry_jitter=True,
-    max_retries=3,
-)
-def detect_and_prioritize_topics(self):
+# Celery task converted to async function for Cloud Run
+async def detect_and_prioritize_topics():
     """Periodic task to detect trending topics and prioritize them"""
     logger.info("Starting trending topic detection and prioritization...")
     
-    async def run_detection():
+    try:
         from app.services.topic_prioritizer import TopicPrioritizer
         prioritizer = TopicPrioritizer()
         prioritized = await prioritizer.prioritize_topics(limit=20)
         
         logger.info(f"Prioritized {len(prioritized)} topics")
         return len(prioritized)
-    
-    try:
-        # Run async function in sync Celery task
-        loop = asyncio.get_event_loop()
-        if loop.is_closed():
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-        
-        result = loop.run_until_complete(run_detection())
-        logger.info(f"Trending topic detection completed. Topics prioritized: {result}")
-        return result
         
     except Exception as exc:
         logger.error(f"Trending topic detection failed: {exc}", exc_info=True)
-        raise self.retry(exc=exc)
+        raise
 
 
-@shared_task(
-    bind=True,
-    autoretry_for=(Exception,),
-    retry_backoff=True,
-    retry_backoff_max=600,
-    retry_jitter=True,
-    max_retries=3,
-)
-def scrape_prioritized_topics(self):
+# Celery task converted to async function for Cloud Run
+async def scrape_prioritized_topics():
     """Scrape sources for prioritized topics"""
     logger.info("Scraping sources for prioritized topics...")
     
-    async def run_scraping():
+    try:
         from app.services.topic_prioritizer import TopicPrioritizer
         prioritizer = TopicPrioritizer()
         topics = await prioritizer.get_next_topics_to_process(limit=5)
@@ -224,18 +197,7 @@ def scrape_prioritized_topics(self):
         new_count = await fetch_and_store(unique_keywords)
         
         return new_count
-    
-    try:
-        # Run async function in sync Celery task
-        loop = asyncio.get_event_loop()
-        if loop.is_closed():
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-        
-        result = loop.run_until_complete(run_scraping())
-        logger.info(f"Prioritized topic scraping completed. New sources: {result}")
-        return result
         
     except Exception as exc:
         logger.error(f"Prioritized topic scraping failed: {exc}", exc_info=True)
-        raise self.retry(exc=exc)
+        raise

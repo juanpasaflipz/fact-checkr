@@ -323,6 +323,14 @@ if ROUTERS_AVAILABLE:
     except Exception as e:
         logger.warning(f"⚠️ Failed to register share router: {e}")
 
+    # Register tasks router (CRITICAL for Cloud Run / Scheduler)
+    try:
+        from app.routers import tasks
+        app.include_router(tasks.router, prefix="/api") # Router itself has /tasks prefix so this becomes /api/tasks
+        logger.info("✅ Tasks router registered")
+    except Exception as e:
+        logger.error(f"❌ Failed to register tasks router: {e}")
+
 # --- Helper Functions ---
 def map_db_claim_to_response(db_claim: DBClaim, db: Optional[Session] = None) -> ClaimResponse:
     """Map database claim object to Pydantic response model"""
