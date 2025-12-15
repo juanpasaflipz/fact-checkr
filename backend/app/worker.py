@@ -14,7 +14,7 @@ celery_app = Celery(
     "factcheckr_worker",
     broker=REDIS_URL,
     backend=REDIS_URL,
-    include=["app.tasks.scraper", "app.tasks.fact_check", "app.tasks.health_check", "app.tasks.credit_topup", "app.tasks.market_notifications", "app.tasks.market_intelligence", "app.tasks.blog_generation"]
+    include=["app.tasks.scraper", "app.tasks.fact_check", "app.tasks.health_check", "app.tasks.credit_topup", "app.tasks.market_notifications", "app.tasks.market_intelligence", "app.tasks.blog_generation", "app.tasks.whatsapp"]
 )
 
 celery_app.conf.update(

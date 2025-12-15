@@ -630,6 +630,27 @@ async def search_claims(
             detail=f"Error searching claims: {str(e)}"
         )
 
+@app.get("/claims/{claim_id}", response_model=ClaimResponse)
+async def get_claim(
+    claim_id: str,
+    db: Session = Depends(get_db)
+):
+    """Get a specific claim by ID"""
+    try:
+        claim = db.query(DBClaim).filter(DBClaim.id == claim_id).first()
+        if not claim:
+            raise HTTPException(status_code=404, detail="Claim not found")
+            
+        return map_db_claim_to_response(claim, db)
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"Error fetching claim {claim_id}: {e}", exc_info=True)
+        raise HTTPException(
+            status_code=500,
+            detail=f"Error fetching claim: {str(e)}"
+        )
+
 @app.get("/stats")
 @limiter.limit("60/minute")
 async def get_stats(request: Request, db: Session = Depends(get_db)):

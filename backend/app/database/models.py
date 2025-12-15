@@ -1,6 +1,6 @@
-from sqlalchemy import Column, String, DateTime, Text, Enum, Integer, ForeignKey, Table, JSON, Boolean, Float, ARRAY, Index
+from sqlalchemy import Column, String, DateTime, Text, Enum, Integer, ForeignKey, Table, JSON, Boolean, Float, ARRAY, Index, BigInteger, BigInteger
 from sqlalchemy.ext.declarative import declarative_base
-from sqlalchemy.orm import relationship
+from sqlalchemy.orm import relationship, backref
 from pgvector.sqlalchemy import Vector
 from datetime import datetime
 import enum
@@ -39,10 +39,13 @@ blog_article_claims = Table(
 )
 
 class VerificationStatus(enum.Enum):
-    VERIFIED = "Verified"
-    DEBUNKED = "Debunked"
-    MISLEADING = "Misleading"
-    UNVERIFIED = "Unverified"
+    VERIFIED = "Verified"  # Verdadero
+    MOSTLY_TRUE = "Mostly True"  # Mayormente verdadero
+    MIXED = "Mixed"  # Mixto / Falta contexto
+    MOSTLY_FALSE = "Mostly False"  # Mayormente engañoso
+    DEBUNKED = "Debunked"  # Engañoso
+    UNVERIFIED = "Unverified"  # No verificable aún
+    MISLEADING = "Misleading"  # Legacy support, verify if we can migrate to MOSTLY_FALSE or keep as alias
 
 class SubscriptionTier(enum.Enum):
     FREE = "free"
@@ -643,4 +646,75 @@ class JobStatus(Base):
     
     # Metrics
     duration_seconds = Column(Float, nullable=True)
+
+
+class WhatsAppUser(Base):
+    """Users interacting via WhatsApp"""
+    __tablename__ = 'whatsapp_users'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    phone_hash = Column(String, unique=True, nullable=False, index=True)  # Hashed phone number for privacy
+    locale = Column(String, default="es_MX")
+    created_at = Column(DateTime, default=datetime.utcnow)
+    # Relationships
+    messages = relationship("WhatsAppMessage", back_populates="user")
+
+
+class WhatsAppMessage(Base):
+    """Messages received from/sent to WhatsApp"""
+    __tablename__ = 'whatsapp_messages'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    user_id = Column(Integer, ForeignKey('whatsapp_users.id'), nullable=False, index=True)
+    wa_message_id = Column(String, unique=True, nullable=False, index=True)  # Meta's message ID
+    message_type = Column(String, nullable=False)  # text, image, audio, etc.
+    content = Column(Text)  # Text body or caption
+    media_id = Column(String, nullable=True)  # Meta media ID
+    status = Column(String, default="received", index=True)  # received, processing, responded, failed
+    
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    user = relationship("WhatsAppUser", back_populates="messages")
+
+
+class Verdict(Base):
+    """Final fact-check verdict for a claim"""
+    __tablename__ = 'verdicts'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    claim_id = Column(String, ForeignKey('claims.id'), unique=True, nullable=False)
+    
+    label = Column(Enum(VerificationStatus), nullable=False)
+    confidence = Column(Float, default=0.0)  # 0-100 normalized to 0-1 if needed
+    
+    explanation_short = Column(JSON)  # List of strings (bullets)
+    explanation_long = Column(Text)  # Detailed receipts text
+    
+    created_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    claim = relationship("Claim", backref=backref("verdict", uselist=False))
+
+
+class Evidence(Base):
+    """Supporting evidence found for a claim"""
+    __tablename__ = 'evidence'
+    
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    claim_id = Column(String, ForeignKey('claims.id'), nullable=False, index=True)
+    
+    url = Column(String, nullable=False)
+    outlet = Column(String)
+    published_at = Column(DateTime, nullable=True)
+    
+    quote = Column(Text)
+    stance = Column(String)  # support, refute, neutral
+    reliability = Column(String)  # high, medium, low
+    
+    retrieved_at = Column(DateTime, default=datetime.utcnow)
+    
+    # Relationships
+    claim = relationship("Claim", backref="evidence_items")
+
 

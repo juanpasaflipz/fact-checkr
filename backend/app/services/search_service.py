@@ -53,6 +53,52 @@ async def search_web(query: str) -> List[str]:
             "https://www.eluniversal.com.mx/nacion/sheinbaum-metro"
         ]
 
+async def search_web_rich(query: str) -> List[Dict[str, str]]:
+    """Search the web using Serper API (returns links and snippets)"""
+    serper_api_key = os.getenv("SERPER_API_KEY")
+    
+    if not serper_api_key:
+        print(f"Warning: SERPER_API_KEY not found. Using mock results for: {query}")
+        return []
+    
+    try:
+        import httpx
+        
+        url = "https://google.serper.dev/search"
+        headers = {
+            "X-API-KEY": serper_api_key,
+            "Content-Type": "application/json"
+        }
+        
+        payload = {
+            "q": f"{query} site:mx OR site:com.mx",
+            "num": 10,
+            "gl": "mx",
+            "hl": "es",
+        }
+        
+        async with httpx.AsyncClient(timeout=10.0) as client:
+            response = await client.post(url, json=payload, headers=headers)
+            response.raise_for_status()
+            data = response.json()
+            
+            results = []
+            if "organic" in data:
+                for result in data["organic"]:
+                    if "link" in result:
+                        results.append({
+                            "link": result.get("link"),
+                            "snippet": result.get("snippet", ""),
+                            "title": result.get("title", "")
+                        })
+            
+            print(f"Serper API (Rich) found {len(results)} results for: {query}")
+            return results
+            
+    except Exception as e:
+        print(f"Error using Serper API (Rich): {e}")
+        return []
+
 async def search_news(query: str) -> List[Dict[str, Any]]:
     """Search for news using Serper API (returns rich results)"""
     serper_api_key = os.getenv("SERPER_API_KEY")
