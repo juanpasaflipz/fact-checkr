@@ -1,34 +1,37 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { useParams, useRouter } from 'next/navigation';
-import { format } from 'date-fns';
-import { es } from 'date-fns/locale';
+import { useState, useEffect, useRef, use } from 'react';
+import Link from 'next/link';
+import { useRouter, useParams } from 'next/navigation';
+import Sidebar from '@/components/features/layout/Sidebar';
+import Header from '@/components/features/layout/Header';
+import { api } from '@/lib/api-client';
 
-interface Message {
+interface WhatsAppMessage {
     id: number;
+    wa_message_id: string;
+    message_type: string;
     content: string;
     status: string;
     created_at: string;
-    message_type: string;
 }
 
-interface User {
+interface WhatsAppUser {
     id: number;
     phone_hash: string;
-    locale: string;
+    created_at: string;
 }
 
-export default function WhatsAppChatView() {
-    const params = useParams();
+export default function WhatsAppChatPage() {
     const router = useRouter();
-    const userId = params.userId;
+    const params = useParams();
+    const userId = params.userId as string;
 
-    const [user, setUser] = useState<User | null>(null);
-    const [messages, setMessages] = useState<Message[]>([]);
+    const [messages, setMessages] = useState<WhatsAppMessage[]>([]);
+    const [user, setUser] = useState<WhatsAppUser | null>(null);
     const [loading, setLoading] = useState(true);
-    const [sending, setSending] = useState(false);
-    const [newMessage, setNewMessage] = useState('');
+    const [error, setError] = useState<string | null>(null);
+
     const messagesEndRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
@@ -37,143 +40,129 @@ export default function WhatsAppChatView() {
         }
     }, [userId]);
 
+    // Scroll to bottom when messages load
     useEffect(() => {
-        scrollToBottom();
-    }, [messages]);
-
-    const scrollToBottom = () => {
         messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    };
+    }, [messages]);
 
     const fetchData = async () => {
         try {
-            const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-
-            const [userRes, messagesRes] = await Promise.all([
-                fetch(`${API_URL}/whatsapp/users/${userId}`),
-                fetch(`${API_URL}/whatsapp/messages/${userId}`)
+            setLoading(true);
+            // Fetch user and messages in parallel
+            const [userData, messagesData] = await Promise.all([
+                api.get<WhatsAppUser>(`/api/whatsapp/users/${userId}`),
+                api.get<WhatsAppMessage[]>(`/api/whatsapp/messages/${userId}`)
             ]);
 
-            if (!userRes.ok || !messagesRes.ok) throw new Error('Failed to fetch data');
-
-            const userData = await userRes.json();
-            const messagesData = await messagesRes.json();
-
             setUser(userData);
-            // Messages come in descending order (newest first), reverse for chat view
-            setMessages(messagesData.reverse());
-        } catch (error) {
-            console.error('Error fetching chat data:', error);
+            // Backend returns messages descending (newest first), reverse to show chronologically
+            setMessages([...messagesData].reverse());
+            setError(null);
+        } catch (err: any) {
+            console.error('Error fetching chat data:', err);
+            setError('Error al cargar la conversación');
         } finally {
             setLoading(false);
         }
     };
 
-    const handleSend = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!newMessage.trim()) return;
-
-        setSending(true);
-        try {
-            // Note: This endpoint expects a phone number, but we only have a hash.
-            // In a real scenario, we'd need a way to look up the number or send via ID if supported.
-            // For now, this UI assumes the backend might handle it or it's a placeholder for future implementation.
-            // IMPORTANT: The current backend /send endpoint takes 'to' (phone number).
-            // Since we don't store the raw phone number, we can't actually send a message back easily
-            // without changing the backend to store numbers or having a lookup.
-            // For this task, we'll implement the UI logic but note this limitation.
-
-            // Temporary: Simulate sending for UI demonstration
-            const simulatedMsg: Message = {
-                id: Date.now(),
-                content: newMessage,
-                status: 'sent',
-                created_at: new Date().toISOString(),
-                message_type: 'text'
-            };
-
-            setMessages([...messages, simulatedMsg]);
-            setNewMessage('');
-        } catch (error) {
-            console.error('Error sending message:', error);
-        } finally {
-            setSending(false);
-        }
-    };
-
-    if (loading) {
-        return (
-            <div className="flex justify-center p-12">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
-            </div>
-        );
-    }
-
-    if (!user) {
-        return <div className="p-8 text-red-600">User not found</div>;
-    }
-
     return (
-        <div className="flex flex-col h-[calc(100vh-64px)] bg-gray-50">
-            {/* Header */}
-            <div className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-                <div>
-                    <h1 className="text-lg font-bold text-gray-900">Chat with User #{user.id}</h1>
-                    <p className="text-sm text-gray-500 font-mono">Hash: {user.phone_hash.substring(0, 12)}...</p>
-                </div>
-                <button
-                    onClick={() => router.back()}
-                    className="text-gray-600 hover:text-gray-900 text-sm font-medium"
-                >
-                    Back to List
-                </button>
-            </div>
+        <div className="min-h-screen bg-gray-50">
+            <Sidebar />
+            <div className="lg:pl-64 flex flex-col h-screen">
+                <Header
+                    searchQuery=""
+                    setSearchQuery={() => { }}
+                    onSearch={() => { }}
+                />
 
-            {/* Messages Area */}
-            <div className="flex-1 overflow-y-auto p-6 space-y-4">
-                {messages.map((msg) => {
-                    const isReceived = msg.status === 'received';
-                    return (
-                        <div
-                            key={msg.id}
-                            className={`flex ${isReceived ? 'justify-start' : 'justify-end'}`}
-                        >
-                            <div
-                                className={`max-w-[70%] rounded-lg px-4 py-2 shadow-sm ${isReceived
-                                        ? 'bg-white text-gray-900 border border-gray-200'
-                                        : 'bg-indigo-600 text-white'
-                                    }`}
-                            >
-                                <div className="text-sm">{msg.content}</div>
-                                <div className={`text-[10px] mt-1 ${isReceived ? 'text-gray-500' : 'text-indigo-200'} text-right`}>
-                                    {format(new Date(msg.created_at), 'p', { locale: es })}
+                <main className="flex-1 p-4 md:p-6 overflow-hidden flex flex-col">
+                    {/* Breadcrumb / Header */}
+                    <div className="mb-4 flex items-center gap-4">
+                        <Link href="/admin/whatsapp" className="text-gray-500 hover:text-gray-700">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                            </svg>
+                        </Link>
+                        <div>
+                            <h1 className="text-xl font-bold text-gray-900">
+                                {user ? `Chat #${user.id}` : 'Cargando...'}
+                            </h1>
+                            {user && (
+                                <p className="text-xs text-gray-500 font-mono">
+                                    ID: {user.phone_hash.substring(0, 15)}...
+                                </p>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Chat Area */}
+                    <div className="flex-1 bg-white border border-gray-200 rounded-xl shadow-sm overflow-hidden flex flex-col relative">
+
+                        {/* Messages List */}
+                        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-slate-50">
+                            {loading ? (
+                                <div className="flex justify-center items-center h-full">
+                                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
+                                </div>
+                            ) : error ? (
+                                <div className="flex justify-center items-center h-full text-red-500">
+                                    {error}
+                                </div>
+                            ) : messages.length === 0 ? (
+                                <div className="flex justify-center items-center h-full text-gray-400">
+                                    No hay mensajes en esta conversación.
+                                </div>
+                            ) : (
+                                messages.map((msg) => {
+                                    const isReceived = msg.status === 'received';
+
+                                    return (
+                                        <div
+                                            key={msg.id}
+                                            className={`flex w-full ${isReceived ? 'justify-start' : 'justify-end'}`}
+                                        >
+                                            <div className={`
+                                        max-w-[70%] rounded-lg px-4 py-2 shadow-sm
+                                        ${isReceived
+                                                    ? 'bg-white border border-gray-200 text-gray-800 rounded-tl-none'
+                                                    : 'bg-indigo-600 text-white rounded-tr-none'
+                                                }
+                                    `}>
+                                                <p className="whitespace-pre-wrap text-sm">{msg.content}</p>
+                                                <div className={`text-[10px] mt-1 text-right ${isReceived ? 'text-gray-400' : 'text-indigo-200'}`}>
+                                                    {new Date(msg.created_at).toLocaleString()}
+                                                    {msg.status !== 'received' && ` • ${msg.status}`}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })
+                            )}
+                            <div ref={messagesEndRef} />
+                        </div>
+
+                        {/* Read-Only Input Area */}
+                        <div className="p-4 bg-white border-t border-gray-200">
+                            <div className="relative">
+                                <input
+                                    type="text"
+                                    disabled
+                                    placeholder="El envío de respuestas está deshabilitado (Modo Solo Lectura)"
+                                    className="w-full pl-4 pr-12 py-3 bg-gray-100 border border-gray-200 rounded-lg text-gray-500 focus:outline-none cursor-not-allowed"
+                                />
+                                <div className="absolute right-3 top-3 text-gray-400">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" />
+                                    </svg>
                                 </div>
                             </div>
+                            <p className="text-xs text-gray-400 mt-2 text-center">
+                                Para responder, se requiere acceso al número de teléfono desencriptado.
+                            </p>
                         </div>
-                    );
-                })}
-                <div ref={messagesEndRef} />
-            </div>
-
-            {/* Input Area */}
-            <div className="bg-white border-t border-gray-200 p-4">
-                <form onSubmit={handleSend} className="flex gap-4 max-w-4xl mx-auto">
-                    <input
-                        type="text"
-                        value={newMessage}
-                        onChange={(e) => setNewMessage(e.target.value)}
-                        placeholder="Type a message..."
-                        className="flex-1 rounded-lg border-gray-300 shadow-sm focus:border-indigo-500 focus:ring-indigo-500 text-black placeholder:text-gray-400"
-                        disabled={sending}
-                    />
-                    <button
-                        type="submit"
-                        disabled={sending || !newMessage.trim()}
-                        className="bg-indigo-600 text-white px-6 py-2 rounded-lg font-medium hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                    >
-                        {sending ? 'Sending...' : 'Send'}
-                    </button>
-                </form>
+                    </div>
+                </main>
             </div>
         </div>
     );
