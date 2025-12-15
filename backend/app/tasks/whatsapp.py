@@ -73,6 +73,12 @@ async def process_message_async(message_id: int, phone_number: str, db: Session)
         logger.error(f"Message {message_id} not found")
         return
 
+    # Normalize phone number for Mexico: 521XXXXXXXXXX -> 52XXXXXXXXXX
+    # Meta sends 521... but requires 52... for the allowed list check in Dev mode
+    if phone_number.startswith("521") and len(phone_number) == 13:
+        phone_number = "52" + phone_number[3:]
+        logger.info(f"Normalized Mexico phone number to: {phone_number}")
+
     # IDEMPOTENCY CHECK
     if message.status in ["completed", "failed", "skipped"]:
         logger.info(f"Message {message_id} already processed with status: {message.status}. Skipping.")
@@ -96,7 +102,35 @@ async def process_message_async(message_id: int, phone_number: str, db: Session)
         claim_text = await extraction_service.extract_claim(message.content)
 
         if claim_text == "SKIP" or not claim_text:
-            message.status = "skipped"
+            # Fallback: Treat as a general news query/topic search
+            # This allows the bot to answer "Qué pasa con la reforma judicial?"
+            logger.info(f"No specific claim found in message {message_id}. Treating as news query.")
+            
+            # Send "Searching news" placeholder
+            await send_whatsapp_message(
+                phone_number, 
+                "📰 No detecté una afirmación específica para verificar, así que buscaré noticias recientes sobre este tema..."
+            )
+            
+            from app.services.search_service import search_news
+            news_results = await search_news(message.content)
+            
+            if not news_results:
+                await send_whatsapp_message(
+                    phone_number, 
+                    "No encontré noticias recientes sobre ese tema. Intenta ser más específico o preguntar sobre otro asunto."
+                )
+            else:
+                # Format news results
+                response = "📢 *Noticias Recientes:*\n\n"
+                for item in news_results[:3]:
+                    response += f"🔹 *{item.get('title')}*\n"
+                    response += f"{item.get('snippet', '')[:100]}...\n"
+                    response += f"🔗 {item.get('link')}\n\n"
+                
+                await send_whatsapp_message(phone_number, response)
+
+            message.status = "completed"
             db.commit()
             return
 

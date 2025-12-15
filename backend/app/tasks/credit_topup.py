@@ -8,7 +8,7 @@ Runs on the 1st of each month.
 from celery import shared_task
 from app.database.connection import get_db
 from app.database.models import UserBalance, Subscription, SubscriptionStatus, SubscriptionTier
-from app.utils import get_user_tier, get_tier_limit
+from app.core.utils import get_user_tier, get_tier_limit
 from datetime import datetime
 import logging
 
@@ -52,7 +52,7 @@ def monthly_credit_topup():
                 ).first()
                 
                 if not balance:
-                    from app.utils import create_default_user_balance
+                    from app.core.utils import create_default_user_balance
                     balance = create_default_user_balance(db, subscription.user_id)
                 
                 # Add top-up credits

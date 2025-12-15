@@ -23,12 +23,12 @@ def upgrade() -> None:
     """Add vector embeddings and semantic search capabilities."""
 
     # Enable pgvector extension (will work on Neon, may fail locally)
-    try:
-        op.execute("CREATE EXTENSION IF NOT EXISTS vector;")
-        vector_available = True
-    except Exception:
-        # pgvector not available (e.g., local PostgreSQL without extension)
-        vector_available = False
+    # try:
+    #     op.execute("CREATE EXTENSION IF NOT EXISTS vector;")
+    #     vector_available = True
+    # except Exception:
+    #     # pgvector not available (e.g., local PostgreSQL without extension)
+    vector_available = False
 
     if vector_available:
         # Add embedding column to claims table for semantic search (if not exists)

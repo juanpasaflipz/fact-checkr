@@ -15,7 +15,7 @@ from app.database.models import (
     SubscriptionTier
 )
 from app.services.markets import yes_probability
-from app.utils import get_user_tier, get_tier_limit
+from app.core.utils import get_user_tier, get_tier_limit
 from datetime import datetime, timedelta
 import logging
 

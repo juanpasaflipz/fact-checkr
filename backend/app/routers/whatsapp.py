@@ -2,8 +2,8 @@
 WhatsApp Integration Router
 Handles WhatsApp webhooks and message processing
 """
-from fastapi import APIRouter, Request, HTTPException, Depends
-from fastapi.responses import JSONResponse
+from fastapi import APIRouter, Request, HTTPException, Depends, Query
+from fastapi.responses import JSONResponse, PlainTextResponse
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
 import os
@@ -22,7 +22,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/whatsapp", tags=["whatsapp"])
 
 # WhatsApp configuration
-WHATSAPP_VERIFY_TOKEN = os.getenv("WHATSAPP_VERIFY_TOKEN", "your_verify_token_here")
+WHATSAPP_VERIFY_TOKEN = os.getenv("WHATSAPP_VERIFY_TOKEN", "my_secret")
 WHATSAPP_PHONE_NUMBER_ID = os.getenv("WHATSAPP_PHONE_NUMBER_ID")
 WHATSAPP_ACCESS_TOKEN = os.getenv("WHATSAPP_ACCESS_TOKEN")
 WHATSAPP_APP_SECRET = os.getenv("WHATSAPP_APP_SECRET")
@@ -65,9 +65,9 @@ class WhatsAppWebhook(BaseModel):
 
 @router.get("/webhook")
 async def verify_webhook(
-    hub_mode: Optional[str] = None,
-    hub_verify_token: Optional[str] = None,
-    hub_challenge: Optional[str] = None
+    hub_mode: Optional[str] = Query(None, alias="hub.mode"),
+    hub_verify_token: Optional[str] = Query(None, alias="hub.verify_token"),
+    hub_challenge: Optional[str] = Query(None, alias="hub.challenge")
 ):
     """
     WhatsApp webhook verification endpoint
@@ -75,7 +75,7 @@ async def verify_webhook(
     """
     if hub_mode == "subscribe" and hub_verify_token == WHATSAPP_VERIFY_TOKEN:
         logger.info("WhatsApp webhook verified successfully")
-        return int(hub_challenge) if hub_challenge else 200
+        return PlainTextResponse(content=hub_challenge or "", status_code=200)
     
     logger.warning(f"Webhook verification failed: mode={hub_mode}, token={hub_verify_token}")
     raise HTTPException(status_code=403, detail="Verification failed")

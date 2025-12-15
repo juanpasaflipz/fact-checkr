@@ -41,6 +41,8 @@ async def send_whatsapp_message(to: str, message: str):
             logger.info(f"WhatsApp message sent to {to}")
             return response.json()
     except Exception as e:
+        if 'response' in locals() and hasattr(response, 'text'):
+            logger.error(f"WhatsApp API Error Response: {response.text}")
         logger.error(f"Error sending WhatsApp message: {e}")
         raise
 

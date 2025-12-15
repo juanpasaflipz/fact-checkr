@@ -4,40 +4,24 @@
 
 ## 📍 Where We Are
 
-We are currently in **Phase 2** of development, focusing heavily on the **WhatsApp Integration** for the FactChecker MX platform.
+We have successfully **refocused** the project to its original vision: a dual-purpose Intelligence System that monitors Mexican news/social media and informs users via WhatsApp and Web.
 
 ### ✅ Recent Accomplishments
-*   **Frontend UI**: 
-    *   Implemented the WhatsApp Admin Dashboard (`/admin/whatsapp`).
-    *   Created the Chat View for individual users (`/admin/whatsapp/[userId]`).
-    *   Added Spanish translations and improved styling (Tailwind CSS) for a better UX.
-    *   Added manual "Refresh" capabilities for the user list.
-*   **Backend**:
-    *   Established basic endpoint structure for `users` and `messages`.
-    *   Addressed initial CORS and connection issues.
-    *   Updated `VerificationStatus` Enum in the database models.
+*   **Core Logic Refocus**:
+    *   **Dual-Mode Bot**: The WhatsApp agent now handles both **Specific Claims** (Fact-Checking) AND **General Topics** (News Summaries).
+    *   **Input Restoration**: Validated that `TwitterScraper` and `GoogleNewsScraper` are correctly configured to feed the "Repository of Truth".
+*   **Integration Complete**:
+    *   **Environment**: All API keys (Twitter, Serper, OpenAI, Anthropic) are verified and active.
+    *   **WhatsApp**: End-to-end flow works for Mexican numbers (`+52` normalization fixed).
 
-### 🚧 Current Focus
-*   **Connecting the Pipes**: We are currently ensuring the local backend (exposed via `ngrok`) correctly receives and processes real-time webhooks from the WhatsApp Business API.
-*   **Database Migrations**: Refined the Alembic migration scripts to correctly handle Enum changes for `VerificationStatus`.
-
----
-
-## 📋 To-Do & Next Steps
-
-### 1. WhatsApp Webhook Verification
-- [ ] **Verify Webhook Reception**: Confirm that `POST /api/v1/whatsapp/webhook` correctly receives data from Meta.
-- [ ] **Signature Verification**: Ensure `verify_signature` (or similar middleware) is active and securing the webhook endpoint.
-- [ ] **End-to-End Test**: Send a message from a real WhatsApp account -> Webhook -> DB -> Frontend Admin View.
-
-### 2. Async Processing & Reliability
-- [ ] **Celery Tasks**: Harden the `process_message` task in `backend/app/tasks/whatsapp.py`.
-- [ ] **Retries**: Configure automatic retries for transient failures (e.g., network blips).
-- [ ] **Idempotency**: Implement checks to ensure the same message ID isn't processed twice.
-
-### 3. Database & Quality Assurance
-- [ ] **Migration Verification**: Double-check that `7fecb6e4b649_update_verification_status_enum.py` has been applied successfully to the production/staging DB without data loss.
-- [ ] **Unit Tests**: Create tests for the WhatsApp message parsing logic.
+### 2. WhatsApp Integration (Completed)
+- [x] **Webhook Verification**: Confirmed `POST /api/whatsapp/webhook` receives data.
+- [x] **Database Setup**: Created `whatsapp_users`, `whatsapp_messages`, `verdicts`, `evidence` tables.
+- [x] **End-to-End Test**: Successfully received message, reviewed DB, and sent reply.
+- [x] **News Query Support**: Added fallback logic to search Google News when no specific claim is found (e.g., "Noticias de Morena").
+- [x] **AI Integration**: AI Keys are set; bot is "Brain-Enabled".
+- [ ] **Proactive Educational Mode**: Develop the logic for "pre-bunking" misinformation.
+- [ ] **Transparency Citations**: Add a footer to generated content showing sources.
 
 ---
 
@@ -59,9 +43,9 @@ We are currently in **Phase 2** of development, focusing heavily on the **WhatsA
     ```bash
     ngrok http 8000
     ```
-    *Important*: Update the Callback URL in the [Meta Developers Portal](https://developers.facebook.com/) whenever the ngrok URL changes.
 
 ### Key Directories
-*   `backend/app/routers/whatsapp.py`: Main API endpoints.
-*   `frontend/src/app/admin/whatsapp`: Frontend admin pages.
+*   `backend/app/routers`: API endpoints (now includes `blog.py`, `share.py`).
+*   `frontend/src/app/(marketing)`: Landing page routes.
+*   `frontend/src/app/(app)`: Main application routes.
 *   `backend/alembic/versions`: Database migration scripts.

@@ -36,7 +36,7 @@ OUTPUT FORMAT (String only):
         if self.anthropic_client:
             try:
                 response = self.anthropic_client.messages.create(
-                    model="claude-3-5-sonnet-20240620",
+                    model="claude-3-5-sonnet-20241022",
                     max_tokens=150,
                     temperature=0.3,
                     system=system_prompt,
@@ -91,7 +91,7 @@ Return JSON format:
         if self.anthropic_client:
             try:
                 response = self.anthropic_client.messages.create(
-                    model="claude-3-5-sonnet-20240620",
+                    model="claude-3-5-sonnet-20241022",
                     max_tokens=200,
                     temperature=0.2,
                     system=system_prompt,
@@ -184,7 +184,7 @@ RESPONSE FORMAT (JSON only, no markdown):
         if self.anthropic_client:
             try:
                 response = self.anthropic_client.messages.create(
-                    model="claude-3-5-sonnet-20240620",
+                    model="claude-3-5-sonnet-20241022",
                     max_tokens=200,
                     temperature=0.2,
                     system=system_prompt,
