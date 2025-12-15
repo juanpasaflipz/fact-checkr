@@ -1,157 +1,223 @@
-from fastapi import APIRouter, Depends, HTTPException, Header, BackgroundTasks
-from typing import Optional
+from fastapi import APIRouter, Depends, HTTPException, Header, BackgroundTasks, Request
+from typing import Optional, Literal
+from pydantic import BaseModel
 import os
 import logging
+import json
+import uuid
+import pytz
 from datetime import datetime
+from sqlalchemy.orm import Session
 
-# Import task functions
-# We import them inside functions or use string references if we want to avoid circular imports,
-# but for this router, direct imports are usually fine if the tasks don't import this router.
+# Database and Models
+from app.database import SessionLocal
+from app.database.models import JobStatus
+
+# Task functions
 from app.tasks import (
     scraper,
-    fact_check,
-    health_check,
-    credit_topup,
     market_notifications,
     market_intelligence,
-    blog_generation
+    blog_generation,
+    health_check,
+    credit_topup
 )
 
 router = APIRouter(prefix="/tasks", tags=["tasks"])
 logger = logging.getLogger(__name__)
 
-# Security dependency
+# --- Models ---
+
+class ScrapePayload(BaseModel):
+    mode: Literal["all", "prioritized", "trending"] = "all"
+    options: Optional[dict] = {}
+
+class TrendingPayload(BaseModel):
+    window_minutes: int = 15
+    limit: int = 20
+
+class BlogPayload(BaseModel):
+    type: Literal["scheduled", "breaking", "morning", "afternoon", "evening"] = "scheduled"
+    topic_id: Optional[int] = None
+
+# --- Dependencies ---
+
 async def verify_task_secret(x_task_secret: Optional[str] = Header(None)):
     """
     Verify that the request comes from a trusted source (Cloud Scheduler)
     """
     expected_secret = os.getenv("TASK_SECRET")
     if not expected_secret:
-        # If no secret is configured, we warn but might allow for dev (or deny for safety)
-        # For production, we MUST have a secret.
-        logger.warning("TASK_SECRET not set! Task endpoint is insecure.")
         if os.getenv("ENVIRONMENT") == "production":
              raise HTTPException(status_code=500, detail="Server misconfiguration: TASK_SECRET not set")
+        logger.warning("TASK_SECRET not set! Task endpoint is insecure.")
         return
         
     if x_task_secret != expected_secret:
         logger.warning(f"Invalid task secret provided: {x_task_secret}")
         raise HTTPException(status_code=403, detail="Invalid task secret")
 
-# --- Scraper Tasks ---
+# --- Helpers ---
 
-@router.post("/scrape-twitter-6am", dependencies=[Depends(verify_task_secret)])
-async def task_scrape_twitter_6am(background_tasks: BackgroundTasks):
-    """Trigger the 6AM scrape of all sources"""
-    logger.info("Triggering scrape-twitter-6am")
-    # Run in background to reply quickly to Cloud Scheduler (avoids timeout if < 60 mins)
-    background_tasks.add_task(scraper.scrape_all_sources)
-    return {"status": "triggered", "task": "scrape_all_sources", "timestamp": datetime.utcnow().isoformat()}
+def track_job_start(db: Session, job_type: str, params: dict) -> str:
+    """Create a new job status record"""
+    job_id = str(uuid.uuid4())
+    job = JobStatus(
+        id=job_id,
+        job_type=job_type,
+        status="running",
+        params=params,
+        started_at=datetime.utcnow()
+    )
+    db.add(job)
+    db.commit()
+    return job_id
 
-@router.post("/scrape-twitter-12pm", dependencies=[Depends(verify_task_secret)])
-async def task_scrape_twitter_12pm(background_tasks: BackgroundTasks):
-    logger.info("Triggering scrape-twitter-12pm")
-    background_tasks.add_task(scraper.scrape_all_sources)
-    return {"status": "triggered", "task": "scrape_all_sources"}
+def update_job_status(job_id: str, status: str, result: dict = None, error: str = None):
+    """Update job status (to be called inside the background task)"""
+    db = SessionLocal()
+    try:
+        job = db.query(JobStatus).filter(JobStatus.id == job_id).first()
+        if job:
+            job.status = status
+            job.result = result
+            job.error_message = error
+            if status in ["completed", "failed"]:
+                job.completed_at = datetime.utcnow()
+                if job.started_at:
+                    job.duration_seconds = (job.completed_at - job.started_at).total_seconds()
+            db.commit()
+    except Exception as e:
+        logger.error(f"Failed to update job status for {job_id}: {e}")
+    finally:
+        db.close()
 
-@router.post("/scrape-twitter-6pm", dependencies=[Depends(verify_task_secret)])
-async def task_scrape_twitter_6pm(background_tasks: BackgroundTasks):
-    logger.info("Triggering scrape-twitter-6pm")
-    background_tasks.add_task(scraper.scrape_all_sources)
-    return {"status": "triggered", "task": "scrape_all_sources"}
+# --- Wrappers for Background Tasks ---
 
-@router.post("/scrape-twitter-midnight", dependencies=[Depends(verify_task_secret)])
-async def task_scrape_twitter_midnight(background_tasks: BackgroundTasks):
-    logger.info("Triggering scrape-twitter-midnight")
-    background_tasks.add_task(scraper.scrape_all_sources)
-    return {"status": "triggered", "task": "scrape_all_sources"}
+async def run_scrape_task(job_id: str, mode: str, options: dict):
+    try:
+        result = None
+        if mode == "all":
+            count = await scraper.scrape_all_sources()
+            result = {"new_sources": count}
+        elif mode == "prioritized":
+            count = await scraper.scrape_prioritized_topics()
+            result = {"new_sources": count}
+        elif mode == "trending":
+             # This might be redundant if we have a separate trending dispatch, 
+             # but keeping it for flexibility
+            count = await scraper.detect_and_prioritize_topics()
+            result = {"topics_prioritized": count}
+            
+        update_job_status(job_id, "completed", result=result)
+    except Exception as e:
+        logger.error(f"Scrape task failed: {e}", exc_info=True)
+        update_job_status(job_id, "failed", error=str(e))
 
-@router.post("/detect-trending-topics", dependencies=[Depends(verify_task_secret)])
-async def task_detect_trending_topics(background_tasks: BackgroundTasks):
-    logger.info("Triggering detect-trending-topics")
-    background_tasks.add_task(scraper.detect_and_prioritize_topics)
-    return {"status": "triggered", "task": "detect_and_prioritize_topics"}
+async def run_trending_task(job_id: str, window_minutes: int):
+    try:
+        # Detect trending topics
+        count = await scraper.detect_and_prioritize_topics()
+        update_job_status(job_id, "completed", result={"topics_detected": count})
+    except Exception as e:
+        logger.error(f"Trending task failed: {e}", exc_info=True)
+        update_job_status(job_id, "failed", error=str(e))
 
-@router.post("/scrape-prioritized-topics", dependencies=[Depends(verify_task_secret)])
-async def task_scrape_prioritized_topics(background_tasks: BackgroundTasks):
-    logger.info("Triggering scrape-prioritized-topics")
-    background_tasks.add_task(scraper.scrape_prioritized_topics)
-    return {"status": "triggered", "task": "scrape_prioritized_topics"}
+async def run_blog_task(job_id: str, edition: str):
+    try:
+        result = None
+        if edition == "morning":
+            result = await blog_generation.generate_morning_blog_article()
+        elif edition == "afternoon":
+            result = await blog_generation.generate_afternoon_blog_article()
+        elif edition == "evening":
+            result = await blog_generation.generate_evening_blog_article()
+        elif edition == "breaking":
+             # Breaking news logic is slightly different, usually triggered manually or by alert
+             # For now we'll call the generic breaking generator
+             result = await blog_generation.generate_breaking_blog_article()
+             
+        update_job_status(job_id, "completed", result={"article": result})
+    except Exception as e:
+        logger.error(f"Blog task failed: {e}", exc_info=True)
+        update_job_status(job_id, "failed", error=str(e))
 
-# --- Market Tasks ---
+# --- Dispatch Endpoints ---
 
-@router.post("/check-market-probability-changes", dependencies=[Depends(verify_task_secret)])
-async def task_check_market_prob(background_tasks: BackgroundTasks):
-    logger.info("Triggering check-market-probability-changes")
-    background_tasks.add_task(market_notifications.check_market_probability_changes)
-    return {"status": "triggered", "task": "check_market_probability_changes"}
+@router.post("/scrape_dispatch", dependencies=[Depends(verify_task_secret)])
+async def dispatch_scrape(
+    payload: ScrapePayload,
+    background_tasks: BackgroundTasks
+):
+    """
+    Central dispatcher for scraping tasks.
+    """
+    db = SessionLocal()
+    try:
+        job_id = track_job_start(db, f"scrape_{payload.mode}", payload.dict())
+        background_tasks.add_task(run_scrape_task, job_id, payload.mode, payload.options)
+        return {"status": "queued", "job_id": job_id, "mode": payload.mode}
+    finally:
+        db.close()
 
-@router.post("/notify-new-markets", dependencies=[Depends(verify_task_secret)])
-async def task_notify_new_markets(background_tasks: BackgroundTasks):
-    logger.info("Triggering notify-new-markets")
-    background_tasks.add_task(market_notifications.notify_new_markets)
-    return {"status": "triggered", "task": "notify_new_markets"}
+@router.post("/trending_dispatch", dependencies=[Depends(verify_task_secret)])
+async def dispatch_trending(
+    payload: TrendingPayload,
+    background_tasks: BackgroundTasks
+):
+    """
+    Dispatcher for trending topic detection.
+    """
+    db = SessionLocal()
+    try:
+        job_id = track_job_start(db, "trending_detection", payload.dict())
+        background_tasks.add_task(run_trending_task, job_id, payload.window_minutes)
+        return {"status": "queued", "job_id": job_id}
+    finally:
+        db.close()
 
-@router.post("/seed-new-markets", dependencies=[Depends(verify_task_secret)])
-async def task_seed_new_markets(background_tasks: BackgroundTasks):
-    logger.info("Triggering seed-new-markets")
-    background_tasks.add_task(market_intelligence.seed_new_markets)
-    return {"status": "triggered", "task": "seed_new_markets"}
+@router.post("/blog_dispatch", dependencies=[Depends(verify_task_secret)])
+async def dispatch_blog(
+    payload: BlogPayload,
+    background_tasks: BackgroundTasks
+):
+    """
+    Dispatcher for blog generation.
+    Automatically determines edition based on time if type is 'scheduled'.
+    """
+    edition = payload.type
+    
+    # Smart scheduling logic
+    if edition == "scheduled":
+        tz = pytz.timezone("America/Mexico_City")
+        now = datetime.now(tz)
+        hour = now.hour
+        
+        if 5 <= hour < 12:
+            edition = "morning"
+        elif 12 <= hour < 18:
+            edition = "afternoon"
+        else:
+            edition = "evening"
+            
+        logger.info(f"Auto-determined blog edition: {edition} (Current hour: {hour})")
 
-@router.post("/reassess-inactive-markets", dependencies=[Depends(verify_task_secret)])
-async def task_reassess_inactive(background_tasks: BackgroundTasks):
-    logger.info("Triggering reassess-inactive-markets")
-    background_tasks.add_task(market_intelligence.reassess_inactive_markets)
-    return {"status": "triggered", "task": "reassess_inactive_markets"}
+    db = SessionLocal()
+    try:
+        job_id = track_job_start(db, f"blog_{edition}", {"requested_type": payload.type, "edition": edition})
+        background_tasks.add_task(run_blog_task, job_id, edition)
+        return {"status": "queued", "job_id": job_id, "edition": edition}
+    finally:
+        db.close()
 
-@router.post("/tier1-lightweight-update", dependencies=[Depends(verify_task_secret)])
-async def task_tier1_update(background_tasks: BackgroundTasks):
-    logger.info("Triggering tier1-lightweight-update")
-    background_tasks.add_task(market_intelligence.tier1_lightweight_update)
-    return {"status": "triggered", "task": "tier1_lightweight_update"}
-
-@router.post("/tier2-daily-analysis", dependencies=[Depends(verify_task_secret)])
-async def task_tier2_analysis(background_tasks: BackgroundTasks):
-    logger.info("Triggering tier2-daily-analysis")
-    background_tasks.add_task(market_intelligence.tier2_daily_analysis)
-    return {"status": "triggered", "task": "tier2_daily_analysis"}
-
-# --- Blog Tasks ---
-
-@router.post("/generate-morning-blog", dependencies=[Depends(verify_task_secret)])
-async def task_morning_blog(background_tasks: BackgroundTasks):
-    logger.info("Triggering generate-morning-blog")
-    background_tasks.add_task(blog_generation.generate_morning_blog_article)
-    return {"status": "triggered", "task": "generate_morning_blog_article"}
-
-@router.post("/generate-afternoon-blog", dependencies=[Depends(verify_task_secret)])
-async def task_afternoon_blog(background_tasks: BackgroundTasks):
-    logger.info("Triggering generate-afternoon-blog")
-    background_tasks.add_task(blog_generation.generate_afternoon_blog_article)
-    return {"status": "triggered", "task": "generate_afternoon_blog_article"}
-
-@router.post("/generate-evening-blog", dependencies=[Depends(verify_task_secret)])
-async def task_evening_blog(background_tasks: BackgroundTasks):
-    logger.info("Triggering generate-evening-blog")
-    background_tasks.add_task(blog_generation.generate_evening_blog_article)
-    return {"status": "triggered", "task": "generate_evening_blog_article"}
-
-@router.post("/generate-breaking-blog", dependencies=[Depends(verify_task_secret)])
-async def task_breaking_blog(background_tasks: BackgroundTasks):
-    logger.info("Triggering generate-breaking-blog")
-    background_tasks.add_task(blog_generation.generate_breaking_blog_article)
-    return {"status": "triggered", "task": "generate_breaking_blog_article"}
-
-# --- Maintenance Tasks ---
+# --- Legacy/Maintenance Endpoints (Optional) ---
 
 @router.post("/health-check", dependencies=[Depends(verify_task_secret)])
 async def task_health_check(background_tasks: BackgroundTasks):
-    logger.info("Triggering health-check")
     background_tasks.add_task(health_check.health_check)
     return {"status": "triggered", "task": "health_check"}
 
 @router.post("/monthly-credit-topup", dependencies=[Depends(verify_task_secret)])
 async def task_credit_topup(background_tasks: BackgroundTasks):
-    logger.info("Triggering monthly-credit-topup")
     background_tasks.add_task(credit_topup.monthly_credit_topup)
     return {"status": "triggered", "task": "monthly_credit_topup"}

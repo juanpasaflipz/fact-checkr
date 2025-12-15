@@ -4,6 +4,7 @@ from sqlalchemy.orm import relationship
 from pgvector.sqlalchemy import Vector
 from datetime import datetime
 import enum
+import uuid
 
 Base = declarative_base()
 
@@ -617,3 +618,29 @@ class MarketVote(Base):
     __table_args__ = (
         Index('idx_mv_market_user', 'market_id', 'user_id', unique=True),
     )
+
+
+class JobStatus(Base):
+    """
+    Tracks execution status of background jobs triggered by Cloud Scheduler.
+    Used for monitoring, debugging, and retry logic.
+    """
+    __tablename__ = 'job_status'
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    job_type = Column(String, nullable=False, index=True)  # e.g., 'scrape_dispatch', 'blog_dispatch'
+    status = Column(String, default='pending', nullable=False, index=True)  # pending, running, completed, failed
+    
+    # Execution details
+    params = Column(JSON, nullable=True)
+    result = Column(JSON, nullable=True)
+    error_message = Column(Text, nullable=True)
+    
+    # Timestamps
+    created_at = Column(DateTime, default=datetime.utcnow, index=True)
+    started_at = Column(DateTime, nullable=True)
+    completed_at = Column(DateTime, nullable=True)
+    
+    # Metrics
+    duration_seconds = Column(Float, nullable=True)
+
