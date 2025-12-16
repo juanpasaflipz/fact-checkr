@@ -25,6 +25,10 @@ from app.services.tasks import (
 
 # ...
 
+from app.core.config import settings
+
+# ...
+
 @router.post("/detect_trending", response_model=TaskResponse, dependencies=[Depends(verify_cloud_tasks_auth)])
 async def detect_trending_endpoint(
     payload: DetectTrendingTask,
@@ -81,7 +85,7 @@ async def verify_cloud_tasks_auth(
     """
     
     # 1. Check for Task Secret (easiest for now and matches requirement "If no Authorization, validate X-Task-Secret")
-    env_secret = os.getenv("TASK_SECRET")
+    env_secret = settings.TASK_SECRET
     if env_secret and x_task_secret == env_secret:
         return True
         

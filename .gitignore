@@ -85,3 +85,7 @@ docs/.next/
 
 .vercel
 .firebase/
+
+# Secrets
+IMPORTANT-env fact-check.rtf
+fix_env_json.py

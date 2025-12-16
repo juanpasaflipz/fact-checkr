@@ -11,9 +11,65 @@ class VerificationService:
         self.anthropic_client = anthropic_client
         self.openai_client = openai_client
 
+    def _call_ai_with_fallback(self, system_prompt: str, user_prompt: str, max_tokens: int = 300) -> Optional[dict]:
+        """
+        Helper method to call AI with fallback logic.
+        Tries Anthropic first, then OpenAI.
+        Returns parsed JSON dict or None if both fail.
+        """
+        # Try Anthropic first (primary)
+        if self.anthropic_client:
+            try:
+                response = self.anthropic_client.messages.create(
+                    model="claude-3-5-sonnet-20240620",
+                    max_tokens=max_tokens,
+                    temperature=0.3,
+                    system=system_prompt,
+                    messages=[{"role": "user", "content": user_prompt}]
+                )
+                
+                response_text = response.content[0].text.strip()
+                return self._parse_json_response(response_text)
+            except Exception as e:
+                logger.warning(f"⚠️  Anthropic API error, falling back to OpenAI: {e}")
+
+        # Fallback to OpenAI
+        if self.openai_client:
+            try:
+                response = self.openai_client.chat.completions.create(
+                    model="gpt-4o",
+                    messages=[
+                        {"role": "system", "content": system_prompt},
+                        {"role": "user", "content": user_prompt}
+                    ],
+                    max_tokens=max_tokens,
+                    temperature=0.3,
+                    response_format={"type": "json_object"}
+                )
+                
+                response_text = response.choices[0].message.content.strip()
+                return self._parse_json_response(response_text)
+            except Exception as e:
+                logger.warning(f"⚠️  OpenAI API error: {e}")
+        
+        return None
+
+    def _parse_json_response(self, response_text: str) -> dict:
+        """Extract and parse JSON from response text"""
+        try:
+            # Handle markdown code blocks
+            if response_text.startswith("```"):
+                json_start = response_text.find("{")
+                json_end = response_text.rfind("}") + 1
+                if json_start != -1 and json_end > json_start:
+                    response_text = response_text[json_start:json_end]
+            return json.loads(response_text)
+        except json.JSONDecodeError as e:
+            logger.warning(f"JSON parse error: {e}")
+            raise e
+
     async def verify_claim(self, claim: str, evidence: List[str]) -> VerificationResult:
         if not self.anthropic_client and not self.openai_client:
-            # Fallback to mock logic if no API keys
             return VerificationResult(
                 status=VerificationStatus.UNVERIFIED,
                 explanation="No AI API keys configured.",
@@ -47,89 +103,22 @@ RESPONSE FORMAT (JSON only, no markdown):
     "explanation": "A concise (max 280 chars) explanation in Mexican Spanish. Tone: informational, not scolding."
 }}"""
         
-        # Try Anthropic first (primary)
-        if self.anthropic_client:
-            try:
-                response = self.anthropic_client.messages.create(
-                    model="claude-3-5-sonnet-20240620",
-                    max_tokens=300,
-                    temperature=0.3,
-                    system=system_prompt,
-                    messages=[{"role": "user", "content": user_prompt}]
-                )
-                
-                # Extract text from Anthropic response
-                response_text = response.content[0].text.strip()
-                
-                # Try to parse JSON - handle cases where response might have markdown code blocks
-                if response_text.startswith("```"):
-                    json_start = response_text.find("{")
-                    json_end = response_text.rfind("}") + 1
-                    if json_start != -1 and json_end > json_start:
-                        response_text = response_text[json_start:json_end]
-                
-                result = json.loads(response_text)
-                status_map = {
-                    "Verified": VerificationStatus.VERIFIED,
-                    "Debunked": VerificationStatus.DEBUNKED,
-                    "Misleading": VerificationStatus.MISLEADING,
-                    "Unverified": VerificationStatus.UNVERIFIED
-                }
-                
-                return VerificationResult(
-                    status=status_map.get(result.get("status"), VerificationStatus.UNVERIFIED),
-                    explanation=result.get("explanation", "No se pudo verificar la información."),
-                    sources=evidence,
-                    confidence=0.5  # Default confidence for old method
-                )
-            except json.JSONDecodeError as e:
-                logger.warning(f"⚠️  Anthropic JSON parse error, falling back to OpenAI: {e}")
-            except Exception as e:
-                logger.warning(f"⚠️  Anthropic API error, falling back to OpenAI: {e}")
+        result = self._call_ai_with_fallback(system_prompt, user_prompt, max_tokens=300)
         
-        # Fallback to OpenAI
-        if self.openai_client:
-            try:
-                response = self.openai_client.chat.completions.create(
-                    model="gpt-4o",
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_prompt}
-                    ],
-                    max_tokens=300,
-                    temperature=0.3,
-                    response_format={"type": "json_object"}  # Request JSON format
-                )
-                
-                response_text = response.choices[0].message.content.strip()
-                
-                # Handle markdown code blocks if present
-                if response_text.startswith("```"):
-                    json_start = response_text.find("{")
-                    json_end = response_text.rfind("}") + 1
-                    if json_start != -1 and json_end > json_start:
-                        response_text = response_text[json_start:json_end]
-                
-                result = json.loads(response_text)
-                status_map = {
-                    "Verified": VerificationStatus.VERIFIED,
-                    "Debunked": VerificationStatus.DEBUNKED,
-                    "Misleading": VerificationStatus.MISLEADING,
-                    "Unverified": VerificationStatus.UNVERIFIED
-                }
-                
-                return VerificationResult(
-                    status=status_map.get(result.get("status"), VerificationStatus.UNVERIFIED),
-                    explanation=result.get("explanation", "No se pudo verificar la información."),
-                    sources=evidence,
-                    confidence=0.5  # Default confidence for old method
-                )
-            except json.JSONDecodeError as e:
-                logger.warning(f"⚠️  OpenAI JSON parse error: {e}")
-            except Exception as e:
-                logger.warning(f"⚠️  OpenAI API error: {e}")
+        if result:
+            status_map = {
+                "Verified": VerificationStatus.VERIFIED,
+                "Debunked": VerificationStatus.DEBUNKED,
+                "Misleading": VerificationStatus.MISLEADING,
+                "Unverified": VerificationStatus.UNVERIFIED
+            }
+            return VerificationResult(
+                status=status_map.get(result.get("status"), VerificationStatus.UNVERIFIED),
+                explanation=result.get("explanation", "No se pudo verificar la información."),
+                sources=evidence,
+                confidence=0.5  # Default confidence for old method
+            )
         
-        # If both fail, return unverified
         return VerificationResult(
             status=VerificationStatus.UNVERIFIED,
             explanation="Error al verificar la información. No se pudo conectar con los servicios de verificación.",
@@ -218,87 +207,24 @@ RESPONSE FORMAT (JSON only, no markdown):
     "key_evidence_points": ["point 1", "point 2"]
 }}"""
         
-        # Try Anthropic first
-        if self.anthropic_client:
-            try:
-                response = self.anthropic_client.messages.create(
-                    model="claude-3-5-sonnet-20240620",
-                    max_tokens=400,
-                    temperature=0.3,
-                    system=system_prompt,
-                    messages=[{"role": "user", "content": user_prompt}]
-                )
-                
-                response_text = response.content[0].text.strip()
-                
-                # Parse JSON
-                if response_text.startswith("```"):
-                    json_start = response_text.find("{")
-                    json_end = response_text.rfind("}") + 1
-                    if json_start != -1 and json_end > json_start:
-                        response_text = response_text[json_start:json_end]
-                
-                result = json.loads(response_text)
-                status_map = {
-                    "Verified": VerificationStatus.VERIFIED,
-                    "Debunked": VerificationStatus.DEBUNKED,
-                    "Misleading": VerificationStatus.MISLEADING,
-                    "Unverified": VerificationStatus.UNVERIFIED
-                }
-                
-                return VerificationResult(
-                    status=status_map.get(result.get("status"), VerificationStatus.UNVERIFIED),
-                    explanation=result.get("explanation", "No se pudo verificar."),
-                    sources=evidence_urls,
-                    confidence=result.get("confidence", 0.5),
-                    evidence_strength=result.get("evidence_strength", "insufficient"),
-                    key_evidence_points=result.get("key_evidence_points", [])
-                )
-            except json.JSONDecodeError as e:
-                logger.warning(f"⚠️  Anthropic JSON parse error: {e}")
-            except Exception as e:
-                logger.warning(f"⚠️  Anthropic API error: {e}")
+        result = self._call_ai_with_fallback(system_prompt, user_prompt, max_tokens=400)
         
-        # Fallback to OpenAI
-        if self.openai_client:
-            try:
-                response = self.openai_client.chat.completions.create(
-                    model="gpt-4o",
-                    messages=[
-                        {"role": "system", "content": system_prompt},
-                        {"role": "user", "content": user_prompt}
-                    ],
-                    max_tokens=400,
-                    temperature=0.3,
-                    response_format={"type": "json_object"}
-                )
-                
-                response_text = response.choices[0].message.content.strip()
-                
-                if response_text.startswith("```"):
-                    json_start = response_text.find("{")
-                    json_end = response_text.rfind("}") + 1
-                    if json_start != -1 and json_end > json_start:
-                        response_text = response_text[json_start:json_end]
-                
-                result = json.loads(response_text)
-                status_map = {
-                    "Verified": VerificationStatus.VERIFIED,
-                    "Debunked": VerificationStatus.DEBUNKED,
-                    "Misleading": VerificationStatus.MISLEADING,
-                    "Unverified": VerificationStatus.UNVERIFIED
-                }
-                
-                return VerificationResult(
-                    status=status_map.get(result.get("status"), VerificationStatus.UNVERIFIED),
-                    explanation=result.get("explanation", "No se pudo verificar."),
-                    sources=evidence_urls,
-                    confidence=result.get("confidence", 0.5),
-                    evidence_strength=result.get("evidence_strength", "insufficient"),
-                    key_evidence_points=result.get("key_evidence_points", [])
-                )
-            except Exception as e:
-                logger.warning(f"⚠️  OpenAI API error: {e}")
+        if result:
+            status_map = {
+                "Verified": VerificationStatus.VERIFIED,
+                "Debunked": VerificationStatus.DEBUNKED,
+                "Misleading": VerificationStatus.MISLEADING,
+                "Unverified": VerificationStatus.UNVERIFIED
+            }
+            
+            return VerificationResult(
+                status=status_map.get(result.get("status"), VerificationStatus.UNVERIFIED),
+                explanation=result.get("explanation", "No se pudo verificar."),
+                sources=evidence_urls,
+                confidence=result.get("confidence", 0.5),
+                evidence_strength=result.get("evidence_strength", "insufficient"),
+                key_evidence_points=result.get("key_evidence_points", [])
+            )
         
         # If both fail, return unverified
         return VerificationResult(

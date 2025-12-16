@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel, EmailStr
 from datetime import datetime
 from typing import Optional, List
-import os
+
 import secrets
 import httpx
 import logging
@@ -87,11 +87,12 @@ def _get_client():
 oauth_states = {}
 
 # Google OAuth configuration
-from app.config.settings import FRONTEND_URL
+from app.core.config import settings
+FRONTEND_URL = settings.get_frontend_url()
 
-GOOGLE_CLIENT_ID = os.getenv("GOOGLE_CLIENT_ID", "")
-GOOGLE_CLIENT_SECRET = os.getenv("GOOGLE_CLIENT_SECRET", "")
-GOOGLE_REDIRECT_URI = os.getenv("GOOGLE_REDIRECT_URI", "http://localhost:8000/api/auth/google/callback")
+GOOGLE_CLIENT_ID = settings.GOOGLE_CLIENT_ID
+GOOGLE_CLIENT_SECRET = settings.GOOGLE_CLIENT_SECRET
+GOOGLE_REDIRECT_URI = settings.GOOGLE_REDIRECT_URI
 
 # Validate OAuth configuration on startup
 def validate_oauth_config():
@@ -119,6 +120,9 @@ def validate_oauth_config():
             logger.warning(f"⚠️  FRONTEND_URL appears incorrect: {FRONTEND_URL} (expected factcheck.mx domain)")
     else:
         logger.warning("⚠️  Google OAuth not configured - set GOOGLE_CLIENT_ID and GOOGLE_CLIENT_SECRET")
+
+# ...
+
 
 # Run validation on module import
 validate_oauth_config()
@@ -639,8 +643,8 @@ async def google_callback(
         
         # Redirect to frontend with token in URL (frontend should extract and store securely)
         # Using URL fragment would be more secure but requires JavaScript on frontend
-        redirect_url = f"{FRONTEND_URL}/signin?token={access_token_jwt}&success=true"
-        logger.info(f"Redirecting to frontend: {FRONTEND_URL}/signin")
+        redirect_url = f"{settings.FRONTEND_URL}/signin?token={access_token_jwt}&success=true"
+        logger.info(f"Redirecting to frontend: {settings.FRONTEND_URL}/signin")
         
         response = RedirectResponse(url=redirect_url)
         
@@ -650,7 +654,7 @@ async def google_callback(
             key="access_token",
             value=access_token_jwt,
             httponly=True,
-            secure=os.getenv("ENVIRONMENT") == "production",  # Only secure in production (HTTPS)
+            secure=settings.ENVIRONMENT == "production",  # Only secure in production (HTTPS)
             samesite="lax",
             max_age=86400 * 7  # 7 days
         )

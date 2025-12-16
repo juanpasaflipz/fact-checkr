@@ -2,7 +2,7 @@
 YouTube Scraper for Mexico Political Content
 Fetches videos, transcribes them, and stores as sources
 """
-import os
+from app.core.config import settings
 import re
 from typing import List
 from datetime import datetime, timedelta
@@ -23,7 +23,7 @@ class YouTubeScraper:
     """Scraper for YouTube videos focused on Mexico political content"""
     
     def __init__(self):
-        self.api_key = os.getenv("YOUTUBE_API_KEY")
+        self.api_key = settings.YOUTUBE_API_KEY
         self.youtube = None
         
         if self.api_key:

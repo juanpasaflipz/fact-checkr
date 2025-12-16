@@ -6,7 +6,7 @@ from fastapi import APIRouter, Request, HTTPException, Depends, Query
 from fastapi.responses import JSONResponse, PlainTextResponse
 from pydantic import BaseModel
 from typing import Optional, Dict, Any
-import os
+from app.core.config import settings
 import logging
 import hmac
 import hashlib
@@ -23,10 +23,10 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/whatsapp", tags=["whatsapp"])
 
 # WhatsApp configuration
-WHATSAPP_VERIFY_TOKEN = os.getenv("WHATSAPP_VERIFY_TOKEN", "my_secret")
-WHATSAPP_PHONE_NUMBER_ID = os.getenv("WHATSAPP_PHONE_NUMBER_ID")
-WHATSAPP_ACCESS_TOKEN = os.getenv("WHATSAPP_ACCESS_TOKEN")
-WHATSAPP_APP_SECRET = os.getenv("WHATSAPP_APP_SECRET")
+WHATSAPP_VERIFY_TOKEN = settings.WHATSAPP_VERIFY_TOKEN
+WHATSAPP_PHONE_NUMBER_ID = settings.WHATSAPP_PHONE_NUMBER_ID
+WHATSAPP_ACCESS_TOKEN = settings.WHATSAPP_ACCESS_TOKEN
+WHATSAPP_APP_SECRET = settings.WHATSAPP_APP_SECRET
 
 async def verify_signature(request: Request):
     """Verify that the payload came from WhatsApp"""

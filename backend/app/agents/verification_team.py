@@ -12,13 +12,38 @@ into a final verdict with high confidence.
 """
 import asyncio
 import json
-from typing import List, Dict, Optional
+from typing import List, Dict, Optional, Any, TypedDict
 from datetime import datetime
 import logging
 
 from app.agents.base_agent import BaseAgent, AgentResult
 
 logger = logging.getLogger(__name__)
+
+class SourceCredibility(TypedDict, total=False):
+    domain: str
+    tier: str
+    credibility_score: float
+
+class WebEvidence(TypedDict, total=False):
+    url: str
+    credibility_tier: str
+
+class SimilarClaim(TypedDict, total=False):
+    claim_text: str
+    status: str
+    similarity: float
+    id: str
+
+class VerificationContext(TypedDict, total=False):
+    evidence_urls: List[str]
+    evidence_texts: List[str]
+    source_credibility: SourceCredibility
+    web_evidence: List[WebEvidence]
+    similar_claims: List[SimilarClaim]
+    entity_facts: List[str]
+    has_prior_debunked: bool
+    original_text: str
 
 
 class SourceCredibilityAgent(BaseAgent):
@@ -32,7 +57,7 @@ class SourceCredibilityAgent(BaseAgent):
     def description(self) -> str:
         return "Evaluates source reliability and potential bias"
     
-    async def analyze(self, claim: str, context: Dict) -> AgentResult:
+    async def analyze(self, claim: str, context: VerificationContext) -> AgentResult:
         try:
             sources = context.get("evidence_urls", [])
             source_credibility = context.get("source_credibility", {})
@@ -113,7 +138,7 @@ class HistoricalContextAgent(BaseAgent):
     def description(self) -> str:
         return "Compares against known facts and past claims"
     
-    async def analyze(self, claim: str, context: Dict) -> AgentResult:
+    async def analyze(self, claim: str, context: VerificationContext) -> AgentResult:
         try:
             similar_claims = context.get("similar_claims", [])
             entity_facts = context.get("entity_facts", [])
@@ -198,7 +223,7 @@ class LogicalConsistencyAgent(BaseAgent):
     def description(self) -> str:
         return "Detects fallacies and manipulation"
     
-    async def analyze(self, claim: str, context: Dict) -> AgentResult:
+    async def analyze(self, claim: str, context: VerificationContext) -> AgentResult:
         try:
             original_text = context.get("original_text", "")
             
@@ -352,7 +377,7 @@ class VerificationOrchestrator:
     async def verify_claim(
         self,
         claim: str,
-        context: Dict
+        context: VerificationContext
     ) -> Dict:
         """
         Run all verification agents and synthesize results.
@@ -510,7 +535,7 @@ RESPONDE EN JSON:
 
 
 # Convenience function for quick verification
-async def verify_claim_with_agents(claim: str, context: Dict) -> Dict:
+async def verify_claim_with_agents(claim: str, context: VerificationContext) -> Dict:
     """Quick verification using multi-agent system"""
     orchestrator = VerificationOrchestrator()
     return await orchestrator.verify_claim(claim, context)

@@ -5,12 +5,13 @@ from firebase_admin import auth, credentials
 from datetime import datetime
 import os
 import logging
-from typing import Optional
+from typing import Optional, List
 from sqlalchemy.orm import Session
 
 from app.database.connection import get_db
-from app.database.models import User
+from app.database.models import User, UserRole
 from app.core.utils import get_user_by_id
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -21,7 +22,7 @@ try:
     if not firebase_admin._apps:
         cred = None
         # Check for Base64 encoded credentials (deployment friendly)
-        firebase_creds_b64 = os.getenv("FIREBASE_CREDENTIALS_B64")
+        firebase_creds_b64 = settings.FIREBASE_CREDENTIALS_B64
         if firebase_creds_b64:
             import base64
             import json
@@ -127,11 +128,38 @@ async def get_optional_user(
     except Exception:
         return None
 
+class RoleChecker:
+    def __init__(self, allowed_roles: List[UserRole]):
+        self.allowed_roles = allowed_roles
+
+    def __call__(self, user: User = Depends(get_current_user)):
+        # Support legacy is_admin flag for graceful migration
+        if user.is_admin and (UserRole.ADMIN in self.allowed_roles or UserRole.SUPER_ADMIN in self.allowed_roles):
+             return user
+             
+        if user.role not in self.allowed_roles:
+            logger.warning(f"⛔ Access denied for user {user.email} (Role: {user.role}). Required: {self.allowed_roles}")
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN, 
+                detail="Operation not permitted"
+            )
+        return user
+
+def allow_roles(roles: List[UserRole]):
+    return RoleChecker(roles)
+
 async def get_admin_user(
     user: User = Depends(get_current_user)
 ) -> User:
-    """Require admin privileges - raises 403 if user is not admin"""
-    if not user.is_admin:
+    """Require admin privileges - checking both legacy boolean and new role enum"""
+    # Check legacy flag OR new role enum
+    is_authorized = (
+        user.is_admin or 
+        user.role in [UserRole.ADMIN, UserRole.SUPER_ADMIN]
+    )
+    
+    if not is_authorized:
+        logger.warning(f"⛔ Admin access denied for user {user.email}")
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
             detail="Admin access required"

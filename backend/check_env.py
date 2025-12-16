@@ -1,33 +1,28 @@
-
+import sys
 import os
-from dotenv import load_dotenv
 
-load_dotenv()
+# Add parent directory to path to import app modules
+sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
-required_vars = [
-    "WHATSAPP_VERIFY_TOKEN",
-    "WHATSAPP_PHONE_NUMBER_ID",
-    "WHATSAPP_ACCESS_TOKEN",
-    "WHATSAPP_APP_SECRET",
-    "TWITTER_BEARER_TOKEN",
-    "SERPER_API_KEY",
-    "OPENAI_API_KEY",
-    "ANTHROPIC_API_KEY"
-]
+from pydantic import ValidationError
 
-print("Checking environment variables in .env...")
-all_present = True
-for var in required_vars:
-    value = os.getenv(var)
-    if not value or value.startswith("your_") or value == "":
-        print(f"❌ {var} is MISSING or default")
-        all_present = False
-    else:
-        # Print only first 4 chars for security
-        masked = value[:4] + "..." if len(value) > 4 else "***"
-        print(f"✅ {var} is set ({masked})")
+print("Checking environment configuration using Settings...")
 
-if all_present:
-    print("\n🎉 All critical environment variables are set!")
-else:
-    print("\n⚠️ Some variables are missing. Functionality will be limited.")
+try:
+    from app.core.config import settings
+    # Accessing properties to trigger any lazy loading if applicable
+    # (Though Pydantic loading happens at instantiation time usually)
+    print(f"✅ Configuration loaded successfully.")
+    print(f"Environment: {settings.ENVIRONMENT}")
+    print(f"Database URL: {settings.DATABASE_URL.scheme}://***@{settings.DATABASE_URL.host}")
+    print("\n🎉 All critical environment variables are set and valid!")
+    
+except ValidationError as e:
+    print("\n❌ Configuration Error:")
+    for error in e.errors():
+        field = " -> ".join(str(loc) for loc in error['loc'])
+        print(f"  - {field}: {error['msg']}")
+    sys.exit(1)
+except Exception as e:
+    print(f"\n❌ Unexpected Error: {e}")
+    sys.exit(1)

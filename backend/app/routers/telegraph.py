@@ -13,6 +13,7 @@ from app.database.models import Claim as DBClaim, Topic as DBTopic, BlogArticle
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
 import re
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -43,7 +44,7 @@ class CreatePageRequest(BaseModel):
 async def create_telegraph_account() -> str:
     """Create or get Telegraph account access token"""
     # Check if we have a stored token
-    token = os.getenv("TELEGRAPH_ACCESS_TOKEN")
+    token = settings.TELEGRAPH_ACCESS_TOKEN
     
     if not token:
         # Create new account

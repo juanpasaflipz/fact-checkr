@@ -1,7 +1,7 @@
 
 import asyncio
 import logging
-import os
+from app.core.config import settings
 import hashlib
 import httpx
 from datetime import datetime
@@ -37,11 +37,11 @@ logger = logging.getLogger(__name__)
 anthropic_client = None
 openai_client = None
 
-if os.getenv("ANTHROPIC_API_KEY"):
-    anthropic_client = Anthropic(api_key=os.getenv("ANTHROPIC_API_KEY"))
+if settings.ANTHROPIC_API_KEY:
+    anthropic_client = Anthropic(api_key=settings.ANTHROPIC_API_KEY)
 
-if os.getenv("OPENAI_API_KEY"):
-    openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
+if settings.OPENAI_API_KEY:
+    openai_client = OpenAI(api_key=settings.OPENAI_API_KEY)
 
 # Logic moved from Celery task, now a plain async function
 async def process_message_logic(message_id: int, phone_number: str):

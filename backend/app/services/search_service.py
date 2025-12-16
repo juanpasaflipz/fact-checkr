@@ -1,9 +1,10 @@
-import os
+from app.core.config import settings
+import httpx
 from typing import List, Dict, Any
 
 async def search_web(query: str) -> List[str]:
     """Search the web using Serper API for evidence gathering (returns URLs only)"""
-    serper_api_key = os.getenv("SERPER_API_KEY")
+    serper_api_key = settings.SERPER_API_KEY
     
     if not serper_api_key:
         print(f"Warning: SERPER_API_KEY not found. Using mock results for: {query}")
@@ -55,7 +56,7 @@ async def search_web(query: str) -> List[str]:
 
 async def search_web_rich(query: str) -> List[Dict[str, str]]:
     """Search the web using Serper API (returns links and snippets)"""
-    serper_api_key = os.getenv("SERPER_API_KEY")
+    serper_api_key = settings.SERPER_API_KEY
     
     if not serper_api_key:
         print(f"Warning: SERPER_API_KEY not found. Using mock results for: {query}")
@@ -101,7 +102,7 @@ async def search_web_rich(query: str) -> List[Dict[str, str]]:
 
 async def search_news(query: str) -> List[Dict[str, Any]]:
     """Search for news using Serper API (returns rich results)"""
-    serper_api_key = os.getenv("SERPER_API_KEY")
+    serper_api_key = settings.SERPER_API_KEY
     
     if not serper_api_key:
         print(f"Warning: SERPER_API_KEY not found. Skipping Serper news search.")

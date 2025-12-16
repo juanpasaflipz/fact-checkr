@@ -9,20 +9,20 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from app.agents import FactChecker
 
 # Patch the scrapers to avoid network calls during init
-@patch("app.agent.MockScraper")
-@patch("app.agent.TwitterScraper")
-@patch("app.agent.GoogleNewsScraper")
-@patch("app.agent.FacebookScraper")
-@patch("app.agent.InstagramScraper")
-@patch("app.agent.DuplicateDetector")
-@patch("app.agent.os.getenv")
+@patch("app.agents.legacy_agent.MockScraper")
+@patch("app.agents.legacy_agent.TwitterScraper")
+@patch("app.agents.legacy_agent.GoogleNewsScraper")
+@patch("app.agents.legacy_agent.FacebookScraper")
+@patch("app.agents.legacy_agent.InstagramScraper")
+@patch("app.agents.legacy_agent.DuplicateDetector")
+@patch("app.agents.legacy_agent.settings")
 @pytest.mark.asyncio
-async def test_extract_claim_anthropic(mock_getenv, mock_dup, mock_insta, mock_fb, mock_google, mock_twitter, mock_mock_scraper):
+async def test_extract_claim_anthropic(mock_settings, mock_dup, mock_insta, mock_fb, mock_google, mock_twitter, mock_mock_scraper):
     # Setup mocks
-    mock_getenv.return_value = "fake-key" # For API keys
+    mock_settings.ANTHROPIC_API_KEY = "fake-key"
     
     # Mock Anthropic client
-    with patch("app.agent.anthropic.Anthropic") as mock_anthropic:
+    with patch("app.agents.legacy_agent.anthropic.Anthropic") as mock_anthropic:
         mock_client = MagicMock()
         mock_anthropic.return_value = mock_client
         
@@ -40,18 +40,18 @@ async def test_extract_claim_anthropic(mock_getenv, mock_dup, mock_insta, mock_f
         assert claim == "Verify this claim"
         mock_client.messages.create.assert_called_once()
 
-@patch("app.agent.MockScraper")
-@patch("app.agent.TwitterScraper")
-@patch("app.agent.GoogleNewsScraper")
-@patch("app.agent.FacebookScraper")
-@patch("app.agent.InstagramScraper")
-@patch("app.agent.DuplicateDetector")
-@patch("app.agent.os.getenv")
+@patch("app.agents.legacy_agent.MockScraper")
+@patch("app.agents.legacy_agent.TwitterScraper")
+@patch("app.agents.legacy_agent.GoogleNewsScraper")
+@patch("app.agents.legacy_agent.FacebookScraper")
+@patch("app.agents.legacy_agent.InstagramScraper")
+@patch("app.agents.legacy_agent.DuplicateDetector")
+@patch("app.agents.legacy_agent.settings")
 @pytest.mark.asyncio
-async def test_extract_claim_skip(mock_getenv, mock_dup, mock_insta, mock_fb, mock_google, mock_twitter, mock_mock_scraper):
-    mock_getenv.return_value = "fake-key"
+async def test_extract_claim_skip(mock_settings, mock_dup, mock_insta, mock_fb, mock_google, mock_twitter, mock_mock_scraper):
+    mock_settings.ANTHROPIC_API_KEY = "fake-key"
     
-    with patch("app.agent.anthropic.Anthropic") as mock_anthropic:
+    with patch("app.agents.legacy_agent.anthropic.Anthropic") as mock_anthropic:
         mock_client = MagicMock()
         mock_anthropic.return_value = mock_client
         
@@ -67,3 +67,4 @@ async def test_extract_claim_skip(mock_getenv, mock_dup, mock_insta, mock_fb, mo
         claim = await checker._extract_claim("Just some noise")
         
         assert claim == "SKIP"
+

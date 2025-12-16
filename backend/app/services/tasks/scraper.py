@@ -138,7 +138,7 @@ async def scrape_all_sources():
     import os
     from app.config.scraping_keywords import get_keywords_for_scraping
     
-    priority = os.getenv("SCRAPING_KEYWORD_PRIORITY", "default")
+    priority = settings.SCRAPING_KEYWORD_PRIORITY
     keywords = get_keywords_for_scraping(priority)
     
     logger.info(f"Using {len(keywords)} keywords for scraping (priority: {priority})")

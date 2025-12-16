@@ -8,7 +8,7 @@ with transparent reasoning chains.
 Uses Claude Sonnet 3.5 for complex reasoning and structured output.
 """
 
-import os
+from app.core.config import settings
 import json
 import logging
 from typing import Optional, List, Dict, Any
@@ -47,7 +47,7 @@ class MarketSynthesizer:
     MAX_TOKENS = 4096
     
     def __init__(self):
-        self.api_key = os.getenv("ANTHROPIC_API_KEY")
+        self.api_key = settings.ANTHROPIC_API_KEY
         self.client = None
         
         if self.api_key:

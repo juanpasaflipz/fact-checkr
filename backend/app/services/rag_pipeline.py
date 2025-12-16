@@ -7,7 +7,7 @@ This pipeline builds rich context for claim verification by:
 3. Searching for web evidence
 4. Fetching content from evidence sources
 """
-import os
+from app.core.config import settings
 import asyncio
 from typing import List, Dict, Optional
 from datetime import datetime
@@ -25,7 +25,7 @@ class RAGPipeline:
     
     def __init__(self):
         self.embedding_service = EmbeddingService()
-        self.serper_api_key = os.getenv("SERPER_API_KEY")
+        self.serper_api_key = settings.SERPER_API_KEY
         
         # Mexican news source credibility tiers
         self.trusted_sources = {

@@ -14,7 +14,7 @@ from sqlalchemy import desc, func
 from typing import Dict, List, Optional
 import json
 import logging
-import os
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +33,7 @@ class MarketIntelligenceAgent(BaseAgent):
         super().__init__()
         
         # Get model preference from env or parameter
-        preference = model_preference or os.getenv("MARKET_INTELLIGENCE_MODEL", "haiku").lower()
+        preference = model_preference or settings.MARKET_INTELLIGENCE_MODEL
         
         # Model selection map
         model_map = {

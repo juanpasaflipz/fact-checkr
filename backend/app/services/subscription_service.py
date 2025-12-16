@@ -1,5 +1,5 @@
 """Stripe subscription management"""
-import os
+from app.core.config import settings
 import stripe
 from typing import Optional
 from sqlalchemy.orm import Session
@@ -8,17 +8,17 @@ from datetime import datetime, timedelta
 from app.database.models import User, Subscription, SubscriptionTier, SubscriptionStatus
 
 # Initialize Stripe
-stripe.api_key = os.getenv("STRIPE_SECRET_KEY", "")
+stripe.api_key = settings.STRIPE_SECRET_KEY
 
 # Stripe price IDs - set these in your Stripe dashboard
 STRIPE_PRICE_IDS = {
     SubscriptionTier.PRO: {
-        "month": os.getenv("STRIPE_PRO_MONTHLY_PRICE_ID", ""),
-        "year": os.getenv("STRIPE_PRO_YEARLY_PRICE_ID", ""),
+        "month": settings.STRIPE_PRO_MONTHLY_PRICE_ID,
+        "year": settings.STRIPE_PRO_YEARLY_PRICE_ID,
     },
-    SubscriptionTier.TEAM: {
-        "month": os.getenv("STRIPE_TEAM_MONTHLY_PRICE_ID", ""),
-        "year": os.getenv("STRIPE_TEAM_YEARLY_PRICE_ID", ""),
+    "team": {
+        "month": settings.STRIPE_TEAM_MONTHLY_PRICE_ID,
+        "year": settings.STRIPE_TEAM_YEARLY_PRICE_ID,
     },
 }
 

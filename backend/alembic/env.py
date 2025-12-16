@@ -18,15 +18,11 @@ if config.config_file_name is not None:
 # for 'autogenerate' support
 import os
 import sys
-from dotenv import load_dotenv
-
-# Load environment variables
-load_dotenv()
-
 # Add parent directory to path to import app modules
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from app.database.models import Base
+from app.core.config import settings
 target_metadata = Base.metadata
 
 # other values from the config, defined by the needs of env.py,
@@ -47,7 +43,7 @@ def run_migrations_offline() -> None:
     script output.
 
     """
-    url = os.getenv("DATABASE_URL") or config.get_main_option("sqlalchemy.url")
+    url = str(settings.DATABASE_URL)
     context.configure(
         url=url,
         target_metadata=target_metadata,
@@ -67,7 +63,7 @@ def run_migrations_online() -> None:
 
     """
     # Override sqlalchemy.url with environment variable
-    db_url = os.getenv("DATABASE_URL")
+    db_url = str(settings.DATABASE_URL)
     if db_url:
         config.set_main_option("sqlalchemy.url", db_url)
 

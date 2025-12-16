@@ -1,12 +1,11 @@
-import os
 import json
 import logging
 from datetime import datetime, timedelta
 from typing import Dict, Optional, Any
-
 from google.cloud import tasks_v2
 from google.protobuf import timestamp_pb2
 from google.api_core.exceptions import GoogleAPICallError
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -30,23 +29,18 @@ def enqueue_task(
     """
     
     # Check for local sync emulation
-    if os.getenv("CLOUD_TASKS_EMULATE_SYNC", "false").lower() == "true":
+    if settings.CLOUD_TASKS_EMULATE_SYNC.lower() == "true":
         logger.info(f"[Local] Emulating task {task_name} execution synchronously.")
-        # We need to import here to avoid circular dependencies potentially
         # In a real app we might have a registry, but for now we'll just log
-        # or implement a simple dispatcher if needed for local dev.
-        # For this refactor, we will rely on integration tests to handle this or 
-        # add a local dispatcher in the router used by tests.
-        # For now, just logging:
         logger.info(f"Payload: {payload}")
         return "local-task-id"
 
-    project = os.getenv("GCP_PROJECT_ID")
-    location = os.getenv("GCP_LOCATION", "us-central1")
-    queue = os.getenv("CLOUD_TASKS_QUEUE", "default")
-    target_url = os.getenv("TASKS_TARGET_BASE_URL")
-    service_account_email = os.getenv("TASKS_OIDC_SERVICE_ACCOUNT_EMAIL")
-    task_secret = os.getenv("TASK_SECRET")
+    project = settings.GCP_PROJECT_ID
+    location = settings.GCP_LOCATION
+    queue = settings.CLOUD_TASKS_QUEUE
+    target_url = settings.TASKS_TARGET_BASE_URL
+    service_account_email = settings.TASKS_OIDC_SERVICE_ACCOUNT_EMAIL
+    task_secret = settings.TASK_SECRET
 
     if not all([project, location, queue, target_url]):
         logger.warning("Cloud Tasks config missing. Task not enqueued.")
@@ -82,6 +76,7 @@ def enqueue_task(
             "audience": target_url,
         }
     elif task_secret:
+        # Fallback to secret header if OIDC not used (e.g. Cloud Run expecting header check)
         task["http_request"]["headers"]["X-Task-Secret"] = task_secret
     else:
         logger.warning("No OIDC SA or TASK_SECRET configured. Task endpoint might reject request.")

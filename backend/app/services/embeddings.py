@@ -6,7 +6,7 @@ This service generates embeddings for claims and enables:
 - Contradiction detection (find conflicting facts)
 - Knowledge retrieval (RAG context building)
 """
-import os
+from app.core.config import settings
 from typing import List, Dict, Optional, Tuple
 import openai
 from datetime import datetime
@@ -22,7 +22,7 @@ class EmbeddingService:
     """Generate and manage embeddings for claims and facts with database persistence"""
 
     def __init__(self):
-        self.api_key = os.getenv("OPENAI_API_KEY")
+        self.api_key = settings.OPENAI_API_KEY
         self.client = None
         self.model = "text-embedding-3-small"  # 1536 dimensions, cost-effective
         self.dimensions = 1536

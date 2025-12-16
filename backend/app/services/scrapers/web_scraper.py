@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import List
 from app.schemas import SocialPost
 import uuid
-import os
+from app.core.config import settings
 from datetime import datetime
 from bs4 import BeautifulSoup
 import logging
@@ -57,11 +57,11 @@ except ImportError:
 
 class TwitterScraper(Scraper):
     def __init__(self):
-        self.api_key = os.getenv("TWITTER_API_KEY")
-        self.api_secret = os.getenv("TWITTER_API_SECRET")
-        self.access_token = os.getenv("TWITTER_ACCESS_TOKEN")
-        self.access_secret = os.getenv("TWITTER_ACCESS_SECRET")
-        self.bearer_token = os.getenv("TWITTER_BEARER_TOKEN")
+        self.api_key = settings.TWITTER_API_KEY
+        self.api_secret = settings.TWITTER_API_SECRET
+        self.access_token = settings.TWITTER_ACCESS_TOKEN
+        self.access_secret = settings.TWITTER_ACCESS_SECRET
+        self.bearer_token = settings.TWITTER_BEARER_TOKEN
         
         self.client = None
         
@@ -371,10 +371,10 @@ class FacebookScraper(Scraper):
             self.api = None
             return
 
-        self.app_id = os.getenv("FACEBOOK_APP_ID")
-        self.app_secret = os.getenv("FACEBOOK_APP_SECRET")
-        self.access_token = os.getenv("FACEBOOK_ACCESS_TOKEN")
-        self.page_access_token = os.getenv("FACEBOOK_PAGE_ACCESS_TOKEN")
+        self.app_id = settings.FACEBOOK_APP_ID
+        self.app_secret = settings.FACEBOOK_APP_SECRET
+        self.access_token = settings.FACEBOOK_ACCESS_TOKEN
+        self.page_access_token = settings.FACEBOOK_PAGE_ACCESS_TOKEN
         self.api = None
 
         if self.access_token:
@@ -469,8 +469,8 @@ class InstagramScraper(Scraper):
     """Instagram Basic Display API scraper"""
 
     def __init__(self):
-        self.access_token = os.getenv("INSTAGRAM_ACCESS_TOKEN")
-        self.user_id = os.getenv("INSTAGRAM_USER_ID")
+        self.access_token = settings.INSTAGRAM_ACCESS_TOKEN
+        self.user_id = settings.INSTAGRAM_USER_ID
         self.base_url = "https://graph.instagram.com"
 
     async def fetch_posts(self, keywords: List[str]) -> List[SocialPost]:

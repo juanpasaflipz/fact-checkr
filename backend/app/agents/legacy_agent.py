@@ -1,4 +1,4 @@
-import os
+from app.core.config import settings
 from typing import List
 from app.schemas import Claim, VerificationResult, VerificationStatus
 from datetime import datetime
@@ -42,7 +42,7 @@ class FactChecker:
         self.duplicate_detector = DuplicateDetector()
         
         # Initialize Anthropic (primary)
-        anthropic_key = os.getenv("ANTHROPIC_API_KEY")
+        anthropic_key = settings.ANTHROPIC_API_KEY
         if anthropic_key:
             try:
                 self.anthropic_client = anthropic.Anthropic(api_key=anthropic_key)
@@ -55,7 +55,7 @@ class FactChecker:
             print("Warning: Anthropic API key not found.")
         
         # Initialize OpenAI (backup)
-        openai_key = os.getenv("OPENAI_API_KEY")
+        openai_key = settings.OPENAI_API_KEY
         if openai_key:
             try:
                 self.openai_client = openai.OpenAI(api_key=openai_key)
