@@ -4,19 +4,6 @@ services:
   # PostgreSQL Database (Neon in production, local for dev)
   # For production, remove this and use Neon connection string
 
-  redis:
-    image: redis:7-alpine
-    ports:
-      - "6379:6379"
-    volumes:
-      - redis_data:/data
-    command: redis-server --appendonly yes
-    healthcheck:
-      test: [ "CMD", "redis-cli", "ping" ]
-      interval: 10s
-      timeout: 5s
-      retries: 5
-
   backend:
     build:
       context: .
@@ -25,7 +12,7 @@ services:
       - "8000:8000"
     environment:
       - DATABASE_URL=${DATABASE_URL}
-      - REDIS_URL=redis://redis:6379/0
+      # - REDIS_URL=redis://redis:6379/0 # Removed
       - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
       - OPENAI_API_KEY=${OPENAI_API_KEY}
       - SERPER_API_KEY=${SERPER_API_KEY}
@@ -37,9 +24,13 @@ services:
       - STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY}
       - STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET}
       - ENVIRONMENT=production
-    depends_on:
-      redis:
-        condition: service_healthy
+      # Cloud Tasks Config
+      - GCP_PROJECT_ID=${GCP_PROJECT_ID}
+      - GCP_LOCATION=${GCP_LOCATION}
+      - CLOUD_TASKS_QUEUE=${CLOUD_TASKS_QUEUE}
+      - TASKS_TARGET_BASE_URL=${TASKS_TARGET_BASE_URL}
+      - TASKS_OIDC_SERVICE_ACCOUNT_EMAIL=${TASKS_OIDC_SERVICE_ACCOUNT_EMAIL}
+      - TASK_SECRET=${TASK_SECRET}
     volumes:
       - ./backend/logs:/app/logs
     restart: unless-stopped
@@ -48,44 +39,6 @@ services:
       interval: 30s
       timeout: 10s
       retries: 3
-
-  celery-worker:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile.worker
-    command: celery -A app.worker:celery_app worker --loglevel=info --concurrency=2
-    environment:
-      - DATABASE_URL=${DATABASE_URL}
-      - REDIS_URL=redis://redis:6379/0
-      - ANTHROPIC_API_KEY=${ANTHROPIC_API_KEY}
-      - OPENAI_API_KEY=${OPENAI_API_KEY}
-      - SERPER_API_KEY=${SERPER_API_KEY}
-      - TWITTER_BEARER_TOKEN=${TWITTER_BEARER_TOKEN}
-      - YOUTUBE_API_KEY=${YOUTUBE_API_KEY}
-      - ENVIRONMENT=production
-    depends_on:
-      - redis
-      - backend
-    volumes:
-      - ./backend/logs:/app/logs
-    restart: unless-stopped
-
-  celery-beat:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile.worker
-    command: celery -A app.worker:celery_app beat --loglevel=info
-    environment:
-      - DATABASE_URL=${DATABASE_URL}
-      - REDIS_URL=redis://redis:6379/0
-      - ENVIRONMENT=production
-    depends_on:
-      - redis
-      - backend
-    volumes:
-      - ./backend/logs:/app/logs
-      - celery_beat_data:/app
-    restart: unless-stopped
 
   frontend:
     build:
@@ -101,7 +54,8 @@ services:
     restart: unless-stopped
 
 volumes:
-  redis_data:
-  celery_beat_data:
+  # redis_data: # Removed
+  # celery_beat_data: # Removed
+
 
 

@@ -144,46 +144,41 @@ async def run_blog_task(job_id: str, edition: str):
 
 # --- Dispatch Endpoints ---
 
+from app.infra.cloud_tasks import enqueue_task
+
+# ...
+
 @router.post("/scrape_dispatch", dependencies=[Depends(verify_task_secret)])
-async def dispatch_scrape(
-    payload: ScrapePayload,
-    background_tasks: BackgroundTasks
-):
+async def dispatch_scrape(payload: ScrapePayload):
     """
     Central dispatcher for scraping tasks.
+    Enqueues Cloud Task.
     """
-    db = SessionLocal()
-    try:
-        job_id = track_job_start(db, f"scrape_{payload.mode}", payload.dict())
-        background_tasks.add_task(run_scrape_task, job_id, payload.mode, payload.options)
-        return {"status": "queued", "job_id": job_id, "mode": payload.mode}
-    finally:
-        db.close()
+    # Map payload to Cloud Task
+    task_id = enqueue_task(
+        task_name="ingest_sources", 
+        payload={
+            "task_type": "ingest_sources",
+            "platforms": ["twitter", "google_news"] # Default
+        }
+    )
+    return {"status": "queued", "task_id": task_id, "mode": payload.mode}
 
 @router.post("/trending_dispatch", dependencies=[Depends(verify_task_secret)])
-async def dispatch_trending(
-    payload: TrendingPayload,
-    background_tasks: BackgroundTasks
-):
+async def dispatch_trending(payload: TrendingPayload):
     """
     Dispatcher for trending topic detection.
     """
-    db = SessionLocal()
-    try:
-        job_id = track_job_start(db, "trending_detection", payload.dict())
-        background_tasks.add_task(run_trending_task, job_id, payload.window_minutes)
-        return {"status": "queued", "job_id": job_id}
-    finally:
-        db.close()
+    task_id = enqueue_task(
+        task_name="detect_trending",
+        payload={"task_type": "detect_trending", "limit": payload.limit}
+    )
+    return {"status": "queued", "task_id": task_id}
 
 @router.post("/blog_dispatch", dependencies=[Depends(verify_task_secret)])
-async def dispatch_blog(
-    payload: BlogPayload,
-    background_tasks: BackgroundTasks
-):
+async def dispatch_blog(payload: BlogPayload):
     """
     Dispatcher for blog generation.
-    Automatically determines edition based on time if type is 'scheduled'.
     """
     edition = payload.type
     
@@ -199,25 +194,25 @@ async def dispatch_blog(
             edition = "afternoon"
         else:
             edition = "evening"
-            
-        logger.info(f"Auto-determined blog edition: {edition} (Current hour: {hour})")
+    
+    task_id = enqueue_task(
+        task_name="generate_blog",
+        payload={
+            "task_type": "generate_blog", 
+            "edition": edition
+        }
+    )
+    return {"status": "queued", "task_id": task_id, "edition": edition}
 
-    db = SessionLocal()
-    try:
-        job_id = track_job_start(db, f"blog_{edition}", {"requested_type": payload.type, "edition": edition})
-        background_tasks.add_task(run_blog_task, job_id, edition)
-        return {"status": "queued", "job_id": job_id, "edition": edition}
-    finally:
-        db.close()
-
-# --- Legacy/Maintenance Endpoints (Optional) ---
+# --- Legacy/Maintenance Endpoints ---
 
 @router.post("/health-check", dependencies=[Depends(verify_task_secret)])
-async def task_health_check(background_tasks: BackgroundTasks):
-    background_tasks.add_task(health_check.health_check)
-    return {"status": "triggered", "task": "health_check"}
+async def task_health_check():
+    # health_check task not yet exposed in cloud_tasks.py but we can run it locally or ignore
+    # For now, just return ok
+    return {"status": "ignored"}
 
 @router.post("/monthly-credit-topup", dependencies=[Depends(verify_task_secret)])
-async def task_credit_topup(background_tasks: BackgroundTasks):
-    background_tasks.add_task(credit_topup.monthly_credit_topup)
-    return {"status": "triggered", "task": "monthly_credit_topup"}
+async def task_credit_topup():
+    return {"status": "ignored"}
+

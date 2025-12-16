@@ -1,11 +1,7 @@
-"""
-Monthly Credit Top-up Task
 
-Adds monthly credit top-ups to Pro+ subscribers based on their tier.
-Runs on the 1st of each month.
 """
-
-from celery import shared_task
+Monthly Credit Top-up Task Logic
+"""
 from app.database.connection import get_db
 from app.database.models import UserBalance, Subscription, SubscriptionStatus, SubscriptionTier
 from app.core.utils import get_user_tier, get_tier_limit
@@ -15,8 +11,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-@shared_task(name="app.tasks.credit_topup.monthly_credit_topup")
-def monthly_credit_topup():
+async def monthly_credit_topup():
     """
     Run monthly to add credits to Pro users.
     Executes on the 1st of each month.
@@ -90,4 +85,3 @@ def monthly_credit_topup():
         raise
     finally:
         db.close()
-

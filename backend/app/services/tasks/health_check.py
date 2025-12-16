@@ -1,7 +1,7 @@
+
 """
-Health check task for monitoring Celery worker status
+Health check task logic
 """
-from celery import shared_task
 from app.database import SessionLocal
 from sqlalchemy import text
 from datetime import datetime, timezone
@@ -9,8 +9,7 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-@shared_task
-def health_check():
+async def health_check():
     """Simple health check task to verify worker is alive and can access database"""
     try:
         db = SessionLocal()
@@ -28,4 +27,3 @@ def health_check():
     except Exception as e:
         logger.error(f"Health check failed: {e}", exc_info=True)
         return {"status": "unhealthy", "error": str(e)}
-

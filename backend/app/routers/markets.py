@@ -453,7 +453,7 @@ async def create_market(
     
     # Auto-seed with agent assessment (async, non-blocking)
     # Run in background task to avoid blocking response
-    from app.tasks.market_intelligence import seed_new_markets
+    from app.services.tasks.market_intelligence import seed_new_markets
     background_tasks.add_task(seed_new_markets)
     
     # Return market detail
@@ -554,7 +554,7 @@ async def resolve_market(
         update_user_stats_on_resolution(db, market.id, resolve_request.winning_outcome)
         
         # Send resolution notifications
-        from app.tasks.market_notifications import notify_market_resolution
+        from app.services.tasks.market_notifications import notify_market_resolution
         background_tasks.add_task(notify_market_resolution, market.id)
         
         db.commit()
@@ -712,6 +712,7 @@ async def list_proposals(
 @router.post("/admin/proposals/{proposal_id}/approve", response_model=MarketDetail)
 async def approve_proposal(
     proposal_id: int,
+    background_tasks: BackgroundTasks,
     admin: User = Depends(get_admin_user),
     db: Session = Depends(get_db)
 ):
@@ -761,8 +762,8 @@ async def approve_proposal(
     db.refresh(market)
     
     # Auto-seed with agent assessment (async, non-blocking)
-    from app.tasks.market_intelligence import seed_new_markets
-    seed_new_markets.delay()  # Celery task runs async
+    from app.services.tasks.market_intelligence import seed_new_markets
+    background_tasks.add_task(seed_new_markets)
     
     # Return market detail
     yes_prob = yes_probability(market)

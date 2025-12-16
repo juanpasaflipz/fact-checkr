@@ -1,10 +1,13 @@
+
 import asyncio
-from celery import shared_task
+import logging
+import os
+from datetime import datetime
+
 from app.database import SessionLocal, Source
 from app.services.scrapers.web_scraper import TwitterScraper, GoogleNewsScraper
-from app.tasks.fact_check import verify_source
-from datetime import datetime
-import logging
+from app.services.tasks.fact_check import verify_source # Changed import
+from app.infra.cloud_tasks import enqueue_task # Import Cloud Tasks enqueuer
 
 logger = logging.getLogger(__name__)
 
@@ -106,18 +109,21 @@ async def fetch_and_store(keywords):
                 
         logger.info(f"Scraped {len(all_posts)} posts, {new_count} new.")
         
-        # Process new sources concurrently
+        # FAN-OUT: Enqueue verify_source tasks for each new source
+        # This replaces the previous in-process fan-out
         if new_source_ids:
-            logger.info(f"Starting verification for {len(new_source_ids)} new sources...")
-            # Use chunks to avoid overwhelming resources if many new sources
-            BATCH_SIZE = 5
-            for i in range(0, len(new_source_ids), BATCH_SIZE):
-                batch_ids = new_source_ids[i:i+BATCH_SIZE]
-                logger.info(f"Processing batch {i//BATCH_SIZE + 1} ({len(batch_ids)} items)")
-                verification_tasks = [verify_source(sid) for sid in batch_ids]
-                # Gather with return_exceptions=True to prevent one failure stopping others
-                await asyncio.gather(*verification_tasks, return_exceptions=True)
-                
+            logger.info(f"Enqueuing verification for {len(new_source_ids)} new sources...")
+            
+            for source_id in new_source_ids:
+                try:
+                    enqueue_task(
+                        task_name="verify_source",
+                        payload={"task_type": "verify_source", "source_id": source_id},
+                        idempotency_key=f"verify_{source_id}"
+                    )
+                except Exception as e:
+                    logger.error(f"Failed to enqueue verify_source for {source_id}: {e}")
+
         return new_count
         
     except Exception as e:
@@ -126,7 +132,6 @@ async def fetch_and_store(keywords):
     finally:
         db.close()
 
-# Celery task converted to async function for Cloud Run
 async def scrape_all_sources():
     """Async task to scrape all sources including YouTube"""
     # Get keywords from configuration
@@ -146,12 +151,8 @@ async def scrape_all_sources():
         
     except Exception as exc:
         logger.error(f"Scraping task failed: {exc}", exc_info=True)
-        # No more retry functionality from Celery here
-        # We could implement a simple retry loop if needed, but CloudScheduler retries on 500
         raise
 
-
-# Celery task converted to async function for Cloud Run
 async def detect_and_prioritize_topics():
     """Periodic task to detect trending topics and prioritize them"""
     logger.info("Starting trending topic detection and prioritization...")
@@ -168,8 +169,6 @@ async def detect_and_prioritize_topics():
         logger.error(f"Trending topic detection failed: {exc}", exc_info=True)
         raise
 
-
-# Celery task converted to async function for Cloud Run
 async def scrape_prioritized_topics():
     """Scrape sources for prioritized topics"""
     logger.info("Scraping sources for prioritized topics...")
