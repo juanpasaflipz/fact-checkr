@@ -19,7 +19,21 @@ logger = logging.getLogger(__name__)
 # On local/Railway, you must set GOOGLE_APPLICATION_CREDENTIALS env var to the path of your service account JSON.
 try:
     if not firebase_admin._apps:
-        firebase_admin.initialize_app()
+        cred = None
+        # Check for Base64 encoded credentials (deployment friendly)
+        firebase_creds_b64 = os.getenv("FIREBASE_CREDENTIALS_B64")
+        if firebase_creds_b64:
+            import base64
+            import json
+            try:
+                json_str = base64.b64decode(firebase_creds_b64).decode('utf-8')
+                cred_dict = json.loads(json_str)
+                cred = credentials.Certificate(cred_dict)
+                logger.info("🔑 Loaded Firebase credentials from Base64 env var")
+            except Exception as e:
+                logger.error(f"❌ Failed to decode FIREBASE_CREDENTIALS_B64: {e}")
+        
+        firebase_admin.initialize_app(cred)
     logger.info("✅ Firebase Admin SDK initialized")
 except Exception as e:
     logger.warning(f"⚠️ Failed to initialize Firebase Admin SDK: {e}")
