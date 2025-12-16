@@ -1,3 +1,4 @@
+
 """
 Background tasks for market intelligence and seeding
 
@@ -6,7 +7,6 @@ Implements tiered analysis system:
 - Tier 2 (Daily): Once per day, full multi-agent synthesis
 - Tier 3 (On-Demand): Deep analysis when triggered
 """
-# from celery import shared_task # Removed for Cloud Run migration
 from app.database import SessionLocal
 from app.database.models import Market, MarketStatus, MarketTrade, MarketPredictionFactors
 from app.services.market_seeding import seed_market_with_agent_assessment
@@ -21,7 +21,6 @@ logger = logging.getLogger(__name__)
 # Tiered Analysis Tasks
 # =============================================================================
 
-# @shared_task(name="app.tasks.market_intelligence.tier1_lightweight_update")
 def tier1_lightweight_update():
     """
     Tier 1 - Lightweight update for active markets.
@@ -142,7 +141,6 @@ def tier1_lightweight_update():
         db.close()
 
 
-# @shared_task(name="app.tasks.market_intelligence.tier2_daily_analysis")
 def tier2_daily_analysis():
     """
     Tier 2 - Full daily analysis for all open markets.
@@ -259,7 +257,6 @@ def tier2_daily_analysis():
         db.close()
 
 
-# @shared_task(name="app.tasks.market_intelligence.tier3_deep_analysis")
 def tier3_deep_analysis(market_id: int):
     """
     Tier 3 - On-demand deep analysis for a specific market.
@@ -378,7 +375,6 @@ def tier3_deep_analysis(market_id: int):
         db.close()
 
 
-# @shared_task(name="app.tasks.market_intelligence.update_calibration_on_resolution")
 def update_calibration_on_resolution(market_id: int, outcome: str):
     """
     Update calibration scores when a market resolves.
@@ -409,7 +405,6 @@ def update_calibration_on_resolution(market_id: int, outcome: str):
 # =============================================================================
 
 
-# @shared_task(name="app.tasks.market_intelligence.seed_new_markets")
 def seed_new_markets():
     """
     Seed newly created markets that haven't been seeded yet.
@@ -469,7 +464,6 @@ def seed_new_markets():
         db.close()
 
 
-# @shared_task(name="app.tasks.market_intelligence.reassess_inactive_markets")
 def reassess_inactive_markets():
     """
     Re-assess markets that haven't had trades in 24+ hours.

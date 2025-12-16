@@ -718,3 +718,25 @@ class Evidence(Base):
     claim = relationship("Claim", backref="evidence_items")
 
 
+class TaskRun(Base):
+    """
+    Idempotency and tracking for Cloud Tasks executions.
+    Prevents double execution of tasks.
+    """
+    __tablename__ = 'task_runs'
+    
+    id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
+    task_type = Column(String, nullable=False)
+    idempotency_key = Column(String, nullable=False)
+    status = Column(String, nullable=False)  # queued, running, succeeded, failed
+    attempts = Column(Integer, default=0)
+    last_error = Column(Text, nullable=True)
+    created_at = Column(DateTime, default=datetime.utcnow)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+    __table_args__ = (
+        Index('idx_task_runs_dedup', 'task_type', 'idempotency_key', unique=True),
+    )
+
+
+

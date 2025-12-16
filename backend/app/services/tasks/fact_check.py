@@ -1,6 +1,6 @@
+
 import asyncio
 import os
-# from celery import shared_task # Removed for Cloud Run migration
 from app.database import SessionLocal, Source, Claim, VerificationStatus
 from app.agents import FactChecker
 from app.schemas import VerificationResult, EvidenceDetail
@@ -288,10 +288,3 @@ async def verify_source(source_id: str):
         db.rollback()
     finally:
         db.close()
-
-# Celery wrapper removed for Cloud Run migration
-# direct calls to verify_source should be used instead
-
-# async def process_source(source_id: str):
-#     """Legacy wrapper alias"""
-#     return await verify_source(source_id)

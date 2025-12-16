@@ -19,7 +19,7 @@ from app.database.models import (
     Evidence as DBEvidence,
     VerificationStatus
 )
-from app.worker import celery_app
+# from app.worker import celery_app # REMOVED
 from app.core.whatsapp_utils import send_whatsapp_message, format_claim_for_whatsapp
 from app.services.claim_extraction import ClaimExtractionService
 from app.services.verification import VerificationService
@@ -43,26 +43,19 @@ if os.getenv("ANTHROPIC_API_KEY"):
 if os.getenv("OPENAI_API_KEY"):
     openai_client = OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
-@celery_app.task(
-    bind=True, 
-    name="app.tasks.whatsapp.process_message",
-    autoretry_for=(httpx.RequestError, Exception), # Retry on API and other transient errors
-    retry_backoff=True, # Exponential backoff
-    retry_backoff_max=300, # Max backoff 5 minutes
-    retry_kwargs={'max_retries': 3} # Max 3 retries
-)
-def process_message(self, message_id: int, phone_number: str):
+# Logic moved from Celery task, now a plain async function
+async def process_message_logic(message_id: int, phone_number: str):
     """
-    Background task to process incoming WhatsApp messages.
+    Logic to process incoming WhatsApp messages.
     """
     logger.info(f"Processing message {message_id} from {phone_number}")
     db = SessionLocal()
     try:
-        # Run async logic in sync task
-        asyncio.run(process_message_async(message_id, phone_number, db))
+        await process_message_async(message_id, phone_number, db)
     except Exception as e:
-        logger.error(f"Error in process_message task for msg {message_id}: {e}", exc_info=True)
-        raise self.retry(exc=e)
+        logger.error(f"Error in process_message_logic for msg {message_id}: {e}", exc_info=True)
+        # We re-raise to let Cloud Tasks retry (non-2xx response)
+        raise
     finally:
         db.close()
 
@@ -218,9 +211,5 @@ async def process_message_async(message_id: int, phone_number: str, db: Session)
 
     except Exception as e:
         logger.error(f"Error logic for message {message_id}: {e}", exc_info=True)
-        # Only mark failed if we've exhausted retries, but here we just catch.
-        # We re-raise to let Celery retry.
-        # But if it's a permanent logical error, we might want to fail hard.
-        # For now, re-raising to trigger autoretry or final failure.
+        # We allow exception to propagate so it can be retried or logged at higher level
         raise e
-

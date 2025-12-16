@@ -331,6 +331,15 @@ if ROUTERS_AVAILABLE:
     except Exception as e:
         logger.error(f"❌ Failed to register tasks router: {e}")
 
+    # Register Cloud Tasks router (HTTP targets)
+    try:
+        from app.routers import cloud_tasks
+        app.include_router(cloud_tasks.router) # Router has /tasks prefix
+        logger.info("✅ Cloud Tasks router registered")
+    except Exception as e:
+        logger.error(f"❌ Failed to register cloud_tasks router: {e}")
+
+
 # --- Helper Functions ---
 def map_db_claim_to_response(db_claim: DBClaim, db: Optional[Session] = None) -> ClaimResponse:
     """Map database claim object to Pydantic response model"""

@@ -136,7 +136,7 @@ async def trigger_trending_detection(
     user = Depends(get_current_user)  # Require auth
 ):
     """Manually trigger trending topic detection"""
-    from app.tasks.scraper import detect_and_prioritize_topics
+    from app.services.tasks.scraper import detect_and_prioritize_topics
     
     # Trigger async task
     background_tasks.add_task(detect_and_prioritize_topics)

@@ -1,3 +1,4 @@
+
 """
 Market Notifications Task
 
@@ -7,8 +8,6 @@ Runs periodically to check for:
 - Market resolutions
 - New markets in user's preferred categories
 """
-
-# from celery import shared_task # Removed for Cloud Run migration
 from app.database.connection import get_db
 from app.database.models import (
     Market, MarketStatus, MarketNotification, MarketTrade, User,
@@ -22,7 +21,6 @@ import logging
 logger = logging.getLogger(__name__)
 
 
-# @shared_task(name="app.tasks.market_notifications.check_market_probability_changes")
 def check_market_probability_changes():
     """
     Check for significant probability changes and notify subscribed users.
@@ -96,7 +94,6 @@ def check_market_probability_changes():
         db.close()
 
 
-# @shared_task(name="app.tasks.market_notifications.notify_market_resolution")
 def notify_market_resolution(market_id: int):
     """
     Notify users when a market is resolved.
@@ -137,7 +134,6 @@ def notify_market_resolution(market_id: int):
         db.close()
 
 
-# @shared_task(name="app.tasks.market_notifications.notify_new_markets")
 def notify_new_markets():
     """
     Notify Pro users about new markets in their preferred categories.
@@ -197,4 +193,3 @@ def notify_new_markets():
         raise
     finally:
         db.close()
-

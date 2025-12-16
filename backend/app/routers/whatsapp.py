@@ -12,7 +12,8 @@ import hmac
 import hashlib
 from app.database import SessionLocal, get_db
 from app.database.models import Claim as DBClaim, WhatsAppMessage as DBWhatsAppMessage, WhatsAppUser as DBWhatsAppUser
-from app.worker import celery_app
+# from app.worker import celery_app # Removed
+from datetime import datetime
 from app.core.whatsapp_utils import send_whatsapp_message, format_claim_for_whatsapp
 from sqlalchemy.orm import Session
 from sqlalchemy import desc
@@ -171,7 +172,19 @@ async def process_incoming_message(message: Dict[str, Any], db: Session):
 
         # Enqueue for async processing
         # We pass the internal ID and the phone number (since we don't store raw number in DB)
-        celery_app.send_task("app.tasks.whatsapp.process_message", args=[new_msg.id, from_number])
+        from app.infra.cloud_tasks import enqueue_task
+        enqueue_task(
+            task_name="process_whatsapp_message",
+            payload={
+                "task_type": "process_whatsapp_message",
+                "whatsapp_message_id": str(new_msg.id),
+                "from_number": from_number,
+                "message_text": content_body,
+                "timestamp": str(datetime.utcnow())
+            },
+            idempotency_key=f"wa_msg_{new_msg.id}" 
+        )
+
         
     except Exception as e:
         logger.error(f"Error storing/enqueuing message: {e}", exc_info=True)
