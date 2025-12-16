@@ -1,6 +1,6 @@
 
 import asyncio
-import os
+from app.core.config import settings
 from app.database import SessionLocal, Source, Claim, VerificationStatus
 from app.agents import FactChecker
 from app.schemas import VerificationResult, EvidenceDetail
@@ -107,7 +107,7 @@ async def verify_source(source_id: str):
         
         # 5. Verify with enhanced context and evidence content
         # Option: Use multi-agent system for higher accuracy (can be toggled)
-        use_multi_agent = os.getenv("USE_MULTI_AGENT_VERIFICATION", "false").lower() == "true"
+        use_multi_agent = settings.USE_MULTI_AGENT_VERIFICATION
         
         if use_multi_agent:
             logger.info(f"Using multi-agent verification system...")

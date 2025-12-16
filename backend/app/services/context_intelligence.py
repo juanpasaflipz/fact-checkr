@@ -4,7 +4,7 @@ Context Intelligence Service
 Assesses relevance of topics to Mexican political, economic, and social context.
 Filters noise and prioritizes topics that matter.
 """
-import os
+from app.core.config import settings
 from typing import Dict, Optional, List
 from datetime import datetime, timedelta
 import logging
@@ -21,7 +21,7 @@ class ContextIntelligenceService:
     """Assesses topic relevance to Mexican context"""
     
     def __init__(self):
-        api_key = os.getenv("ANTHROPIC_API_KEY")
+        api_key = settings.ANTHROPIC_API_KEY
         if api_key:
             self.client = anthropic.Anthropic(api_key=api_key)
         else:

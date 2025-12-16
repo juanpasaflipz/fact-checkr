@@ -3,7 +3,7 @@
 Blog Generation Task Logic
 """
 import asyncio
-import os
+from app.core.config import settings
 import logging
 from app.database import SessionLocal
 from app.services.blog_generator import BlogArticleGenerator
@@ -13,7 +13,7 @@ from datetime import datetime
 logger = logging.getLogger(__name__)
 
 # Configuration
-AUTO_POST_TO_TWITTER = os.getenv("AUTO_POST_TO_TWITTER", "false").lower() == "true"
+AUTO_POST_TO_TWITTER = settings.AUTO_POST_TO_TWITTER
 
 
 async def generate_morning_blog_article():
@@ -26,7 +26,7 @@ async def generate_morning_blog_article():
         logger.info(f"Generated morning article: {article.slug} (ID: {article.id})")
         
         # Auto-publish if configured
-        if os.getenv("AUTO_PUBLISH_BLOG", "false").lower() == "true":
+        if settings.AUTO_PUBLISH_BLOG:
             await _publish_article_async(db, article, auto_twitter=AUTO_POST_TO_TWITTER)
         
         return article.id
@@ -46,7 +46,7 @@ async def generate_afternoon_blog_article():
         article = await generator.generate_afternoon_edition()
         logger.info(f"Generated afternoon article: {article.slug} (ID: {article.id})")
         
-        if os.getenv("AUTO_PUBLISH_BLOG", "false").lower() == "true":
+        if settings.AUTO_PUBLISH_BLOG:
             await _publish_article_async(db, article, auto_twitter=AUTO_POST_TO_TWITTER)
         
         return article.id
@@ -66,7 +66,7 @@ async def generate_evening_blog_article():
         article = await generator.generate_evening_edition()
         logger.info(f"Generated evening article: {article.slug} (ID: {article.id})")
         
-        if os.getenv("AUTO_PUBLISH_BLOG", "false").lower() == "true":
+        if settings.AUTO_PUBLISH_BLOG:
             await _publish_article_async(db, article, auto_twitter=AUTO_POST_TO_TWITTER)
         
         return article.id
@@ -86,7 +86,7 @@ async def generate_breaking_blog_article():
         article = await generator.generate_breaking_news_edition()
         logger.info(f"Generated breaking news article: {article.slug} (ID: {article.id})")
         
-        if os.getenv("AUTO_PUBLISH_BLOG", "false").lower() == "true":
+        if settings.AUTO_PUBLISH_BLOG:
             await _publish_article_async(db, article, auto_twitter=AUTO_POST_TO_TWITTER)
         
         return article.id

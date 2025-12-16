@@ -3,6 +3,7 @@ import os
 import logging
 import stripe
 from typing import Dict, List, Tuple
+from app.core.config import settings
 
 logger = logging.getLogger(__name__)
 
@@ -63,16 +64,17 @@ def validate_stripe_config() -> Tuple[bool, Dict[str, List[str]]]:
     
     # Check for missing variables
     for var_name in REQUIRED_STRIPE_VARS:
-        value = os.getenv(var_name, "")
+        # settings is a Pydantic model, so we get attributes
+        value = getattr(settings, var_name, None)
         if not value:
             errors["missing"].append(var_name)
     
     # Validate formats
-    stripe_secret_key = os.getenv("STRIPE_SECRET_KEY", "")
+    stripe_secret_key = settings.STRIPE_SECRET_KEY or ""
     if stripe_secret_key and not validate_stripe_key_format(stripe_secret_key):
         errors["invalid_format"].append("STRIPE_SECRET_KEY (must start with sk_test_ or sk_live_)")
     
-    stripe_webhook_secret = os.getenv("STRIPE_WEBHOOK_SECRET", "")
+    stripe_webhook_secret = settings.STRIPE_WEBHOOK_SECRET or ""
     if stripe_webhook_secret and not validate_webhook_secret_format(stripe_webhook_secret):
         errors["invalid_format"].append("STRIPE_WEBHOOK_SECRET (must start with whsec_)")
     
@@ -85,7 +87,7 @@ def validate_stripe_config() -> Tuple[bool, Dict[str, List[str]]]:
     ]
     
     for var_name in price_id_vars:
-        value = os.getenv(var_name, "")
+        value = getattr(settings, var_name, None)
         if value and not validate_price_id_format(value):
             errors["invalid_format"].append(f"{var_name} (must start with price_)")
     
@@ -117,8 +119,8 @@ def log_stripe_config_status():
     
     if is_valid:
         logger.info("✅ Stripe configuration is valid")
-        logger.info(f"  - Secret Key: {'*' * 20}...{os.getenv('STRIPE_SECRET_KEY', '')[-4:]}")
-        logger.info(f"  - Webhook Secret: {'*' * 20}...{os.getenv('STRIPE_WEBHOOK_SECRET', '')[-4:]}")
+        logger.info(f"  - Secret Key: {'*' * 20}...{(settings.STRIPE_SECRET_KEY or '')[-4:]}")
+        logger.info(f"  - Webhook Secret: {'*' * 20}...{(settings.STRIPE_WEBHOOK_SECRET or '')[-4:]}")
         logger.info("  - All price IDs configured")
     else:
         logger.warning("⚠️  Stripe configuration has issues:")

@@ -5,6 +5,7 @@ Posts blog article links to Twitter/X platform
 import os
 import logging
 from typing import Optional
+from app.core.config import settings
 
 try:
     import tweepy
@@ -19,10 +20,10 @@ class TwitterPoster:
     """Post articles to Twitter/X"""
     
     def __init__(self):
-        self.api_key = os.getenv("TWITTER_API_KEY")
-        self.api_secret = os.getenv("TWITTER_API_SECRET")
-        self.access_token = os.getenv("TWITTER_ACCESS_TOKEN")
-        self.access_secret = os.getenv("TWITTER_ACCESS_SECRET")
+        self.api_key = settings.TWITTER_API_KEY
+        self.api_secret = settings.TWITTER_API_SECRET
+        self.access_token = settings.TWITTER_ACCESS_TOKEN
+        self.access_secret = settings.TWITTER_ACCESS_SECRET
         
         self.client = None
         if all([self.api_key, self.api_secret, self.access_token, self.access_secret]) and TWEEPY_AVAILABLE:

@@ -17,18 +17,19 @@ import os
 import anthropic
 import openai
 import json
+from app.core.config import settings
 
 
 def get_ai_client():
     """Get available AI client (Anthropic preferred, OpenAI as backup)"""
-    anthropic_key = os.getenv("ANTHROPIC_API_KEY")
+    anthropic_key = settings.ANTHROPIC_API_KEY
     if anthropic_key:
         try:
             return anthropic.Anthropic(api_key=anthropic_key), "anthropic"
         except Exception:
             pass
     
-    openai_key = os.getenv("OPENAI_API_KEY")
+    openai_key = settings.OPENAI_API_KEY
     if openai_key:
         try:
             return openai.OpenAI(api_key=openai_key), "openai"

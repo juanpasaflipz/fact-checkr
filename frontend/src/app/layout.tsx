@@ -3,6 +3,7 @@ import { Noto_Sans, Noto_Serif } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/contexts/AuthContext";
 import ErrorBoundary from "@/components/ui/ErrorBoundary";
+import Providers from "@/components/providers/Providers";
 
 const notoSans = Noto_Sans({
   variable: "--font-noto-sans",
@@ -32,9 +33,11 @@ export default function RootLayout({
         className={`${notoSans.variable} ${notoSerif.variable} font-sans antialiased`}
       >
         <ErrorBoundary>
-          <AuthProvider>
-            {children}
-          </AuthProvider>
+          <Providers>
+            <AuthProvider>
+              {children}
+            </AuthProvider>
+          </Providers>
         </ErrorBoundary>
       </body>
     </html>

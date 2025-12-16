@@ -5,11 +5,11 @@ Each agent specializes in a specific aspect of fact-checking.
 Agents run in parallel and their findings are synthesized by the orchestrator.
 """
 from abc import ABC, abstractmethod
-from typing import Dict, Optional
+from typing import Dict, Optional, Any
 from pydantic import BaseModel
 import anthropic
 import openai
-import os
+from app.core.config import settings
 import logging
 
 logger = logging.getLogger(__name__)
@@ -30,8 +30,8 @@ class BaseAgent(ABC):
     
     def __init__(self):
         # Try Anthropic first (primary)
-        anthropic_key = os.getenv("ANTHROPIC_API_KEY")
-        openai_key = os.getenv("OPENAI_API_KEY")
+        anthropic_key = settings.ANTHROPIC_API_KEY
+        openai_key = settings.OPENAI_API_KEY
         
         self.anthropic_client = None
         self.openai_client = None
@@ -64,7 +64,7 @@ class BaseAgent(ABC):
         pass
     
     @abstractmethod
-    async def analyze(self, claim: str, context: Dict) -> AgentResult:
+    async def analyze(self, claim: str, context: Dict[str, Any]) -> AgentResult:
         """Main analysis method - must be implemented by each agent"""
         pass
     

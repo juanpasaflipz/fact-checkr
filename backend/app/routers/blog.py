@@ -11,6 +11,7 @@ from typing import Dict, Optional, Any
 from datetime import datetime
 from pydantic import BaseModel
 
+from app.core.config import settings
 from app.database.connection import get_db
 from app.database.models import BlogArticle, User, SubscriptionTier
 from app.core.auth import get_current_user, get_optional_user
@@ -21,7 +22,7 @@ logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/blog", tags=["blog"])
 
 # Free tier: 3 articles, PRO: unlimited
-FREE_TIER_ARTICLE_LIMIT = int(os.getenv("BLOG_FREE_TIER_LIMIT", "3"))
+FREE_TIER_ARTICLE_LIMIT = settings.BLOG_FREE_TIER_LIMIT
 
 
 @router.get("/stats")

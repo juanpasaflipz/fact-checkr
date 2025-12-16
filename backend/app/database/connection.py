@@ -5,13 +5,11 @@ import os
 import time
 import logging
 
-from dotenv import load_dotenv
-
-load_dotenv()
-
 logger = logging.getLogger(__name__)
 
-DATABASE_URL = os.getenv("DATABASE_URL", "postgresql://localhost/factcheckr")
+from app.core.config import settings
+
+DATABASE_URL = settings.DATABASE_URL
 
 # Lazy-loaded engine and session to prevent blocking at import time
 _engine = None
@@ -27,8 +25,8 @@ def get_engine():
         # pool_size: number of connections to maintain persistently
         # max_overflow: additional connections that can be created on demand
         # Total max connections = pool_size + max_overflow
-        pool_size = int(os.getenv("DB_POOL_SIZE", "5"))  # Increased from 3
-        max_overflow = int(os.getenv("DB_MAX_OVERFLOW", "10"))  # Increased from 5
+        pool_size = settings.DB_POOL_SIZE
+        max_overflow = settings.DB_MAX_OVERFLOW
         
         _engine = create_engine(
             DATABASE_URL,

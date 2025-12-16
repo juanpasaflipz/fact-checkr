@@ -1,5 +1,5 @@
 
-import os
+from app.core.config import settings
 import logging
 import httpx
 from typing import List, Dict, Any, Optional
@@ -8,8 +8,8 @@ from app.database.models import Claim as DBClaim, VerificationStatus
 logger = logging.getLogger(__name__)
 
 # WhatsApp configuration
-WHATSAPP_PHONE_NUMBER_ID = os.getenv("WHATSAPP_PHONE_NUMBER_ID")
-WHATSAPP_ACCESS_TOKEN = os.getenv("WHATSAPP_ACCESS_TOKEN")
+WHATSAPP_PHONE_NUMBER_ID = settings.WHATSAPP_PHONE_NUMBER_ID
+WHATSAPP_ACCESS_TOKEN = settings.WHATSAPP_ACCESS_TOKEN
 
 from app.core import messages
 
@@ -65,7 +65,7 @@ def format_claim_for_whatsapp(claim: DBClaim) -> str:
         bullets = ["Verificación completa disponible en el enlace."]
 
     # Construct URLs
-    frontend_url = os.getenv("FRONTEND_URL", "https://factcheck.mx")
+    frontend_url = settings.get_frontend_url()
     receipt_url = f"{frontend_url}/receipts/{claim.id}"
     share_link = f"https://wa.me/?text={receipt_url}"
 

@@ -5,7 +5,7 @@ from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional
 from datetime import datetime
-
+from app.core.config import settings
 from app.database.connection import get_db
 from app.database.models import User, Subscription, SubscriptionTier, SubscriptionStatus
 from app.core.auth import get_current_user
@@ -123,6 +123,7 @@ async def create_checkout_session(
     
     # Create checkout session
     try:
+        frontend_url = settings.get_frontend_url()
         checkout_session = stripe.checkout.Session.create(
             customer=customer_id,
             payment_method_types=["card"],
@@ -132,8 +133,8 @@ async def create_checkout_session(
             }],
             mode="subscription",
             locale="es",  # Spanish locale for checkout page
-            success_url=f"{os.getenv('FRONTEND_URL', 'http://localhost:3000').replace('wwww', 'www').rstrip('/')}/subscription/success?session_id={{CHECKOUT_SESSION_ID}}",
-            cancel_url=f"{os.getenv('FRONTEND_URL', 'http://localhost:3000').replace('wwww', 'www').rstrip('/')}/subscription/cancel",
+            success_url=f"{frontend_url}/subscription/success?session_id={{CHECKOUT_SESSION_ID}}",
+            cancel_url=f"{frontend_url}/subscription/cancel",
             metadata={
                 "user_id": str(user.id),
                 "tier": tier.value,
@@ -153,12 +154,11 @@ async def create_checkout_session(
 @router.post("/webhook")
 async def stripe_webhook(request: Request, db: Session = Depends(get_db)):
     """Handle Stripe webhook events"""
-    import os
     import json
     
     payload = await request.body()
     sig_header = request.headers.get("stripe-signature")
-    webhook_secret = os.getenv("STRIPE_WEBHOOK_SECRET", "")
+    webhook_secret = settings.STRIPE_WEBHOOK_SECRET
     
     if not webhook_secret:
         raise HTTPException(status_code=500, detail="Webhook secret not configured")

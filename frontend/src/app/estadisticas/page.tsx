@@ -46,7 +46,7 @@ export default function EstadisticasPage() {
     setError(null);
     try {
       const baseUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-      
+
       // Fetch real-time stats and analytics in parallel
       const [statsRes, analyticsRes] = await Promise.all([
         fetch(`${baseUrl}/stats`),
@@ -83,7 +83,7 @@ export default function EstadisticasPage() {
 
   // Calculate percentages for status distribution
   const getStatusPercentage = (count: number) => {
-    if (!analytics || !analytics.status_distribution.length) return 0;
+    if (!analytics || !analytics.status_distribution?.length) return 0;
     const total = analytics.status_distribution.reduce((sum, s) => sum + s.count, 0);
     return total > 0 ? (count / total) * 100 : 0;
   };
@@ -96,7 +96,7 @@ export default function EstadisticasPage() {
 
   // Get max value for chart scaling
   const getMaxDailyCount = () => {
-    if (!analytics || !analytics.daily_claims.length) return 1;
+    if (!analytics || !analytics.daily_claims?.length) return 1;
     return Math.max(...analytics.daily_claims.map(d => d.total), 1);
   };
 
@@ -118,14 +118,14 @@ export default function EstadisticasPage() {
     <div className="min-h-screen bg-[#0a0a0f] relative">
       <Sidebar />
       <div className="lg:pl-64 relative z-10">
-        <Header 
-          searchQuery={searchQuery} 
-          setSearchQuery={setSearchQuery} 
-          onSearch={handleSearch} 
+        <Header
+          searchQuery={searchQuery}
+          setSearchQuery={setSearchQuery}
+          onSearch={handleSearch}
         />
         <main className="p-6 lg:p-8">
           <div className="max-w-7xl mx-auto space-y-8">
-            
+
             {/* Header with Time Period Selector - Enhanced */}
             <div className="bg-gradient-to-br from-indigo-50 via-purple-50 to-pink-50 rounded-2xl p-6 border-2 border-indigo-200/50 shadow-xl">
               <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
@@ -140,7 +140,7 @@ export default function EstadisticasPage() {
                     <p className="text-gray-600 mt-1">Análisis completo y métricas en tiempo real</p>
                   </div>
                 </div>
-              
+
                 <div className="flex gap-2 bg-white rounded-lg p-1 border border-gray-200 shadow-sm">
                   {([7, 30, 90] as const).map((period) => (
                     <button
@@ -254,7 +254,7 @@ export default function EstadisticasPage() {
                     </div>
                   </div>
                   <p className="text-4xl font-bold text-gray-900 mb-2">
-                    {stats.total_analyzed > 0 
+                    {stats.total_analyzed > 0
                       ? ((stats.fake_news_detected / stats.total_analyzed) * 100).toFixed(1)
                       : '0'
                     }%
@@ -265,7 +265,7 @@ export default function EstadisticasPage() {
             )}
 
             {/* Status Distribution Chart */}
-            {analytics && analytics.status_distribution.length > 0 && (
+            {analytics && analytics.status_distribution?.length > 0 && (
               <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
                 <h3 className="text-lg font-bold text-gray-900 mb-6">Distribución por Estado</h3>
                 <div className="space-y-4">
@@ -273,7 +273,7 @@ export default function EstadisticasPage() {
                     const percentage = getStatusPercentage(status.count);
                     const color = statusColors[status.status] || statusColors['Unverified'];
                     const label = statusLabels[status.status] || status.status;
-                    
+
                     return (
                       <div key={status.status} className="space-y-2">
                         <div className="flex items-center justify-between">
@@ -300,7 +300,7 @@ export default function EstadisticasPage() {
             )}
 
             {/* Daily Claims Chart */}
-            {analytics && analytics.daily_claims.length > 0 && (
+            {analytics && analytics.daily_claims?.length > 0 && (
               <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
                 <h3 className="text-lg font-bold text-gray-900 mb-6">Tendencia Diaria de Afirmaciones</h3>
                 <div className="space-y-3">
@@ -309,7 +309,7 @@ export default function EstadisticasPage() {
                     const totalPercentage = (day.total / maxCount) * 100;
                     const verifiedPercentage = day.total > 0 ? (day.verified / day.total) * 100 : 0;
                     const debunkedPercentage = day.total > 0 ? (day.debunked / day.total) * 100 : 0;
-                    
+
                     return (
                       <div key={index} className="space-y-2">
                         <div className="flex items-center justify-between text-sm">
@@ -324,7 +324,7 @@ export default function EstadisticasPage() {
                           ></div>
                           <div
                             className="absolute top-0 h-full bg-red-500 transition-all duration-500"
-                            style={{ 
+                            style={{
                               left: `${(day.verified / maxCount) * 100}%`,
                               width: `${(day.debunked / maxCount) * 100}%`
                             }}
@@ -352,14 +352,14 @@ export default function EstadisticasPage() {
             )}
 
             {/* Platform Distribution */}
-            {analytics && analytics.platforms.length > 0 && (
+            {analytics && analytics.platforms?.length > 0 && (
               <div className="bg-white rounded-2xl p-6 border border-gray-100 shadow-sm">
                 <h3 className="text-lg font-bold text-gray-900 mb-6">Distribución por Plataforma</h3>
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                   {analytics.platforms.map((platform) => {
                     const total = analytics.platforms.reduce((sum, p) => sum + p.count, 0);
                     const percentage = total > 0 ? (platform.count / total) * 100 : 0;
-                    
+
                     return (
                       <div key={platform.platform} className="p-4 bg-gray-50 rounded-lg">
                         <div className="flex items-center justify-between mb-2">
@@ -398,7 +398,7 @@ export default function EstadisticasPage() {
                   <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-blue-200/50">
                     <p className="text-xs text-gray-600 mb-2 font-semibold uppercase tracking-wide">Tasa de Verificación</p>
                     <p className="text-3xl font-bold text-green-600 mb-1">
-                      {stats.total_analyzed > 0 
+                      {stats.total_analyzed > 0
                         ? ((stats.verified / stats.total_analyzed) * 100).toFixed(1)
                         : '0'
                       }%
@@ -408,7 +408,7 @@ export default function EstadisticasPage() {
                   <div className="bg-white/80 backdrop-blur-sm rounded-xl p-4 border border-blue-200/50">
                     <p className="text-xs text-gray-600 mb-2 font-semibold uppercase tracking-wide">Tasa de Fake News</p>
                     <p className="text-3xl font-bold text-red-600 mb-1">
-                      {stats.total_analyzed > 0 
+                      {stats.total_analyzed > 0
                         ? ((stats.fake_news_detected / stats.total_analyzed) * 100).toFixed(1)
                         : '0'
                       }%
@@ -429,16 +429,16 @@ export default function EstadisticasPage() {
             {/* Empty State */}
             {!loading && stats && analytics && analytics.daily_claims.length === 0 && (
               <div className="bg-[#111118] rounded-lg p-12 border-2 border-[#00f0ff]/30 text-center"
-                   style={{ boxShadow: '0 0 30px rgba(0, 240, 255, 0.2)' }}>
+                style={{ boxShadow: '0 0 30px rgba(0, 240, 255, 0.2)' }}>
                 <div className="w-20 h-20 bg-[#1a1a24] border-2 border-[#00f0ff]/50 rounded-full flex items-center justify-center mx-auto mb-4"
-                     style={{ boxShadow: '0 0 20px rgba(0, 240, 255, 0.3)' }}>
+                  style={{ boxShadow: '0 0 20px rgba(0, 240, 255, 0.3)' }}>
                   <svg className="w-10 h-10 text-[#00f0ff]" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                       style={{ filter: 'drop-shadow(0 0 5px #00f0ff)' }}>
+                    style={{ filter: 'drop-shadow(0 0 5px #00f0ff)' }}>
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
                   </svg>
                 </div>
                 <p className="text-[#00f0ff] font-semibold text-lg mb-2"
-                   style={{ textShadow: '0 0 5px rgba(0, 240, 255, 0.5)' }}>No hay datos de análisis disponibles</p>
+                  style={{ textShadow: '0 0 5px rgba(0, 240, 255, 0.5)' }}>No hay datos de análisis disponibles</p>
                 <p className="text-gray-300 mb-6">Los datos aparecerán aquí una vez que se analicen afirmaciones.</p>
                 <div className="flex flex-wrap items-center justify-center gap-3">
                   <button

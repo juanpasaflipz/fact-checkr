@@ -1,13 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException, Header, BackgroundTasks, Request
 from typing import Optional, Literal
 from pydantic import BaseModel
-import os
 import logging
 import json
 import uuid
 import pytz
 from datetime import datetime
 from sqlalchemy.orm import Session
+from app.core.config import settings
+
 
 # Database and Models
 from app.database import SessionLocal
@@ -46,9 +47,9 @@ async def verify_task_secret(x_task_secret: Optional[str] = Header(None)):
     """
     Verify that the request comes from a trusted source (Cloud Scheduler)
     """
-    expected_secret = os.getenv("TASK_SECRET")
+    expected_secret = settings.TASK_SECRET
     if not expected_secret:
-        if os.getenv("ENVIRONMENT") == "production":
+        if settings.ENVIRONMENT == "production":
              raise HTTPException(status_code=500, detail="Server misconfiguration: TASK_SECRET not set")
         logger.warning("TASK_SECRET not set! Task endpoint is insecure.")
         return

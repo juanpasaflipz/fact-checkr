@@ -1,5 +1,5 @@
 from datetime import datetime
-from typing import List, Optional, Any
+from typing import List, Optional, Any, Dict
 import json
 import logging
 
@@ -134,7 +134,7 @@ Return JSON format:
         
         return []
 
-    async def extract_topics(self, claim_text: str, available_topics: List[dict] = None) -> List[str]:
+    async def extract_topics(self, claim_text: str, available_topics: Optional[List[Dict[str, Any]]] = None) -> List[str]:
         """Extract topics from claim text. Returns list of topic names that match database topics."""
         if not self.anthropic_client and not self.openai_client:
             return []

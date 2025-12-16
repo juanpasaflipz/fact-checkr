@@ -151,6 +151,11 @@ class Entity(Base):
     entity_type = Column(String)  # "person", "institution", "location"
     extra_data = Column(JSON)  # Additional info (position, party, etc.)
 
+class UserRole(enum.Enum):
+    USER = "user"
+    ADMIN = "admin"
+    SUPER_ADMIN = "super_admin"
+
 class User(Base):
     """User accounts for authentication and subscriptions"""
     __tablename__ = 'users'
@@ -164,7 +169,14 @@ class User(Base):
     full_name = Column(String)
     is_active = Column(Boolean, default=True)
     is_verified = Column(Boolean, default=False)
-    is_admin = Column(Boolean, default=False)
+    is_admin = Column(Boolean, default=False)  # Deprecated in favor of role, kept for backward compat
+    
+    # RBAC
+    role = Column(
+        Enum(UserRole, name="userrole", values_callable=enum_values),
+        default=UserRole.USER,
+        nullable=False
+    )
     
     # Preferences for personalization
     preferred_categories = Column(JSON, nullable=True)  # Array of category strings

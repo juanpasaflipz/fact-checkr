@@ -5,7 +5,7 @@ Aggregates and analyzes news articles related to prediction markets.
 Uses Claude Haiku for cost-effective summarization and stance detection.
 """
 
-import os
+from app.core.config import settings
 import logging
 import asyncio
 from typing import List, Optional, Dict, Any
@@ -72,8 +72,8 @@ class NewsAnalyzer:
     MAX_ARTICLES = 20
     
     def __init__(self):
-        self.serper_api_key = os.getenv("SERPER_API_KEY")
-        self.anthropic_api_key = os.getenv("ANTHROPIC_API_KEY")
+        self.serper_api_key = settings.SERPER_API_KEY
+        self.anthropic_api_key = settings.ANTHROPIC_API_KEY
         
         self.anthropic_client = None
         if self.anthropic_api_key:

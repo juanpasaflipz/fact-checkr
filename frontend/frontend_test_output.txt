@@ -1,0 +1,261 @@
+
+> factcheck-mx-frontend@1.0.0 test
+> vitest src/components/features/claims/__tests__/ClaimCard.test.tsx run
+
+
+[1m[44m DEV [49m[22m [34mv4.0.15 [39m[90m/Users/juan/fact-check-mx/fact-checkr/frontend[39m
+
+ [31m❯[39m src/components/features/claims/__tests__/ClaimCard.test.tsx [2m([22m[2m4 tests[22m[2m | [22m[31m4 failed[39m[2m)[22m[32m 14[2mms[22m[39m
+[31m     [31m×[31m renders claim text correctly[39m[32m 10[2mms[22m[39m
+[31m     [31m×[31m renders verification status[39m[32m 1[2mms[22m[39m
+[31m     [31m×[31m renders explanation[39m[32m 1[2mms[22m[39m
+[31m     [31m×[31m renders source information[39m[32m 1[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 4 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m src/components/features/claims/__tests__/ClaimCard.test.tsx[2m > [22mClaimCard[2m > [22mrenders claim text correctly
+[41m[1m FAIL [22m[49m src/components/features/claims/__tests__/ClaimCard.test.tsx[2m > [22mClaimCard[2m > [22mrenders verification status
+[41m[1m FAIL [22m[49m src/components/features/claims/__tests__/ClaimCard.test.tsx[2m > [22mClaimCard[2m > [22mrenders explanation
+[41m[1m FAIL [22m[49m src/components/features/claims/__tests__/ClaimCard.test.tsx[2m > [22mClaimCard[2m > [22mrenders source information
+[31m[1mError[22m: invariant expected app router to be mounted[39m
+[90m [2m❯[22m useRouter node_modules/next/dist/client/components/navigation.js:[2m136:37[22m[39m
+[36m [2m❯[22m ClaimCard src/components/features/claims/ClaimCard/index.tsx:[2m14:20[22m[39m
+    [90m 12| [39m
+    [90m 13| [39m[35mexport[39m [35mdefault[39m [35mfunction[39m [33mClaimCard[39m({ claim }[33m:[39m [33mClaimProps[39m) {
+    [90m 14| [39m    [35mconst[39m router [33m=[39m [34museRouter[39m()[33m;[39m
+    [90m   | [39m                   [31m^[39m
+    [90m 15| [39m    [35mconst[39m status [33m=[39m claim[33m.[39mverification[33m?.[39mstatus [33m||[39m [32m"Unverified"[39m[33m;[39m
+    [90m 16| [39m    [35mconst[39m config [33m=[39m statusConfig[status][33m;[39m
+[90m [2m❯[22m Object.react_stack_bottom_frame node_modules/react-dom/cjs/react-dom-client.development.js:[2m25904:20[22m[39m
+[90m [2m❯[22m renderWithHooks node_modules/react-dom/cjs/react-dom-client.development.js:[2m7662:22[22m[39m
+[90m [2m❯[22m updateFunctionComponent node_modules/react-dom/cjs/react-dom-client.development.js:[2m10166:19[22m[39m
+[90m [2m❯[22m beginWork node_modules/react-dom/cjs/react-dom-client.development.js:[2m11778:18[22m[39m
+[90m [2m❯[22m runWithFiberInDEV node_modules/react-dom/cjs/react-dom-client.development.js:[2m874:13[22m[39m
+[90m [2m❯[22m performUnitOfWork node_modules/react-dom/cjs/react-dom-client.development.js:[2m17641:22[22m[39m
+[90m [2m❯[22m workLoopSync node_modules/react-dom/cjs/react-dom-client.development.js:[2m17469:41[22m[39m
+[90m [2m❯[22m renderRootSync node_modules/react-dom/cjs/react-dom-client.development.js:[2m17450:11[22m[39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/4]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m4 failed[39m[22m[90m (4)[39m
+[2m   Start at [22m 23:02:35
+[2m   Duration [22m 744ms[2m (transform 72ms, setup 63ms, import 159ms, tests 14ms, environment 397ms)[22m
+
+[1m[41m FAIL [49m[22m [31mTests failed. Watching for file changes...[39m
+       [2mpress [22m[1mh[22m[2m to show help[22m[2m, [22m[2mpress [22m[1mq[22m[2m to quit[22m
+c[3J[1m[44m RERUN [49m[22m [34m[2msrc/components/features/claims/__tests__/ClaimCard.test.tsx [22m[34mx1 [34m[39m
+       [2m Filename pattern: [22m[34msrc/components/features/claims/__tests__/ClaimCard.test.tsx, run[39m
+
+ [31m❯[39m src/components/features/claims/__tests__/ClaimCard.test.tsx [2m([22m[2m4 tests[22m[2m | [22m[31m1 failed[39m[2m)[22m[32m 66[2mms[22m[39m
+[31m     [31m×[31m renders claim text correctly[39m[32m 41[2mms[22m[39m
+     [32m✓[39m renders verification status[32m 6[2mms[22m[39m
+     [32m✓[39m renders explanation[32m 9[2mms[22m[39m
+     [32m✓[39m renders source information[32m 5[2mms[22m[39m
+
+[31m⎯⎯⎯⎯⎯⎯⎯[39m[1m[41m Failed Tests 1 [49m[22m[31m⎯⎯⎯⎯⎯⎯⎯[39m
+
+[41m[1m FAIL [22m[49m src/components/features/claims/__tests__/ClaimCard.test.tsx[2m > [22mClaimCard[2m > [22mrenders claim text correctly
+[31m[1mTestingLibraryElementError[22m[39m: Unable to find an element with the text: Sky is green. This could be because the text is broken up by multiple elements. In this case, you can provide a function for your text matcher to make your matcher more flexible.
+
+Ignored nodes: comments, script, style
+[36m<body>[39m
+  [36m<div>[39m
+    [36m<article[39m
+      [33mclass[39m=[32m"
+      group relative p-6 
+      bg-white 
+      border-l-4 border-l-rose-500
+      border-t border-r border-b border-gray-200
+      transition-all duration-200 
+      hover:shadow-md hover:border-gray-300
+      rounded-lg
+    "[39m
+    [36m>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"flex items-start justify-between gap-4 mb-4"[39m
+      [36m>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"flex items-center gap-3 flex-1 min-w-0"[39m
+        [36m>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"
+          size-10 rounded-lg 
+          bg-gray-100 
+          flex items-center justify-center flex-shrink-0
+          border border-gray-200
+          group-hover:bg-gray-200 transition-colors duration-200
+        "[39m
+          [36m>[39m
+            [36m<svg[39m
+              [33mclass[39m=[32m"size-5 text-gray-600"[39m
+              [33mfill[39m=[32m"none"[39m
+              [33mstroke[39m=[32m"currentColor"[39m
+              [33mviewBox[39m=[32m"0 0 24 24"[39m
+            [36m>[39m
+              [36m<path[39m
+                [33md[39m=[32m"M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"[39m
+                [33mstroke-linecap[39m=[32m"round"[39m
+                [33mstroke-linejoin[39m=[32m"round"[39m
+                [33mstroke-width[39m=[32m"2"[39m
+              [36m/>[39m
+            [36m</svg>[39m
+          [36m</div>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"min-w-0 flex-1"[39m
+          [36m>[39m
+            [36m<p[39m
+              [33mclass[39m=[32m"text-sm text-gray-900 truncate font-semibold"[39m
+            [36m>[39m
+              [0mUser123[0m
+            [36m</p>[39m
+            [36m<p[39m
+              [33mclass[39m=[32m"text-xs text-gray-500"[39m
+            [36m>[39m
+              [0mTwitter[0m
+            [36m</p>[39m
+          [36m</div>[39m
+        [36m</div>[39m
+        [36m<span[39m
+          [33mclass[39m=[32m"
+        inline-flex items-center gap-1.5 px-3 py-1.5 
+        rounded-lg text-xs font-semibold border 
+        bg-rose-50 text-rose-700 border-rose-200 
+        transition-all duration-200
+      "[39m
+        [36m>[39m
+          [36m<svg[39m
+            [33mclass[39m=[32m"size-4"[39m
+            [33mfill[39m=[32m"none"[39m
+            [33mstroke[39m=[32m"currentColor"[39m
+            [33mviewBox[39m=[32m"0 0 24 24"[39m
+          [36m>[39m
+            [36m<path[39m
+              [33md[39m=[32m"M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"[39m
+              [33mstroke-linecap[39m=[32m"round"[39m
+              [33mstroke-linejoin[39m=[32m"round"[39m
+              [33mstroke-width[39m=[32m"2"[39m
+            [36m/>[39m
+          [36m</svg>[39m
+          [0mFalso[0m
+        [36m</span>[39m
+      [36m</div>[39m
+      [36m<h3[39m
+        [33mclass[39m=[32m"text-gray-900 mb-4 line-clamp-2 font-semibold text-lg leading-relaxed"[39m
+      [36m>[39m
+        [0m"[0m
+        [0mSky is green[0m
+        [0m"[0m
+      [36m</h3>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200"[39m
+      [36m>[39m
+        [36m<p[39m
+          [33mclass[39m=[32m"text-xs text-gray-600 mb-2 font-semibold uppercase tracking-wide"[39m
+        [36m>[39m
+          [0mORIGEN[0m
+        [36m</p>[39m
+        [36m<p[39m
+          [33mclass[39m=[32m"text-sm text-gray-700 line-clamp-2 leading-relaxed"[39m
+        [36m>[39m
+          [0mLook at the sky, it is green![0m
+        [36m</p>[39m
+      [36m</div>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"mb-4 p-4 bg-gray-50 rounded-lg border border-gray-200"[39m
+      [36m>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"flex items-center justify-between mb-3"[39m
+        [36m>[39m
+          [36m<p[39m
+            [33mclass[39m=[32m"text-xs text-gray-600 font-semibold uppercase tracking-wide"[39m
+          [36m>[39m
+            [0mANÁLISIS DE FACTCHECKR[0m
+          [36m</p>[39m
+          [36m<div[39m
+            [33mclass[39m=[32m"flex items-center gap-2"[39m
+          [36m>[39m
+            [36m<label[39m
+              [33mclass[39m=[32m"text-xs text-gray-600"[39m
+              [33mfor[39m=[32m"reading-level-123"[39m
+            [36m>[39m
+              [0mNivel:[0m
+            [36m</label>[39m
+            [36m<select[39m
+              [33mclass[39m=[32m"text-xs px-2 py-1 bg-white border border-gray-300 rounded text-gray-700 focus:outline-none focus:ring-1 focus:ring-gray-900"[39m
+              [33mid[39m=[32m"reading-level-123"[39m
+            [36m>[39m
+              [36m<option[39m
+                [33mvalue[39m=[32m"simple"[39m
+              [36m>[39m
+                [0mSimple (ELI12)[0m
+              [36m</option>[39m
+              [36m<option[39m
+                [33mvalue[39m=[32m"normal"[39m
+              [36m>[39m
+                [0mNormal (ELI18)[0m
+              [36m</option>[39m
+              [36m<option[39m
+                [33mvalue[39m=[32m"expert"[39m
+              [36m>[39m
+                [0mExperto[0m
+              [36m</option>[39m
+            [36m</select>[39m
+          [36m</div>[39m
+        [36m</div>[39m
+        [36m<p[39m
+          [33mclass[39m=[32m"text-sm text-gray-700 leading-relaxed"[39m
+        [36m>[39m
+          [0mSky is actually blue.[0m
+        [36m</p>[39m
+      [36m</div>[39m
+      [36m<div[39m
+        [33mclass[39m=[32m"mt-4"[39m
+      [36m>[39m
+        [36m<p[39m
+          [33mclass[39m=[32m"text-xs text-gray-600 mb-3 font-semibold uppercase tracking-wide"[39m
+        [36m>[39m
+          [0mFUENTES[0m
+        [36m</p>[39m
+        [36m<div[39m
+          [33mclass[39m=[32m"space-y-3"[39m
+        [36m/>[39m
+      [36m</div>[39m
+    [36m</article>[39m
+  [36m</div>[39m
+[36m</body>[39m
+[90m [2m❯[22m Object.getElementError node_modules/@testing-library/dom/dist/config.js:[2m37:19[22m[39m
+[90m [2m❯[22m node_modules/@testing-library/dom/dist/query-helpers.js:[2m76:38[22m[39m
+[90m [2m❯[22m node_modules/@testing-library/dom/dist/query-helpers.js:[2m52:17[22m[39m
+[90m [2m❯[22m node_modules/@testing-library/dom/dist/query-helpers.js:[2m95:19[22m[39m
+[36m [2m❯[22m src/components/features/claims/__tests__/ClaimCard.test.tsx:[2m43:23[22m[39m
+    [90m 41| [39m    [34mit[39m([32m'renders claim text correctly'[39m[33m,[39m () [33m=>[39m {
+    [90m 42| [39m        [34mrender[39m([33m<[39m[33mClaimCard[39m [33mclaim[39m[33m=[39m[33m{[39mmockClaim [35mas[39m any[33m}[39m [33m/[39m[33m>[39m)[33m;[39m
+    [90m 43| [39m        [34mexpect[39m(screen[33m.[39m[34mgetByText[39m([32m'Sky is green'[39m))[33m.[39m[34mtoBeInTheDocument[39m()[33m;[39m
+    [90m   | [39m                      [31m^[39m
+    [90m 44| [39m    })[33m;[39m
+    [90m 45| [39m
+
+[31m[2m⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯[22m[39m
+
+
+[2m Test Files [22m [1m[31m1 failed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[31m1 failed[39m[22m[2m | [22m[1m[32m3 passed[39m[22m[90m (4)[39m
+[2m   Start at [22m 23:02:51
+[2m   Duration [22m 323ms
+
+[1m[41m FAIL [49m[22m [31mTests failed. Watching for file changes...[39m
+       [2mpress [22m[1mh[22m[2m to show help[22m[2m, [22m[2mpress [22m[1mq[22m[2m to quit[22m
+c[3J[1m[44m RERUN [49m[22m [34m[2msrc/components/features/claims/__tests__/ClaimCard.test.tsx [22m[34mx2 [34m[39m
+       [2m Filename pattern: [22m[34msrc/components/features/claims/__tests__/ClaimCard.test.tsx, run[39m
+
+ [32m✓[39m src/components/features/claims/__tests__/ClaimCard.test.tsx [2m([22m[2m4 tests[22m[2m)[22m[32m 44[2mms[22m[39m
+
+[2m Test Files [22m [1m[32m1 passed[39m[22m[90m (1)[39m
+[2m      Tests [22m [1m[32m4 passed[39m[22m[90m (4)[39m
+[2m   Start at [22m 23:03:51
+[2m   Duration [22m 315ms
+
+[1m[42m PASS [49m[22m [32mWaiting for file changes...[39m
+       [2mpress [22m[1mh[22m[2m to show help[22m[2m, [22m[2mpress [22m[1mq[22m[2m to quit[22m

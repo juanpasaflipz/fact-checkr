@@ -1,6 +1,6 @@
 """Utility functions for authentication, subscriptions, and usage tracking"""
 import bcrypt
-import os
+from app.core.config import settings
 import re
 from datetime import datetime, timedelta
 from typing import Optional
@@ -22,10 +22,10 @@ def get_redis_url() -> str:
         Redis connection URL string
     """
     # Check for REDIS_PUBLIC_URL first (this is what Railway warns about)
-    redis_public_url = os.getenv("REDIS_PUBLIC_URL")
+    redis_public_url = settings.REDIS_PUBLIC_URL
     if redis_public_url:
         # REDIS_PUBLIC_URL uses public endpoint - switch to private
-        railway_private_domain = os.getenv("RAILWAY_PRIVATE_DOMAIN")
+        railway_private_domain = settings.RAILWAY_PRIVATE_DOMAIN
         if railway_private_domain:
             # Extract port and database from public URL
             port_match = re.search(r':(\d+)', redis_public_url)
@@ -37,11 +37,11 @@ def get_redis_url() -> str:
             # Use Railway's private internal domain (no egress fees)
             return f"redis://redis.railway.internal:{port}/{db}"
     
-    redis_url = os.getenv("REDIS_URL", "redis://localhost:6379/0")
+    redis_url = settings.REDIS_URL
     
-    # Check if we're on Railway and using a public endpoint
-    railway_private_domain = os.getenv("RAILWAY_PRIVATE_DOMAIN")
-    railway_tcp_proxy = os.getenv("RAILWAY_TCP_PROXY_DOMAIN")
+    # Check for Railway internal networking
+    railway_private_domain = settings.RAILWAY_PRIVATE_DOMAIN
+    railway_tcp_proxy = settings.RAILWAY_TCP_PROXY_DOMAIN
     
     # If on Railway and REDIS_URL contains public endpoint, switch to private
     if railway_private_domain and railway_tcp_proxy:

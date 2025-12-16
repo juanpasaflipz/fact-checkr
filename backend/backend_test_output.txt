@@ -1,0 +1,67 @@
+============================= test session starts ==============================
+platform darwin -- Python 3.13.5, pytest-9.0.2, pluggy-1.6.0
+rootdir: /Users/juan/fact-check-mx/fact-checkr/backend
+plugins: anyio-4.12.0
+collected 2 items
+
+tests/test_verification_flow.py FF                                       [100%]
+
+=================================== FAILURES ===================================
+______________________ test_verification_flow_integration ______________________
+async def functions are not natively supported.
+You need to install a suitable plugin for your async framework, for example:
+  - anyio
+  - pytest-asyncio
+  - pytest-tornasync
+  - pytest-trio
+  - pytest-twisted
+____________________ test_verification_flow_skip_irrelevant ____________________
+async def functions are not natively supported.
+You need to install a suitable plugin for your async framework, for example:
+  - anyio
+  - pytest-asyncio
+  - pytest-tornasync
+  - pytest-trio
+  - pytest-twisted
+=============================== warnings summary ===============================
+app/database/models.py:9
+  /Users/juan/fact-check-mx/fact-checkr/backend/app/database/models.py:9: MovedIn20Warning: The ``declarative_base()`` function is now available as sqlalchemy.orm.declarative_base(). (deprecated since: 2.0) (Background on SQLAlchemy 2.0 at: https://sqlalche.me/e/b8d9)
+    Base = declarative_base()
+
+app/schemas.py:70
+  /Users/juan/fact-check-mx/fact-checkr/backend/app/schemas.py:70: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class MarketSummary(BaseModel):
+
+app/schemas.py:85
+  /Users/juan/fact-check-mx/fact-checkr/backend/app/schemas.py:85: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class MarketDetail(BaseModel):
+
+app/schemas.py:137
+  /Users/juan/fact-check-mx/fact-checkr/backend/app/schemas.py:137: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class MarketProposalResponse(BaseModel):
+
+app/schemas.py:154
+  /Users/juan/fact-check-mx/fact-checkr/backend/app/schemas.py:154: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class UserPerformanceResponse(BaseModel):
+
+app/schemas.py:168
+  /Users/juan/fact-check-mx/fact-checkr/backend/app/schemas.py:168: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class MarketNotificationResponse(BaseModel):
+
+app/schemas.py:209
+  /Users/juan/fact-check-mx/fact-checkr/backend/app/schemas.py:209: PydanticDeprecatedSince20: Support for class-based `config` is deprecated, use ConfigDict instead. Deprecated in Pydantic V2.0 to be removed in V3.0. See Pydantic V2 Migration Guide at https://errors.pydantic.dev/2.12/migration/
+    class LeaderboardEntry(BaseModel):
+
+tests/test_verification_flow.py:20
+  /Users/juan/fact-check-mx/fact-checkr/backend/tests/test_verification_flow.py:20: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+tests/test_verification_flow.py:108
+  /Users/juan/fact-check-mx/fact-checkr/backend/tests/test_verification_flow.py:108: PytestUnknownMarkWarning: Unknown pytest.mark.asyncio - is this a typo?  You can register custom marks to avoid this warning - for details, see https://docs.pytest.org/en/stable/how-to/mark.html
+    @pytest.mark.asyncio
+
+-- Docs: https://docs.pytest.org/en/stable/how-to/capture-warnings.html
+=========================== short test summary info ============================
+FAILED tests/test_verification_flow.py::test_verification_flow_integration - ...
+FAILED tests/test_verification_flow.py::test_verification_flow_skip_irrelevant
+======================== 2 failed, 9 warnings in 1.36s =========================

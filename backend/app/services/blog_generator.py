@@ -2,7 +2,7 @@
 Blog Article Generator Service
 Generates AI-powered blog articles from fact-checking data analytics
 """
-import os
+from app.core.config import settings
 import json
 import re
 import logging
@@ -20,7 +20,7 @@ from app.agents import FactChecker
 logger = logging.getLogger(__name__)
 
 # Free tier article limit
-FREE_TIER_ARTICLE_LIMIT = int(os.getenv("BLOG_FREE_TIER_LIMIT", "3"))
+FREE_TIER_ARTICLE_LIMIT = settings.BLOG_FREE_TIER_LIMIT
 
 
 class BlogArticleGenerator:
@@ -616,7 +616,7 @@ class BlogArticleGenerator:
         edition_number = (last_edition.edition_number + 1) if last_edition and last_edition.edition_number else 1
         
         # Check if auto-publish is enabled
-        auto_publish = os.getenv("AUTO_PUBLISH_BLOG", "false").lower() == "true"
+        auto_publish = settings.AUTO_PUBLISH_BLOG
         
         article = BlogArticle(
             title=title,

@@ -3,7 +3,12 @@ from datetime import datetime
 from app.core.whatsapp_utils import format_claim_for_whatsapp
 from app.database.models import Claim, VerificationStatus
 
-def test_format_claim_verified():
+from unittest import mock
+import os
+
+@mock.patch("app.core.whatsapp_utils.settings")
+def test_format_claim_verified(mock_settings):
+    mock_settings.get_frontend_url.return_value = "https://factcheck.mx"
     claim = Claim(
         id=1,
         claim_text="El cielo es azul",
